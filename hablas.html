@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html lang=""en">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.1.5/jszip.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/epubjs/dist/epub.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700&family=Roboto:wght@400;700&family=Quicksand:wght@400;700&family=Montserrat:wght@400;700&display=swap" rel="stylesheet"> <!-- Include Lato, Roboto, and Montserrat fonts -->
+
+
+<style>
+    body {
+        background-color:  #a9d1d7;
+        margin: 1%;
+        overflow: hidden;
+        width: 99vw; 
+        height: 90vh;
+        justify-content:center;
+        align-items: center; 
+
+        }
+    #input_sentence {
+        
+        margin-top:2%;
+        
+    }
+    div {
+        padding: 0.5%;
+        
+    }
+    
+    #title {
+        font-size: 1.9em;
+        font-family: 'Quicksand', sans-serif;
+        font-weight: 600;
+        color:white; 
+        padding: 1%;
+        text-align: left;
+        display: flex;
+    }
+
+    #div2viewer {
+        margin: auto;
+        font-family: 'Roboto', sans-serif;
+        font-weight: 300;
+        background-color: #f9f9f9; /* Light background color */
+        border: 1px solid #ccc; /* Light grey border */
+        border-radius: 10px; /* Rounded corners */
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1); /* Subtle shadow for depth */
+        max-width: 800px; /* Maximum width */
+        width: 90%; /* Full width */
+        height: 70%; /* Automatic height */
+        background-blend-mode: overlay; /* Blend texture with background color */
+        padding: auto;
+        
+    }
+
+    #div2viewer:hover {
+        box-shadow: 0 6px 15px rgba(0, 0, 0, 0.2); /* Darker shadow on hover */
+    }
+
+    #div3 {
+        
+        font-family: 'Monserrat', sans-serif;
+        font-weight: 300;
+        padding: auto;
+        margin: auto;
+	width:90%;
+    }
+    #file-input {
+        display: none;
+    }
+    #wrong {
+        color: red;
+    }
+    #viewer {
+        width: auto;
+        height: 100%;
+        border: 1px solid #ccc;
+        overflow: auto;
+    }
+
+    #navigation {
+        display: none;
+    }
+
+    .movingBtns {
+        background-color: #A9A9A9;
+        color: white; /* White text */
+        border: none; /* Remove border */
+        border-radius: 5px; /* Rounded corners */
+        padding: 10px 20px; /* Padding */
+        text-align: center; /* Center text */
+        text-decoration: none; /* Remove underline */
+        display: inline-block; /* Inline-block for spacing */
+        font-size: 16px; /* Font size */
+        margin: 10px 2px; /* Margin around buttons */
+        cursor: pointer;
+        transition: background-color 0.3s,
+    
+    }
+    .movingBtns:hover {
+        
+        background-color:  #8c8b8b;
+        transition: all 0.3s ease;  /* Smooth transition for all changes */
+        transform: translateX(3.5%);
+    }
+ 
+    #file {
+        display: flex;
+        background-color: #4588a0; 
+        font-family: 'Roboto', sans-serif;
+        color: white; /* White text */
+        border: none; /* Remove border */
+        border-radius: 5px; /* Rounded corners */
+        padding: 10px 20px; /* Padding */
+        font-size: 16px; /* Font size */
+        cursor: pointer; /* Pointer cursor on hover */
+        transition: background-color 0.3s; /* Smooth transition */
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2); /* Shadow for depth */
+        width: 25%;
+        
+    }
+    img {
+            max-width: 25%; /* Ensure the image is responsive */
+            height: auto; /* Maintain aspect ratio */
+            display: block; /* Ensure the image is treated as a block element */
+            margin: auto auto; /* Center the image */
+    }
+
+    #settings {
+        float:right;
+        height:10vh;
+        margin-right: 0; 
+        padding: 1%;
+        cursor: pointer;
+    }
+    
+    #top-popout{
+        display: flex;
+    }
+    .modal {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 90%;
+        height: 70%;
+        background-color: rgba(0,0,0,0.4); 
+    }
+    .modal-content {
+        position: relative; /* Makes this element a positioning context for its children
+        Any child with position: absolute will be positioned relative to this element
+        Like creating a coordinate system inside this element */
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        /* Makes flex items stack vertically instead of horizontally*/
+        background-color: #fefefe;
+        margin: 15% auto;
+        padding: 20px;
+        border: 1px solid #888;
+        width: 80%;
+        position: relative;
+        font-family: 'Roboto', sans-serif;
+    }
+
+    .close {
+        margin-left: auto;
+        order:2;
+        cursor: pointer;
+    }
+    #actionButtons {
+        display: flex; /*if i dont put this, the buttons will be in a column*/ 
+        flex-direction:row;
+        height:30%;
+    
+    }
+
+    #actionButtons img {
+        flex:1 ; 
+        cursor: pointer    /* Changes mouse cursor to a hand when hovering */
+        /*padding: 5px 10px; */ /* Adds space inside each arrow (5px top/bottom, 10px left/right) */
+    }
+        
+    .text-container {
+        flex: 9; /* Takes up all available space in the flex container */
+        overflow-y: auto; /* Adds vertical scroll when content is too tall */
+        padding: 20px;
+        margin-bottom: 60px;
+    }
+
+    .darkerGrey {
+        background-color: #A76D9A;
+    }
+
+    .darkerGrey:hover {
+        background-color: #7a4e70;
+    }
+
+    #fileInput{
+        display: none;
+        visibility: hidden;
+    }
+    
+    .drawer {
+        height: 100%;
+        width: 30%;
+        background-color: #e9f0f3;
+        transition: transform 0.3s ease;
+        right: 0;
+        top: 0;
+        box-shadow: -2px 0 5px rgba(0,0,0,0.2);
+        font-family: 'Quicksand', sans-serif;
+        position: fixed; /*fixed position means that it will stay in the same place even if you scroll*/
+        overflow-x: hidden; /*prevents horizontal scrolling*/
+        z-index: 999; /*ensure drawer is above other elements*/
+        transform: translateX(100%);
+    }
+
+    .drawer.open {
+        transform: translateX(0);
+    }
+
+    .options {
+        margin-bottom: 7%;
+        cursor: pointer;
+    }
+    .options:hover {
+        background-color:  #a9d1d7;
+        transition: all 0.3s ease;  /* Smooth transition for all changes */
+        transform: translateX(3.5%);
+        border-radius: 7%; 
+        padding: 1%;
+        margin-right: 7%;
+    }
+
+    #language-select {
+        display: flex;
+        background-color:rgb(225, 242, 253);
+        color:  #4588a0;;
+        border: none;
+        border-radius: 1%;
+        padding: auto;
+        font-size: 1em;
+        cursor: pointer;
+        transition: background-color 0.3s;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+    }
+    /* Style for the options in the dropdown */
+    #language-select option {
+        background-color: white;
+        color: #4588a0;
+        padding: 10px;
+        font-family: 'Roboto', sans-serif;
+    }
+    /* Optional hover effect */
+    #language-select:hover {
+        background-color: #3a7286;
+    }
+
+</style>
+<body>
+    
+    <div id="title">
+        <p>Hablas</p>
+        <img src="settings.png" id="settings"/> 
+    </div>
+    
+    <div id="div2viewer">
+        <div id="viewer"></div> 
+    </div>
+
+    <div id="div3">
+        
+         <div id="file">
+            <img src="upload-icon-white.png" alt="upload symbol" />
+            <img src="epub-icon-white.png" alt="upload symbol" />
+        </div>
+    </div>
+
+    <input type="file" id="fileInput" accept=".epub"/>
+     
+    <div id="settings-drawer" class="drawer">
+            <span id="close-drawer" class="close">&times;</span>
+            <h2>Settings</h2>
+            <div id="settings-options">
+                <div id="log-in" class="options">Log in/sign up</div>
+                <div id="available-books" class="options">Available books</div>
+                <div id="languages" class="options">Languages</div>
+            </div>
+    </div><
+
+    <div id="myModal" class="modal"> 
+        <div class="modal-content"> 
+            <div id="top-popout">
+                <select id="language-select">
+                    <option value="en">English</option>
+                    <option value="fr">French</option>
+                    <option value="sp">Spanish</option>
+                    <option value="it">Italian</option>
+                    <option value="de">German</option>
+                
+                </select>
+                <span class="close">&times;</span> 
+            </div>
+
+            <div class="text-container">
+                <div id="selectedText"></div>
+            </div>
+
+            <div id="return_sentence"></div>
+
+            <div id="actionButtons">
+
+                        <img class="arrowPrev" src="arrow-left.png" alt="prev--arrow" />
+                        <img id="record" src="recordingButton.png" alt="record icon"/>
+                        <img class="arrowNext" src="arrow-right.png" alt="next--arrow" />
+            </div>
+        </div>
+    </div>
+
+<div id="navigation">
+    
+    <button id="prev" class="movingBtns">Previous</button>
+    <button id="next" class="movingBtns">Next</button>
+    <button id="select" class="movingBtns darkerGrey" >Select this paragraph</button>
+    
+</div>
+
+<script>
+    const fileInput = document.getElementById('fileInput');
+    fileInput.style.display= "none";
+    let currentBook = null;
+    let rendition = null;
+    let selectedText = null;
+    let lines = null; 
+    let lineNum = 0;
+    let language = "";
+    let isRecording = false; //booleag flag
+
+    let mediaRecorder; 
+    let audioChunks = []; //buffer
+
+    const modalDiv = document.getElementById('myModal');
+    const closeBtn = document.getElementsByClassName('close')[0];
+    
+    const selectDiv = document.getElementById('selectedText');
+    const prevArrowBtn = document.getElementsByClassName('arrowPrev')[0];
+    const nextArrowBtn = document.getElementsByClassName('arrowNext')[0];
+    const returnSentenceDiv = document.getElementById('return_sentence');
+    const languageSel =document.getElementById('language-select');
+    const navigationDiv = document.getElementById('navigation');
+    const fileDiv = document.getElementById("file");
+
+    const nextPageBtn = document.getElementById('next');
+    const prevPageBtn = document.getElementById('prev');
+    const selectBtn = document.getElementById('select');
+
+    const settingsBtn = document.getElementById ("settings");
+    const drawer = document.getElementById('settings-drawer');
+    const closeDrawerBtn = document.getElementById('close-drawer');
+    const availableBooksBtn = document.getElementById('available-books');
+
+    const recordBtn = document.getElementById('record'); 
+    
+    const abbreviations = [
+        'Mr.', 'Mrs.', 'Ms.', 'Dr.', 'Prof.',
+        'Sr.', 'Jr.', 'etc.', 'e.g.', 'i.e.', '."'
+    ];
+    let socket; // Declare socket variable. Built-in object of js
+
+    // Separate function for epub rendering
+    function renderEpub(file) {
+        currentBook = ePub(file);
+        viewer.innerHTML = "";
+        rendition = currentBook.renderTo("viewer", {
+            height: "100%",
+            allowScriptedContent: true,
+            script: true,
+            sandbox: "allow-same-origin allow-scripts allow-popups",
+            spread: "none"
+        });
+        
+        rendition.display();
+        navigationDiv.style.display = 'block';
+        fileDiv.style.display = "none";
+    }
+    async function createBlobAndConnect() {
+        // Assuming you have the logic to create the blob here
+        const audioBlob = new Blob(audioChunks, { type: 'audio/wav' }); // Create the blob
+
+        // Now establish the WebSocket connection
+        socket = new WebSocket('wss://carriertech.uk:8675'); // Create the WebSocket connection
+
+        // WebSocket event handlers
+        socket.addEventListener('open', () => {
+            //console.log('WebSocket connection established');
+            // You can send the blob or any other data here if needed
+            const reader = new FileReader(); //fileReader instance to manipulate the blob
+            reader.onloadend = function() {  //it's like an "instruction for the future". When you have data (blob) and you finish loading, this is what you would have to do 
+                // The result will be a data URL, so we split to get the Base64 part
+                const base64Blob = reader.result;
+                const dataToSend = {
+                    name: "John Doe",
+                    age: 30,
+                    language: languageSel.value, 
+                    blob:base64Blob,
+                    sentence:lines[lineNum]
+                };
+                socket.send(JSON.stringify(dataToSend)); // Send data (turning json object into string) after connection is established
+            };
+            reader.readAsDataURL(audioBlob); // Read the blob as a data URL
+            audioChunks=[];
+        });
+
+        socket.addEventListener('message', (event) => {
+            //actual message/data received from the WebSocket server (stringfy json)
+            const msg = JSON.parse(event.data);
+
+            if (msg.hasOwnProperty('pred_sentence')) {
+                returnSentenceDiv.innerHTML = msg.pred_sentence;
+            }
+            //returnSentenceDiv.textContent = event.data; // Display message from server. ex: "an audio has been received"
+        });
+
+        socket.addEventListener('close', () => {
+            console.log('WebSocket connection closed');
+        });
+
+        socket.addEventListener('error', (error) => {
+            console.error('WebSocket error:', error);
+        });
+    }
+    // Separate function for text extraction
+    function extractVisibleText() {
+        console.log("extractVisibleText called");
+        const location = rendition.currentLocation();
+        console.log("Current location:", location);
+
+        const makeRangeCfi = (a, b) => {
+                const CFI = new ePub.CFI()
+                const start = CFI.parse(a), end = CFI.parse(b)
+                const cfi = {
+                    range: true,
+                    base: start.base,
+                    path: {
+                        steps: [],
+                        terminal: null
+                    },
+                    start: start.path,
+                    end: end.path
+                }
+                const len = cfi.start.steps.length
+                for (let i = 0; i < len; i++) {
+                    if (CFI.equalStep(cfi.start.steps[i], cfi.end.steps[i])) {
+                        if (i == len - 1) {
+                            if (cfi.start.terminal === cfi.end.terminal) {
+                                cfi.path.steps.push(cfi.start.steps[i])
+                                cfi.range = false
+                            }
+                        } else cfi.path.steps.push(cfi.start.steps[i])
+                    } else break
+                }
+                cfi.start.steps = cfi.start.steps.slice(cfi.path.steps.length)
+                cfi.end.steps = cfi.end.steps.slice(cfi.path.steps.length)
+
+                return 'epubcfi(' + CFI.segmentString(cfi.base)
+                    + '!' + CFI.segmentString(cfi.path)
+                    + ',' + CFI.segmentString(cfi.start)
+                    + ',' + CFI.segmentString(cfi.end)
+                    + ')'
+            }
+
+        if (location && location.start && location.end) {
+            const rangeCfi = makeRangeCfi(location.start.cfi, location.end.cfi);
+            console.log("Range CFI created:", rangeCfi);
+            
+            currentBook.getRange(rangeCfi)
+                .then(range => {
+                    selectedText = range.toString();
+                    console.log("Raw selected text:", selectedText);
+                    
+                    // Clean up text
+                    selectedText = cleanText(selectedText);
+                    console.log("Cleaned selected text:", selectedText);
+                    
+                    lines = selectedText.split('.');
+                    console.log("Lines array:", lines);
+                    console.log("Number of lines:", lines.length);
+                })
+                .catch(error => console.error('Error getting range:', error));
+        } else {
+            console.log("Location is invalid:", location);
+        }
+    }
+
+    // Separate text cleaning function
+    function cleanText(text) {
+        const regexMatch = /[A-Z]\./g;
+        text = text.replace(regexMatch, match => match.replace('.', ''));
+        
+        abbreviations.forEach(abbr => {
+            let clean = abbr.replaceAll(".", "");
+            text = text.replaceAll(abbr, clean);
+        });
+        
+        return text;
+    }
+
+    // Event listener becomes much simpler
+    availableBooksBtn.addEventListener('click', () => {
+        const file = "./LePetitPrince.epub";
+        renderEpub(file);
+        
+        // Set up navigation
+        rendition.on('rendered', extractVisibleText);
+        
+        document.getElementById('prev').addEventListener('click', () => {
+            rendition.prev().then(extractVisibleText);
+        });
+        
+        document.getElementById('next').addEventListener('click', () => {
+            rendition.next().then(extractVisibleText);
+        });
+    });
+
+    recordBtn.addEventListener('click', async () => { //standarised procedure 
+        if (!isRecording) {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true }); //built-in function of mozilla to get the media of the user
+            mediaRecorder = new MediaRecorder(stream); //object pre-built
+            
+            mediaRecorder.ondataavailable = event => { //event = the object has changed in some way. every ms that you talk and it gets saved in the array
+                audioChunks.push(event.data);  //saving the audio into an array
+            };
+
+            mediaRecorder.start();
+            recordBtn.src = "stopRecButton.png";
+            //socket.send(JSON.stringify({ event: 'start' })); // Notify server that recording has started
+            isRecording=true;
+
+         } else {   //this means that isRecording==true;
+            mediaRecorder.stop(); 
+            isRecording=false;
+            recordBtn.src = "recordingButton.png";
+         }        
+        mediaRecorder.onstop = () => {
+            createBlobAndConnect(); // Call the function to create the blob and connect
+            //socket.send(JSON.stringify({ event: 'stop' })); // Notify server that recording has stopped
+        };
+
+       
+    });
+
+
+    prevArrowBtn.addEventListener('click', () => {
+        console.log("prev arrrow button clicked")
+            if (lineNum <= 0) {
+                // Do nothing when at the start
+            } else {
+                lineNum--;
+                selectDiv.innerHTML = lines[lineNum];
+            }
+        });
+
+    nextArrowBtn.addEventListener('click',() => {
+            console.log(`clicked on nextArrowBtn. line number: ${lineNum}`);
+            if (lineNum == lines.length-1) {
+            
+            } else {
+                lineNum++;
+                selectDiv.innerHTML=lines[lineNum];
+            }
+            
+        })
+
+    selectBtn.addEventListener('click', () => {
+        console.log("Select button clicked");
+        console.log("Current rendition:", rendition);
+        
+        if (!rendition) { 
+            alert('Please load an EPUB file first');
+            return;
+        }
+        
+        modalDiv.style.display = "block"; //
+        //selectDiv.innerHTML=selectedText;
+        console.log(lines);
+        console.log(lineNum); 
+        selectDiv.innerHTML=lines[lineNum];
+
+    });
+
+    closeBtn.addEventListener('click', (event) => {
+        modalDiv.style.display = "none"; 
+        lineNum=0;
+
+    });
+
+    // Close modal when clicking outside
+    window.addEventListener('click',(event)=> {
+        if (event.target==modalDiv) {
+            modalDiv.style.display = "none";
+        }
+    });
+
+    fileInput.addEventListener('change', async (event) => { //change=file selected
+        const file = event.target.files[0]; //the element that triggered the event (the file input)
+        if (file) {
+            renderEpub(file);
+        }
+    });
+
+    fileDiv.addEventListener('click',()=> {
+        fileInput.click();
+    })
+
+    settingsBtn.addEventListener('click',()=> {
+    
+        drawer.classList.add('open');
+    });
+
+    closeDrawerBtn.addEventListener('click', () => {
+        drawer.classList.remove('open');
+    });
+
+    window.addEventListener('click', (event) => {
+        if (!drawer.contains(event.target) && event.target !== settingsBtn) {
+            drawer.classList.remove('open');
+        }
+    });
+
+    nextPageBtn.addEventListener('click', () => {
+        console.log("nextPageBtn clicked");
+        if (rendition) { //if an epub is loaded
+            rendition.next().then(extractVisibleText); //next is a method from epub.js to go to the next page
+        }
+    })
+
+    prevPageBtn.addEventListener('click',() =>{
+        console.log("prevPageBtn clicked");
+        if (rendition){
+            rendition.prev().then(extractVisibleText);
+        }
+    } )
+
+</script>
+
