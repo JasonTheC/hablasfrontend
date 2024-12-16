@@ -216,7 +216,9 @@
         z-index: 999; /*ensure drawer is above other elements*/
         transform: translateX(100%);
     }
-
+    .drawer .close{s
+        transform: translateX(100%);
+    }
     .drawer.open {
         transform: translateX(0);
     }
@@ -257,15 +259,85 @@
     #language-select:hover {
         background-color: #3a7286;
     }
+    #books-grid {
+        display: flex;
+        flex-direction: column; /* Stack items vertically */
+        padding: 20px;
+        max-height: 70vh; /* Limits height to enable scrolling */
+        overflow-y: auto; /* Adds vertical scrollbar */
+        overflow-x: hidden; /* Prevents horizontal scrolling */
+    }
 
+    .language-section {
+        margin-bottom: 30px;
+        width: 100%;
+    }
+
+    .books-container {
+        display: flex;
+        flex-direction: column; /* Stack books vertically */
+        gap: 15px;
+        padding: 10px;
+    }
+
+    .book {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 10px;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        transition: transform 0.2s;
+        background-color: white;
+        width: 100%;
+    }
+
+    .book:hover {
+        transform: scale(1.05);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+
+    .book img {
+        width: 120px;
+        height: 160px;
+        object-fit: cover;
+        border-radius: 5px;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    }
+
+    .book-title {
+        margin-top: 10px;
+        font-family: 'Quicksand', sans-serif;
+        font-size: 0.9em;
+        text-align: center;
+    }
+
+    /* Style the scrollbar */
+    #books-grid::-webkit-scrollbar {
+        width: 8px;
+    }
+
+    #books-grid::-webkit-scrollbar-track {
+        background: #f1f1f1;
+        border-radius: 4px;
+    }
+
+    #books-grid::-webkit-scrollbar-thumb {
+        background: #888;
+        border-radius: 4px;
+    }
+
+    #books-grid::-webkit-scrollbar-thumb:hover {
+        background: #555;
+    }
 </style>
 <body>
     
     <div id="title">
         <p>Hablas</p>
-        <img src="settings.png" id="settings"/> 
+        <img src="images/settings.png" id="settings"/> 
     </div>
-    
+
     <div id="div2viewer">
         <div id="viewer"></div> 
     </div>
@@ -273,8 +345,8 @@
     <div id="div3">
         
          <div id="file">
-            <img src="upload-icon-white.png" alt="upload symbol" />
-            <img src="epub-icon-white.png" alt="upload symbol" />
+            <img src="images/upload-icon-white.png" alt="upload symbol" />
+            <img src="images/epub-icon-white.png" alt="upload symbol" />
         </div>
     </div>
 
@@ -294,11 +366,11 @@
         <div class="modal-content"> 
             <div id="top-popout">
                 <select id="language-select">
-                    <option value="en">English</option>
-                    <option value="fr">French</option>
-                    <option value="sp">Spanish</option>
-                    <option value="it">Italian</option>
-                    <option value="de">German</option>
+                    <option value="en">english</option>
+                    <option value="fr">francais</option>
+                    <option value="sp">espagnol</option>
+                    <option value="it">italiano</option>
+                    <option value="de">deutsch</option>
                 
                 </select>
                 <span class="close">&times;</span> 
@@ -312,9 +384,9 @@
 
             <div id="actionButtons">
 
-                        <img class="arrowPrev" src="arrow-left.png" alt="prev--arrow" />
-                        <img id="record" src="recordingButton.png" alt="record icon"/>
-                        <img class="arrowNext" src="arrow-right.png" alt="next--arrow" />
+                        <img class="arrowPrev" src="images/arrow-left.png" alt="prev--arrow" />
+                        <img id="record" src="images/recordingButton.png" alt="record icon"/>
+                        <img class="arrowNext" src="images/arrow-right.png" alt="next--arrow" />
             </div>
         </div>
     </div>
@@ -326,6 +398,14 @@
     <button id="select" class="movingBtns darkerGrey" >Select this paragraph</button>
     
 </div>
+
+<div id="books-modal" class="modal">
+    <div class="modal-content">
+        <span class="close">&times;</span>
+        <div id="books-grid"></div>
+    </div>
+</div>
+
 
 <script>
     const fileInput = document.getElementById('fileInput');
@@ -368,7 +448,101 @@
         'Sr.', 'Jr.', 'etc.', 'e.g.', 'i.e.', '."'
     ];
     let socket; // Declare socket variable. Built-in object of js
+    const booksModal = document.getElementById('books-modal');
 
+availableBooksBtn.addEventListener('click', async () => {
+    try {
+        const response = await fetch('hablas-api.php');
+        const books = await response.json();
+        
+        const booksGrid = document.getElementById('books-grid');
+        booksGrid.innerHTML = '';
+        
+        // Group books by language
+        const booksByLanguage = books.reduce((acc, book) => {
+            if (!acc[book.language]) {
+                acc[book.language] = [];
+            }
+            acc[book.language].push(book);
+            return acc;
+        }, {});
+        
+        // Update language-select options
+        const languageSelect = document.getElementById('language-select');
+        languageSelect.innerHTML = ''; // Clear existing options
+        
+        // Add options for each available language
+        Object.keys(booksByLanguage).forEach(language => {
+            const option = document.createElement('option');
+            const languageMap = {
+                'english': 'en',
+                'french': 'fr',
+                'spanish': 'sp',
+                'italian': 'it',
+                'german': 'de'
+            };
+            option.value = languageMap[language.toLowerCase()] || language.toLowerCase();
+            option.textContent = language.charAt(0).toUpperCase() + language.slice(1);
+            languageSelect.appendChild(option);
+        });
+
+        // Rest of your existing code for creating the books grid...
+        Object.entries(booksByLanguage).forEach(([language, languageBooks]) => {
+            // Create language section
+            const languageSection = document.createElement('div');
+            languageSection.className = 'language-section';
+            
+            // Add language header
+            const languageHeader = document.createElement('h2');
+            languageHeader.textContent = language.charAt(0).toUpperCase() + language.slice(1);
+            languageSection.appendChild(languageHeader);
+            
+            // Create books container for this language
+            const booksContainer = document.createElement('div');
+            booksContainer.className = 'books-container';
+            
+            // Add books for this language
+            languageBooks.forEach(book => {
+                const bookElement = document.createElement('div');
+                bookElement.className = 'book';
+                
+                const img = document.createElement('img');
+                img.src = book.cover;
+                img.alt = book.filename;
+                
+                const title = document.createElement('div');
+                title.className = 'book-title';
+                title.textContent = book.filename.replace('.epub', '');
+                
+                bookElement.appendChild(img);
+                bookElement.appendChild(title);
+                
+                // Add click event to load the book
+                bookElement.addEventListener('click', () => {
+                    renderEpub(book.path);
+                    booksModal.style.display = 'none';
+                });
+                
+                booksContainer.appendChild(bookElement);
+            });
+            
+            languageSection.appendChild(booksContainer);
+            booksGrid.appendChild(languageSection);
+        });
+        
+        booksModal.style.display = 'block';
+        drawer.classList.remove('open');
+    } catch (error) {
+        console.error('Error loading books:', error);
+    }
+});
+
+// Close books modal
+document.querySelectorAll('.modal .close').forEach(closeBtn => {
+    closeBtn.addEventListener('click', () => {
+        closeBtn.closest('.modal').style.display = 'none';
+    });
+});
     // Separate function for epub rendering
     function renderEpub(file) {
         currentBook = ePub(file);
@@ -507,22 +681,7 @@
         return text;
     }
 
-    // Event listener becomes much simpler
-    availableBooksBtn.addEventListener('click', () => {
-        const file = "./LePetitPrince.epub";
-        renderEpub(file);
-        
-        // Set up navigation
-        rendition.on('rendered', extractVisibleText);
-        
-        document.getElementById('prev').addEventListener('click', () => {
-            rendition.prev().then(extractVisibleText);
-        });
-        
-        document.getElementById('next').addEventListener('click', () => {
-            rendition.next().then(extractVisibleText);
-        });
-    });
+ 
 
     recordBtn.addEventListener('click', async () => { //standarised procedure 
         if (!isRecording) {
@@ -642,6 +801,97 @@
             rendition.prev().then(extractVisibleText);
         }
     } )
+
+    // Fetch the book data from the API
+    fetch('hablas-api.php')
+        .then(response => response.json())
+        .then(books => {
+            console.log('Books:', books);
+            
+            // Group books by language
+            const booksByLanguage = books.reduce((acc, book) => {
+                if (!acc[book.language]) {
+                    acc[book.language] = [];
+                }
+                acc[book.language].push(book);
+                return acc;
+            }, {});
+            
+            // Create book elements
+            const booksGrid = document.getElementById('books-grid');
+            
+            // For each language group
+            Object.entries(booksByLanguage).forEach(([language, languageBooks]) => {
+                // Create language section
+                const languageSection = document.createElement('div');
+                languageSection.className = 'language-section';
+                
+                // Add language header
+                const languageHeader = document.createElement('h2');
+                languageHeader.textContent = language.charAt(0).toUpperCase() + language.slice(1);
+                languageSection.appendChild(languageHeader);
+                
+                // Create books container for this language
+                const booksContainer = document.createElement('div');
+                booksContainer.className = 'books-container';
+                
+                // Add books for this language
+                languageBooks.forEach(book => {
+                    const bookElement = document.createElement('div');
+                    bookElement.className = 'book';
+                    
+                    const img = document.createElement('img');
+                    img.src = book.cover;
+                    img.alt = book.filename;
+                    
+                    const title = document.createElement('div');
+                    title.className = 'book-title';
+                    title.textContent = book.filename.replace('.epub', '');
+                    
+                    bookElement.appendChild(img);
+                    bookElement.appendChild(title);
+                    
+                    // Add click event to load the book
+                    bookElement.addEventListener('click', () => {
+                        const file = book.path;
+                        renderEpub(file);
+                        
+                        // Set up navigation
+                        rendition.on('rendered', extractVisibleText);
+                        
+                        document.getElementById('prev').addEventListener('click', () => {
+                            rendition.prev().then(extractVisibleText);
+                        });
+                        
+                        document.getElementById('next').addEventListener('click', () => {
+                            rendition.next().then(extractVisibleText);
+                        });
+                        
+                        // Hide books modal after selection
+                        bookElement.closest('.modal').style.display = 'none';
+                    });
+                    
+                    booksContainer.appendChild(bookElement);
+                });
+                
+                languageSection.appendChild(booksContainer);
+                booksGrid.appendChild(languageSection);
+            });
+        })
+        .catch(error => console.error('Error:', error));
+
+    // Add event listener for the available books button
+    availableBooksBtn.addEventListener('click', () => {
+        const booksModal = document.getElementById('books-modal');
+        booksModal.style.display = 'block';
+    });
+
+    // Close books modal
+    document.querySelectorAll('.modal .close').forEach(closeBtn => {
+        closeBtn.addEventListener('click', () => {
+            closeBtn.closest('.modal').style.display = 'none';
+        });
+    });
 
 </script>
 
