@@ -36,6 +36,7 @@
         padding: 1%;
         text-align: left;
         display: flex;
+        margin-left: 4%;
     }
 
     #div2viewer {
@@ -43,7 +44,7 @@
         font-family: 'Roboto', sans-serif;
         font-weight: 300;
         background-color: #f9f9f9; /* Light background color */
-        border: 1px solid #ccc; /* Light grey border */
+        border: 1px solid #ccc; /* Light grey border! */
         border-radius: 10px; /* Rounded corners */
         box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1); /* Subtle shadow for depth */
         max-width: 800px; /* Maximum width */
@@ -64,6 +65,8 @@
         font-weight: 300;
         padding: auto;
         margin: auto;
+        margin-top: 2%;
+        
 	width:90%;
     }
     #file-input {
@@ -71,6 +74,7 @@
     }
     #wrong {
         color: red;
+        cursor: pointer;
     }
     #viewer {
         width: auto;
@@ -118,7 +122,28 @@
         transition: background-color 0.3s; /* Smooth transition */
         box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2); /* Shadow for depth */
         width: 25%;
+        }
+    
+    #selectedText {
+        flex: 5;
+    }
+
+    #robot {
+        background-color: #A76D9A;
+        flex-grow: 0;
+        margin-left: auto; 
+        width: auto;
+        height: 100%;
+        cursor: pointer;
+        margin: auto;
         
+        
+    }
+
+    #return_sentence {
+        flex:5;
+        border-radius: 10px;
+        border : 0.02rem solid #6bd8ff;
     }
     img {
             max-width: 25%; /* Ensure the image is responsive */
@@ -135,32 +160,30 @@
         cursor: pointer;
     }
     
-    #top-popout{
-        display: flex;
-    }
+    
     .modal {
         display: none;
         position: fixed;
         top: 0;
         left: 0;
-        width: 90%;
-        height: 70%;
+        width: 100%;
+        height: 100%;
         background-color: rgba(0,0,0,0.4); 
     }
     .modal-content {
         position: relative; /* Makes this element a positioning context for its children
         Any child with position: absolute will be positioned relative to this element
         Like creating a coordinate system inside this element */
-        height: 100%;
+        height: 80%;
         display: flex;
         flex-direction: column;
         /* Makes flex items stack vertically instead of horizontally*/
         background-color: #fefefe;
-        margin: 15% auto;
+        margin: 5%;
         padding: 20px;
         border: 1px solid #888;
         width: 80%;
-        position: relative;
+        
         font-family: 'Roboto', sans-serif;
     }
 
@@ -169,17 +192,47 @@
         order:2;
         cursor: pointer;
     }
+    
+    #top-popout{
+      flex:1;
+      display: flex;
+      justify-content: flex-end; /* Add this */
+
+       
+    }
+    #modal-main {
+        display: flex;
+        flex-direction: column;
+        flex: 10;
+    }
+    
+
+    #translation {
+        font-size: 12px;
+    }
+   
     #actionButtons {
         display: flex; /*if i dont put this, the buttons will be in a column*/ 
         flex-direction:row;
-        height:30%;
+        justify-content: space-between;
+        align-items: center;
+        flex: 0 0 auto; /* Don't grow, don't shrink, auto base size */
+        padding: 1rem; /* Give it some breathing room */
     
     }
 
     #actionButtons img {
-        flex:1 ; 
-        cursor: pointer    /* Changes mouse cursor to a hand when hovering */
+       /* max-height:70%;
+        width:auto;
+        cursor: pointer;    /* Changes mouse cursor to a hand when hovering */
         /*padding: 5px 10px; */ /* Adds space inside each arrow (5px top/bottom, 10px left/right) */
+        max-height:60%;
+        object-fit: contain;
+        
+    }
+    #bottom {
+        flex: 0 0 auto; /* Take only needed space */
+        
     }
         
     .text-container {
@@ -187,8 +240,11 @@
         overflow-y: auto; /* Adds vertical scroll when content is too tall */
         padding: 20px;
         margin-bottom: 60px;
+        border-radius: 10px;
+        border : 0.02rem solid #c7f6fd;
+        background-color: #c7f6fd;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2); /* Add shadow for 3D effect */
     }
-
     .darkerGrey {
         background-color: #A76D9A;
     }
@@ -214,9 +270,9 @@
         position: fixed; /*fixed position means that it will stay in the same place even if you scroll*/
         overflow-x: hidden; /*prevents horizontal scrolling*/
         z-index: 999; /*ensure drawer is above other elements*/
-        transform: translateX(100%);
+        transform: translateX(100%); /*translate 100% of its width to the right (in the axis)*/
     }
-    .drawer .close{s
+    .drawer .close{
         transform: translateX(100%);
     }
     .drawer.open {
@@ -247,6 +303,8 @@
         cursor: pointer;
         transition: background-color 0.3s;
         box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+        width:30%;
+        margin :auto;
     }
     /* Style for the options in the dropdown */
     #language-select option {
@@ -254,6 +312,7 @@
         color: #4588a0;
         padding: 10px;
         font-family: 'Roboto', sans-serif;
+        
     }
     /* Optional hover effect */
     #language-select:hover {
@@ -330,6 +389,57 @@
     #books-grid::-webkit-scrollbar-thumb:hover {
         background: #555;
     }
+
+    #languageUser {
+        display: block;
+        font-family: 'Roboto', sans-serif;
+        margin-bottom: 7%;
+        cursor: pointer;
+        border: none;
+        background-color: transparent;
+        font-size:15;
+        
+    }
+
+    #languageUser:hover {
+        background-color:  #a9d1d7;
+        transition: all 0.3s ease;  /* Smooth transition for all changes */
+        transform: translateX(3.5%);
+        border-radius: 7%; 
+        padding: 1%;
+        margin-right: 7%;
+    }
+
+    #languageUserOptions { /*animated drawer!*/
+        transform: translateX(1000%);
+        transition: transform 0.3s ease;
+    }
+    #languageUserOptions.show {
+    transform: translateX(0); /* Move it into view */
+}
+
+.vertical-slider {
+    display: inline-block;
+    writing-mode: bt-lr; /* For Firefox */
+    -webkit-appearance: slider-vertical; /* For Chrome */
+    width: 3%;
+    height: 100%;
+    padding: 1%;
+    margin: 0;
+
+}
+#bottom {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    width: 100%; /* Set explicit width instead of auto */
+    min-height: fit-content;
+    min-width: fit-content;
+    overflow: visible; /*prevents clipping*/
+    padding: 10px;
+}
+
+
 </style>
 <body>
     
@@ -358,38 +468,18 @@
             <div id="settings-options">
                 <div id="log-in" class="options">Log in/sign up</div>
                 <div id="available-books" class="options">Available books</div>
-                <div id="languages" class="options">Languages</div>
-            </div>
-    </div><
-
-    <div id="myModal" class="modal"> 
-        <div class="modal-content"> 
-            <div id="top-popout">
-                <select id="language-select">
-                    <option value="en">english</option>
-                    <option value="fr">francais</option>
-                    <option value="sp">espagnol</option>
-                    <option value="it">italiano</option>
-                    <option value="de">deutsch</option>
-                
+                <div id="userLanguages"  class="options">Languages</div>
+                <select id="languageUserOptions" default="en">
+                    <option value="es">Spanish</option> 
+                    <option value="en">English</option>
+                    <option value="fr">Français</option>
+                    <option value="deutch">Deutch</option>
+                    <option value="it">Italian</option>
                 </select>
-                <span class="close">&times;</span> 
             </div>
-
-            <div class="text-container">
-                <div id="selectedText"></div>
-            </div>
-
-            <div id="return_sentence"></div>
-
-            <div id="actionButtons">
-
-                        <img class="arrowPrev" src="images/arrow-left.png" alt="prev--arrow" />
-                        <img id="record" src="images/recordingButton.png" alt="record icon"/>
-                        <img class="arrowNext" src="images/arrow-right.png" alt="next--arrow" />
-            </div>
-        </div>
     </div>
+
+    
 
 <div id="navigation">
     
@@ -406,6 +496,37 @@
     </div>
 </div>
 
+<div id="myModal" class="modal"> 
+    <div class="modal-content"> 
+        <div id="top-popout">
+            
+            <span class="close">&times;</span> 
+        </div>
+        <div id="modal-main">
+            <div class="text-container">
+                <div id="selectedText"></div>
+                
+            </div>
+            <div id="translation">translation...</div>
+            <div id="return_sentence"></div>
+        </div>
+
+        <div id="actionButtons">
+
+            <img class="arrowPrev" src="images/arrow-left.png" alt="prev--arrow" />
+            <img id="record" src="images/recordingButton.png" alt="record icon"/>
+            <img class="arrowNext" src="images/arrow-right.png" alt="next--arrow" />
+        </div>
+   
+        <div id="bottom">
+                <select id="language-select"></select>
+         
+                <img id="robot" src="images/robot_talk_white.png" alt="robot"/>
+           
+                <input type="range" orient="vertical" min="0.2" max="2" value="1"  step="0.1" class="vertical-slider">
+        </div>
+    </div>
+</div>
 
 <script>
     const fileInput = document.getElementById('fileInput');
@@ -417,6 +538,7 @@
     let lineNum = 0;
     let language = "";
     let isRecording = false; //booleag flag
+    let translationText = "";
 
     let mediaRecorder; 
     let audioChunks = []; //buffer
@@ -442,13 +564,27 @@
     const availableBooksBtn = document.getElementById('available-books');
 
     const recordBtn = document.getElementById('record'); 
+    const textToSpeechBtn = document.getElementById('robot');
+    const translation = document.getElementById('translation');
     
+    const languageDisplay2 = document.getElementById('userLanguages');
+    const languageUserOptionsSelect = document.getElementById('languageUserOptions');
+    let userLanguage = 'en'; //default language
+    let languageUserOptionsOpen = false; //boolean flag for the language user options translation x
     const abbreviations = [
         'Mr.', 'Mrs.', 'Ms.', 'Dr.', 'Prof.',
         'Sr.', 'Jr.', 'etc.', 'e.g.', 'i.e.', '."'
     ];
     let socket; // Declare socket variable. Built-in object of js
     const booksModal = document.getElementById('books-modal');
+
+    // First, get reference to your slider
+    const speedSlider = document.querySelector('.vertical-slider'); // Adjust selector as needed
+    let speechRate = 1; // Default speech rate
+
+    // Add event listener to the slider
+   
+
 
 availableBooksBtn.addEventListener('click', async () => {
     try {
@@ -472,16 +608,20 @@ availableBooksBtn.addEventListener('click', async () => {
         languageSelect.innerHTML = ''; // Clear existing options
         
         // Add options for each available language
-        Object.keys(booksByLanguage).forEach(language => {
-            const option = document.createElement('option');
-            const languageMap = {
+        console.log("OLIVIA'S TRIAL: language : ", language);
+        console.log("OLIVIA'S TRIAL: booksbylanguage", booksByLanguage);
+        Object.keys(booksByLanguage).forEach(language => { //language here is an empty parameter
+            console.log('language: ', language); //these are ALL the language options. NOT the language selected
+            const option = document.createElement('option'); //shows all the languages like this: <option value="deutsch">Deutsch</option>
+            
+            const languageMap = { //ignore, its not being used technically...
                 'english': 'en',
                 'french': 'fr',
                 'spanish': 'sp',
                 'italian': 'it',
                 'german': 'de'
             };
-            option.value = languageMap[language.toLowerCase()] || language.toLowerCase();
+            option.value =  language.toLowerCase();
             option.textContent = language.charAt(0).toUpperCase() + language.slice(1);
             languageSelect.appendChild(option);
         });
@@ -505,11 +645,10 @@ availableBooksBtn.addEventListener('click', async () => {
             languageBooks.forEach(book => {
                 const bookElement = document.createElement('div');
                 bookElement.className = 'book';
-                
+
                 const img = document.createElement('img');
                 img.src = book.cover;
                 img.alt = book.filename;
-                
                 const title = document.createElement('div');
                 title.className = 'book-title';
                 title.textContent = book.filename.replace('.epub', '');
@@ -521,8 +660,10 @@ availableBooksBtn.addEventListener('click', async () => {
                 bookElement.addEventListener('click', () => {
                     renderEpub(book.path);
                     booksModal.style.display = 'none';
+
+                    languageSelect.value= language;
+                    console.log("OLIVIA'S TRIAL: language", language); //HERE is where we finally have the language of the book!!!!
                 });
-                
                 booksContainer.appendChild(bookElement);
             });
             
@@ -565,6 +706,7 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
 
         // Now establish the WebSocket connection
         socket = new WebSocket('wss://carriertech.uk:8675'); // Create the WebSocket connection
+        //socket = new WebSocket ('ws://localhost:8765'); //port appears in local_web_server.py (for Fuckoffee)
 
         // WebSocket event handlers
         socket.addEventListener('open', () => {
@@ -577,10 +719,11 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
                 const dataToSend = {
                     name: "John Doe",
                     age: 30,
-                    language: languageSel.value, 
+                    language: languageSel.value.substring(0,2),
                     blob:base64Blob,
                     sentence:lines[lineNum]
                 };
+                console.log("language 652: ",language);
                 socket.send(JSON.stringify(dataToSend)); // Send data (turning json object into string) after connection is established
             };
             reader.readAsDataURL(audioBlob); // Read the blob as a data URL
@@ -590,6 +733,7 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
         socket.addEventListener('message', (event) => {
             //actual message/data received from the WebSocket server (stringfy json)
             const msg = JSON.parse(event.data);
+            console.log("OLIVIA'S TRIAL: msg: ", msg);
 
             if (msg.hasOwnProperty('pred_sentence')) {
                 returnSentenceDiv.innerHTML = msg.pred_sentence;
@@ -667,7 +811,7 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
             console.log("Location is invalid:", location);
         }
     }
-
+    
     // Separate text cleaning function
     function cleanText(text) {
         const regexMatch = /[A-Z]\./g;
@@ -693,14 +837,14 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
             };
 
             mediaRecorder.start();
-            recordBtn.src = "stopRecButton.png";
+            recordBtn.src = "images/stopRecButton.png";
             //socket.send(JSON.stringify({ event: 'start' })); // Notify server that recording has started
             isRecording=true;
 
          } else {   //this means that isRecording==true;
             mediaRecorder.stop(); 
             isRecording=false;
-            recordBtn.src = "recordingButton.png";
+            recordBtn.src = "images/recordingButton.png";
          }        
         mediaRecorder.onstop = () => {
             createBlobAndConnect(); // Call the function to create the blob and connect
@@ -718,6 +862,7 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
             } else {
                 lineNum--;
                 selectDiv.innerHTML = lines[lineNum];
+                translate();
             }
         });
 
@@ -728,6 +873,7 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
             } else {
                 lineNum++;
                 selectDiv.innerHTML=lines[lineNum];
+                translate();
             }
             
         })
@@ -742,10 +888,11 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
         }
         
         modalDiv.style.display = "block"; //
-        //selectDiv.innerHTML=selectedText;
         console.log(lines);
         console.log(lineNum); 
         selectDiv.innerHTML=lines[lineNum];
+        translate();
+
 
     });
 
@@ -775,11 +922,11 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
 
     settingsBtn.addEventListener('click',()=> {
     
-        drawer.classList.add('open');
+        drawer.classList.add('open'); //adding a class named 'open'
     });
 
     closeDrawerBtn.addEventListener('click', () => {
-        drawer.classList.remove('open');
+        drawer.classList.remove('open'); //removing a class named 'open'
     });
 
     window.addEventListener('click', (event) => {
@@ -814,6 +961,7 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
                     acc[book.language] = [];
                 }
                 acc[book.language].push(book);
+                
                 return acc;
             }, {});
             
@@ -893,5 +1041,100 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
         });
     });
 
-</script>
+    textToSpeechBtn.addEventListener('click', () => { //using a Web Speech API (speechSynthesis part)
+      
 
+        if ('speechSynthesis' in window) { //window is a global object in JavaScript that represents the browser window/tab
+            //standard way to access browser functionality. 
+            // Speech synthesis is supported
+            let msg = new SpeechSynthesisUtterance(); //defined as local bc im not gonna use it outside 
+            msg.text = lines[lineNum];
+            console.log('languageSel is:', languageSel.value); 
+            msg.lang = languageSel.value.substring(0,2);
+            
+            /*if (msg.lang == 'en') {
+                msg.lang = 'en-GB';
+            }*/ 
+
+            msg.rate = speedSlider.value;
+            msg.volume = 2;
+            msg.pitch = 1.5;
+
+            window.speechSynthesis.speak(msg); 
+
+        } else {
+            // Speech synthesis is not supported
+            console.log("Sorry, your browser doesn't support text to speech!");
+        }
+
+        
+    })
+    
+    languageDisplay2.addEventListener('click', () => {
+       
+        if (languageUserOptionsOpen){
+            languageUserOptionsOpen = false;
+            languageUserOptionsSelect.style.transform=  'translateX(1000%)';
+        } else {
+            languageUserOptionsSelect.style.transform = 'translateX(0)'; //we CAN see it
+            languageUserOptionsOpen = true;
+        }
+    });
+
+
+   
+
+    async function translate() { //based on my practicing script translate3
+        const textToTranslate = selectDiv.innerHTML;
+        console.log("OLIVIAS TRIAL. the selected text to translate is: ",textToTranslate);
+        const targetLanguage = document.getElementById('languageUserOptions').value; 
+        console.log("targetLanguage: ",targetLanguage); //en verdad no necesito este language si no el que elijan ellos
+        console.log("language: ",languageSel.value.substring(0,2));
+        const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(textToTranslate)}&langpair=${languageSel.value.substring(0,2)}|${targetLanguage}`;
+
+        try {
+            
+            const response= await fetch(url);
+            const data = await response.json(); //turn the response into js object
+            translationText= data.responseData.translatedText;
+            translation.innerHTML = translationText;
+            
+        } catch (error) {
+            console.error('Translation error:', error);
+            translation.innerHTML = 'Translation error occurred';
+        }
+    }
+
+    function createPopup(content, event) {
+        const popup = document.createElement('div');
+        const closePopupButton = document.createElement('span');
+        const contentElement = document.createElement('p');
+
+        contentElement.textContent = content;
+
+        popup.appendChild(contentElement);
+        popup.appendChild(closePopupButton);
+
+        closePopupButton.addEventListener('click', () => {
+            popup.remove();
+        });
+
+        popup.addEventListener('click', (event) => {
+            if (event.target === popup) {
+                popup.remove();
+            }
+        });
+        // Get click/touch position
+        const x = event.clientX || event.touches[0].clientX;
+        const y = event.clientY || event.touches[0].clientY;
+
+        popup.style.left = `${x}px`;
+        popup.style.top = `${y}px`; 
+
+        document.body.appendChild(popup); //add the popup to the website (document)
+
+        return popup;
+    }
+
+    
+</script>
