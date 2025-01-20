@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang=""en">
+<html lang="en">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.1.5/jszip.min.js"></script>
@@ -581,7 +581,7 @@
     // First, get reference to your slider
     const speedSlider = document.querySelector('.vertical-slider'); // Adjust selector as needed
     let speechRate = 1; // Default speech rate
-
+    let popupflag=false;
     // Add event listener to the slider
    
 
@@ -730,13 +730,25 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
             audioChunks=[];
         });
 
-        socket.addEventListener('message', (event) => {
+        socket.addEventListener('message', async (event) => {
             //actual message/data received from the WebSocket server (stringfy json)
             const msg = JSON.parse(event.data);
             console.log("OLIVIA'S TRIAL: msg: ", msg);
 
             if (msg.hasOwnProperty('pred_sentence')) {
                 returnSentenceDiv.innerHTML = msg.pred_sentence;
+                await new Promise(resolve => requestAnimationFrame(resolve));
+
+                // Now query for elements with class "wrong"
+                const wrongElements = document.getElementsByClassName("wrong");
+                console.log("OLIVIA'S TRIAL: wrongElements: ", wrongElements);
+                // Now you can work with the wrong elements
+                for (const element of wrongElements) {
+                    // Your code for handling wrong elements
+                    element.addEventListener('click', (event) => {
+                        createPopup(element.id, event);
+                    });
+                }
             }
             //returnSentenceDiv.textContent = event.data; // Display message from server. ex: "an audio has been received"
         });
@@ -1105,11 +1117,31 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
         }
     }
 
+    function textToSpeech(textToSpeak) {
+        if ('speechSynthesis' in window) {//standard way to access browser functionality. 
+            
+            let msg = new SpeechSynthesisUtterance(); //its an object that speaks the text you give it. similar to a json
+            msg.text = textToSpeak;
+            console.log('textToSpeak is:', textToSpeak); 
+            msg.lang = languageSel.value.substring(0,2);
+          
+            msg.rate = speedSlider.value;
+            msg.volume = 2;
+            msg.pitch = 1.5;
+
+            window.speechSynthesis.speak(msg); 
+
+        } else { // Speech synthesis is not supported
+            console.log("Sorry, your browser doesn't support text to speech!");
+        }
+    }
+    
     function createPopup(content, event) {
         const popup = document.createElement('div');
         const closePopupButton = document.createElement('span');
         const contentElement = document.createElement('p');
 
+        
         contentElement.textContent = content;
 
         popup.appendChild(contentElement);
@@ -1120,21 +1152,36 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
         });
 
         popup.addEventListener('click', (event) => {
-            if (event.target === popup) {
+            console.log("!popup clicked");
+            if(popupflag && !popup.contains(event.target)) {
                 popup.remove();
-            }
+            } 
+            popupflag=false;
         });
         // Get click/touch position
         const x = event.clientX || event.touches[0].clientX;
         const y = event.clientY || event.touches[0].clientY;
 
+        popup.style.position = 'absolute'; 
         popup.style.left = `${x}px`;
         popup.style.top = `${y}px`; 
+        popup.classList.add('popup');
 
         document.body.appendChild(popup); //add the popup to the website (document)
-
-        return popup;
+        popup.style.zIndex = 1000;
+        textToSpeech(content); 
+        popupflag=true;
     }
 
+    window.addEventListener('click', (event) => {
+        //broken, will fix later 
+        if(popupflag){
+            let popUps = document.getElementsByClassName('popup');
+            for(let popup of popUps){
+                popup.remove();
+            }
+            popupflag=false;
+        }
+    });
     
 </script>
