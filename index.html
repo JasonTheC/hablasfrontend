@@ -169,6 +169,7 @@
         width: 100%;
         height: 100%;
         background-color: rgba(0,0,0,0.4); 
+        z-index: 999; /*olivias trial*/
     }
     .modal-content {
         position: relative; /* Makes this element a positioning context for its children
@@ -439,6 +440,52 @@
     padding: 10px;
 }
 
+#user-modal {
+    display: none;
+}
+
+.user-modal {
+    display: none;  /* This ensures the modal is hidden initially */
+    justify-content: center;
+    align-items: center;
+}
+
+.user-modal-content {
+    position: relative;  /* Needed for absolute positioning, relative to the parent (modal) */
+    padding: 20px;      /* Give some space around the content */
+}
+
+.user-modal .close {
+    position: absolute;  /* Position relative to modal-content */
+    right: 10px;        /* Distance from right edge */
+    top: 10px;          /* Distance from top edge */
+    font-size: 24px;    /* Make it bigger */
+    cursor: pointer;    /* Show pointer on hover */
+    font-weight: bold;  /* Make it bolder */
+}
+
+/* Optional: make it look nicer on hover */
+.user-modal .close:hover {
+    color: #888;
+}
+
+/* Add this new CSS - specific to this modal's close button */
+.options-close {
+    position: absolute;
+    right: 10px;
+    top: 10px;
+    font-size: 24px;
+    cursor: pointer;
+}
+
+/* Or even more specific if needed */
+#user-account-options-modal .options-close {
+    position: absolute;
+    right: 10px;
+    top: 10px;
+    font-size: 24px;
+    cursor: pointer;
+}
 
 </style>
 <body>
@@ -466,7 +513,7 @@
             <span id="close-drawer" class="close">&times;</span>
             <h2>Settings</h2>
             <div id="settings-options">
-                <div id="log-in" class="options">Log in/sign up</div>
+                <div id="user-account" class="options" onclick="openUserAccount()">Log in/sign up</div>
                 <div id="available-books" class="options">Available books</div>
                 <div id="userLanguages"  class="options">Languages</div>
                 <select id="languageUserOptions" default="en">
@@ -476,10 +523,10 @@
                     <option value="deutch">Deutch</option>
                     <option value="it">Italian</option>
                 </select>
+                <div id="user-account-options" class="options" onclick="openUserAccountOptions()">Your account</div>
+                <div id="log-out" class="options">Log out</div>
             </div>
     </div>
-
-    
 
 <div id="navigation">
     
@@ -528,6 +575,27 @@
     </div>
 </div>
 
+<div id="user-modal" class="modal user-modal">
+    <div class="modal-content user-modal-content">
+        <span class="close">&times;</span>
+        <p>User account interaction</p>
+        <input type="text" id="user-name" placeholder="Username">
+        <input type="password" id="user-password" placeholder="Password">
+        <button id="login-button">Login</button>
+        <button id="signup-button">Sign up</button>
+        <button id="forgot-password-button">Forgot password?</button>
+    </div>
+</div>
+
+<div id="user-account-options-modal" class="modal user-account-options-modal">
+    <div class="modal-content user-account-options-modal-content">
+        <span class="close options-close">&times;</span>
+        <p>User account options</p>
+        <button id="change-info-button">Change info</button>
+        <button id="delete-account-button">Delete account</button>
+    </div>
+</div>
+
 <script>
     const fileInput = document.getElementById('fileInput');
     fileInput.style.display= "none";
@@ -571,6 +639,7 @@
     const languageUserOptionsSelect = document.getElementById('languageUserOptions');
     let userLanguage = 'en'; //default language
     let languageUserOptionsOpen = false; //boolean flag for the language user options translation x
+    
     const abbreviations = [
         'Mr.', 'Mrs.', 'Ms.', 'Dr.', 'Prof.',
         'Sr.', 'Jr.', 'etc.', 'e.g.', 'i.e.', '."'
@@ -584,6 +653,15 @@
     let popupflag=false;
     // Add event listener to the slider
    
+    const userAccountBtn = document.getElementById('user-account');
+    const username = document.getElementById('user-name').value;
+    const password = document.getElementById('user-password').value;
+    const loginButton = document.getElementById ('login-button');
+    const signupButton = document.getElementById ('signup-button');
+    const forgotPasswordButton = document.getElementById ('forgot-password-button');
+    const userAccountOptionsBtn = document.getElementById ('user-account-options');
+    const changeInfoButton = document.getElementById ('change-info-button');
+    const deleteAccountButton = document.getElementById ('delete-account-button');
 
 
 availableBooksBtn.addEventListener('click', async () => {
@@ -1183,5 +1261,30 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
             popupflag=false;
         }
     });
-    
+
+    function openUserAccount() {
+        document.getElementById('user-modal').style.display = 'block';
+       }
+
+    loginButton.addEventListener('click', () => {
+        loginButton.style.backgroundColor = '#FFB6C1';
+        console.log("login button clicked");
+        console.log("username is: ", username);
+        console.log("password is: ", password);
+    });
+
+    signupButton.addEventListener('click', () => {
+        signupButton.style.backgroundColor = '#FFB6C1';
+        console.log("signup button clicked");
+        console.log("username is: ", username);
+        console.log("password is: ", password);
+
+    });
+
+    function openUserAccountOptions() {
+        document.getElementById('user-account-options-modal').style.display = 'block';
+    }
+
+
+
 </script>
