@@ -487,6 +487,18 @@
     cursor: pointer;
 }
 
+#inputs-account {
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 15px; 
+}
+
+#buttons-account {
+    display: flex;
+    flex-direction: column;
+    
+}
+
 </style>
 <body>
     
@@ -579,11 +591,15 @@
     <div class="modal-content user-modal-content">
         <span class="close">&times;</span>
         <p>User account interaction</p>
-        <input type="text" id="user-name" placeholder="Username">
-        <input type="password" id="user-password" placeholder="Password">
-        <button id="login-button">Login</button>
-        <button id="signup-button">Sign up</button>
-        <button id="forgot-password-button">Forgot password?</button>
+        <div id="inputs-account">
+            <input type="text" id="user-name" placeholder="Username">
+            <input type="password" id="user-password" placeholder="Password">
+        </div>
+        <div id="buttons-account">
+            <button id="login-button">Login</button>
+            <button id="signup-button">Sign up</button>
+            <button id="forgot-password-button">Forgot password?</button>
+        </div>
     </div>
 </div>
 
@@ -654,14 +670,17 @@
     // Add event listener to the slider
    
     const userAccountBtn = document.getElementById('user-account');
-    const username = document.getElementById('user-name').value;
-    const password = document.getElementById('user-password').value;
+    const usernameInput = document.getElementById('user-name');
+    const passwordInput = document.getElementById('user-password');
     const loginButton = document.getElementById ('login-button');
     const signupButton = document.getElementById ('signup-button');
     const forgotPasswordButton = document.getElementById ('forgot-password-button');
     const userAccountOptionsBtn = document.getElementById ('user-account-options');
     const changeInfoButton = document.getElementById ('change-info-button');
     const deleteAccountButton = document.getElementById ('delete-account-button');
+
+    let username = '';
+    let password = '';
 
 
 availableBooksBtn.addEventListener('click', async () => {
@@ -795,13 +814,16 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
                 // The result will be a data URL, so we split to get the Base64 part
                 const base64Blob = reader.result;
                 const dataToSend = {
-                    name: "John Doe",
-                    age: 30,
+                    username: username,
+                    password: password,
                     language: languageSel.value.substring(0,2),
                     blob:base64Blob,
-                    sentence:lines[lineNum]
+                    sentence:lines[lineNum],
+                    username: username,
+                    password: password,
                 };
                 console.log("language 652: ",language);
+                console.log("datauser OLIVIA'STRIAL: ", username, password);
                 socket.send(JSON.stringify(dataToSend)); // Send data (turning json object into string) after connection is established
             };
             reader.readAsDataURL(audioBlob); // Read the blob as a data URL
@@ -1268,13 +1290,30 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
 
     loginButton.addEventListener('click', () => {
         loginButton.style.backgroundColor = '#FFB6C1';
+        username=usernameInput.value;
+        password=passwordInput.value;
         console.log("login button clicked");
         console.log("username is: ", username);
         console.log("password is: ", password);
+        //temporary! websockets should only be initialised once
+        socket = new WebSocket('wss://carriertech.uk:8675'); // Create the WebSocket connection
+        //socket = new WebSocket ('ws://localhost:8765'); //port appears in local_web_server.py (for Fuckoffee)
+        
+        socket.addEventListener('open',() => {
+            console.log('WebSocket connection established');
+            const loginData = {
+                username: username,
+                password: password,
+            };  
+            socket.send(JSON.stringify(loginData));    
+        }); 
+        
     });
 
     signupButton.addEventListener('click', () => {
         signupButton.style.backgroundColor = '#FFB6C1';
+        username=usernameInput.value;
+        password=passwordInput.value;
         console.log("signup button clicked");
         console.log("username is: ", username);
         console.log("password is: ", password);
