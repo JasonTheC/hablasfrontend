@@ -660,6 +660,7 @@
         'Mr.', 'Mrs.', 'Ms.', 'Dr.', 'Prof.',
         'Sr.', 'Jr.', 'etc.', 'e.g.', 'i.e.', '."'
     ];
+
     let socket; // Declare socket variable. Built-in object of js
     const booksModal = document.getElementById('books-modal');
 
@@ -682,6 +683,22 @@
     let username = '';
     let password = '';
 
+console.log ("starting script");
+function initializeWebSocket() {
+    console.log("initializing websocket");
+
+    socket = new WebSocket('wss://carriertech.uk:8675'); // Create the WebSocket connection
+    //socket = new WebSocket ('ws://localhost:8765'); //port appears in local_web_server.py (for Fuckoffee)
+    socket.addEventListener('open',() => {
+        console.log('WebSocket connection established');
+    });
+
+    socket.addEventListener('message', (event) => {
+        console.log('WebSocket message received:', event.data);
+    });
+
+    return socket;
+    }
 
 availableBooksBtn.addEventListener('click', async () => {
     try {
@@ -804,30 +821,33 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
         // Now establish the WebSocket connection
         socket = new WebSocket('wss://carriertech.uk:8675'); // Create the WebSocket connection
         //socket = new WebSocket ('ws://localhost:8765'); //port appears in local_web_server.py (for Fuckoffee)
+        
+        /*if (!socket || socket.readyState !== WebSocket.OPEN) {
+            console.error('WebSocket connection not established');
+            socket = initializeWebSocket();
+        } */
 
-        // WebSocket event handlers
         socket.addEventListener('open', () => {
             //console.log('WebSocket connection established');
             // You can send the blob or any other data here if needed
-            const reader = new FileReader(); //fileReader instance to manipulate the blob
-            reader.onloadend = function() {  //it's like an "instruction for the future". When you have data (blob) and you finish loading, this is what you would have to do 
-                // The result will be a data URL, so we split to get the Base64 part
-                const base64Blob = reader.result;
-                const dataToSend = {
-                    username: username,
-                    password: password,
-                    language: languageSel.value.substring(0,2),
-                    blob:base64Blob,
-                    sentence:lines[lineNum],
-                    username: username,
-                    password: password,
-                };
-                console.log("language 652: ",language);
-                console.log("datauser OLIVIA'STRIAL: ", username, password);
-                socket.send(JSON.stringify(dataToSend)); // Send data (turning json object into string) after connection is established
+           
+        const reader = new FileReader(); //fileReader instance to manipulate the blob
+        reader.onloadend = function() {  //it's like an "instruction for the future". When you have data (blob) and you finish loading, this is what you would have to do 
+            // The result will be a data URL, so we split to get the Base64 part
+            const base64Blob = reader.result;
+            const dataToSend = {
+                username: username,
+                password: password,
+                language: languageSel.value.substring(0,2),
+                blob:base64Blob,
+                sentence:lines[lineNum],
             };
-            reader.readAsDataURL(audioBlob); // Read the blob as a data URL
-            audioChunks=[];
+            console.log("language 652: ",language);
+            console.log("datauser OLIVIA'STRIAL username: ", username, "password: ", password);
+            socket.send(JSON.stringify(dataToSend)); // Send data (turning json object into string) after connection is established
+        };
+        reader.readAsDataURL(audioBlob); // Read the blob as a data URL
+        audioChunks=[];
         });
 
         socket.addEventListener('message', async (event) => {
@@ -936,8 +956,6 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
         
         return text;
     }
-
- 
 
     recordBtn.addEventListener('click', async () => { //standarised procedure 
         if (!isRecording) {
@@ -1193,9 +1211,6 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
         }
     });
 
-
-   
-
     async function translate() { //based on my practicing script translate3
         const textToTranslate = selectDiv.innerHTML;
         console.log("OLIVIAS TRIAL. the selected text to translate is: ",textToTranslate);
@@ -1292,20 +1307,25 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
         loginButton.style.backgroundColor = '#FFB6C1';
         username=usernameInput.value;
         password=passwordInput.value;
+
         console.log("login button clicked");
         console.log("username is: ", username);
-        console.log("password is: ", password);
-        //temporary! websockets should only be initialised once
-        socket = new WebSocket('wss://carriertech.uk:8675'); // Create the WebSocket connection
-        //socket = new WebSocket ('ws://localhost:8765'); //port appears in local_web_server.py (for Fuckoffee)
+        console.log("password is: ", password); 
         
+
+        if(!socket || socket.readyState !== WebSocket.OPEN) { //if socket is not open or not initialized
+            console.error('WebSocket connection not established'); 
+            socket = initializeWebSocket();
+        }
+
         socket.addEventListener('open',() => {
             console.log('WebSocket connection established');
             const loginData = {
                 username: username,
                 password: password,
             };  
-            socket.send(JSON.stringify(loginData));    
+            socket.send(JSON.stringify(loginData)); 
+            console.log("loginData sent");   
         }); 
         
     });
@@ -1323,7 +1343,5 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
     function openUserAccountOptions() {
         document.getElementById('user-account-options-modal').style.display = 'block';
     }
-
-
 
 </script>
