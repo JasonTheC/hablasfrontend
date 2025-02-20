@@ -1,0 +1,494 @@
+body {
+    background-color:  #a9d1d7;
+    margin: 1%;
+    overflow: hidden;
+    width: 99vw; 
+    height: 90vh;
+    justify-content:center;
+    align-items: center; 
+
+    }
+#input_sentence {
+    
+    margin-top:2%;
+    
+}
+div {
+    padding: 0.5%;
+    
+}
+
+#title {
+    font-size: 1.9em;
+    font-family: 'Quicksand', sans-serif;
+    font-weight: 600;
+    color:white; 
+    padding: 1%;
+    text-align: left;
+    display: flex;
+    margin-left: 4%;
+}
+
+#div2viewer {
+    margin: auto;
+    font-family: 'Roboto', sans-serif;
+    font-weight: 300;
+    background-color: #f9f9f9; /* Light background color */
+    border: 1px solid #ccc; /* Light grey border! */
+    border-radius: 10px; /* Rounded corners */
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1); /* Subtle shadow for depth */
+    max-width: 800px; /* Maximum width */
+    width: 90%; /* Full width */
+    height: 70%; /* Automatic height */
+    background-blend-mode: overlay; /* Blend texture with background color */
+    padding: auto;
+    
+}
+
+#div2viewer:hover {
+    box-shadow: 0 6px 15px rgba(0, 0, 0, 0.2); /* Darker shadow on hover */
+}
+
+#div3 {
+    
+    font-family: 'Monserrat', sans-serif;
+    font-weight: 300;
+    padding: auto;
+    margin: auto;
+    margin-top: 2%;
+    
+width:90%;
+}
+#file-input {
+    display: none;
+}
+#wrong {
+    color: red;
+    cursor: pointer;
+}
+#viewer {
+    width: auto;
+    height: 100%;
+    border: 1px solid #ccc;
+    overflow: auto;
+}
+
+#navigation {
+    display: none;
+}
+
+.movingBtns {
+    background-color: #A9A9A9;
+    color: white; /* White text */
+    border: none; /* Remove border */
+    border-radius: 5px; /* Rounded corners */
+    padding: 10px 20px; /* Padding */
+    text-align: center; /* Center text */
+    text-decoration: none; /* Remove underline */
+    display: inline-block; /* Inline-block for spacing */
+    font-size: 16px; /* Font size */
+    margin: 10px 2px; /* Margin around buttons */
+    cursor: pointer;
+    transition: background-color 0.3s,
+
+}
+.movingBtns:hover {
+    
+    background-color:  #8c8b8b;
+    transition: all 0.3s ease;  /* Smooth transition for all changes */
+    transform: translateX(3.5%);
+}
+
+#file {
+    display: flex;
+    background-color: #4588a0; 
+    font-family: 'Roboto', sans-serif;
+    color: white; /* White text */
+    border: none; /* Remove border */
+    border-radius: 5px; /* Rounded corners */
+    padding: 10px 20px; /* Padding */
+    font-size: 16px; /* Font size */
+    cursor: pointer; /* Pointer cursor on hover */
+    transition: background-color 0.3s; /* Smooth transition */
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2); /* Shadow for depth */
+    width: 25%;
+    }
+
+#selectedText {
+    flex: 5;
+}
+
+#robot {
+    background-color: #A76D9A;
+    flex-grow: 0;
+    margin-left: auto; 
+    width: auto;
+    height: 100%;
+    cursor: pointer;
+    margin: auto;
+    
+    
+}
+
+#return_sentence {
+    flex:5;
+    border-radius: 10px;
+    border : 0.02rem solid #6bd8ff;
+}
+img {
+        max-width: 25%; /* Ensure the image is responsive */
+        height: auto; /* Maintain aspect ratio */
+        display: block; /* Ensure the image is treated as a block element */
+        margin: auto auto; /* Center the image */
+}
+
+#settings {
+    float:right;
+    height:10vh;
+    margin-right: 0; 
+    padding: 1%;
+    cursor: pointer;
+}
+
+
+.modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0,0,0,0.4); 
+    z-index: 999; /*olivias trial*/
+}
+.modal-content {
+    position: relative; /* Makes this element a positioning context for its children
+    Any child with position: absolute will be positioned relative to this element
+    Like creating a coordinate system inside this element */
+    height: 80%;
+    display: flex;
+    flex-direction: column;
+    /* Makes flex items stack vertically instead of horizontally*/
+    background-color: #fefefe;
+    margin: 5%;
+    padding: 20px;
+    border: 1px solid #888;
+    width: 80%;
+    
+    font-family: 'Roboto', sans-serif;
+}
+
+.close {
+    margin-left: auto;
+    order:2;
+    cursor: pointer;
+}
+
+#top-popout{
+  flex:1;
+  display: flex;
+  justify-content: flex-end; /* Add this */
+
+   
+}
+#modal-main {
+    display: flex;
+    flex-direction: column;
+    flex: 10;
+}
+
+
+#translation {
+    font-size: 12px;
+}
+
+#actionButtons {
+    display: flex; /*if i dont put this, the buttons will be in a column*/ 
+    flex-direction:row;
+    justify-content: space-between;
+    align-items: center;
+    flex: 0 0 auto; /* Don't grow, don't shrink, auto base size */
+    padding: 1rem; /* Give it some breathing room */
+
+}
+
+#actionButtons img {
+   /* max-height:70%;
+    width:auto;
+    cursor: pointer;    /* Changes mouse cursor to a hand when hovering */
+    /*padding: 5px 10px; */ /* Adds space inside each arrow (5px top/bottom, 10px left/right) */
+    max-height:60%;
+    object-fit: contain;
+    
+}
+#bottom {
+    flex: 0 0 auto; /* Take only needed space */
+    
+}
+    
+.text-container {
+    flex: 9; /* Takes up all available space in the flex container */
+    overflow-y: auto; /* Adds vertical scroll when content is too tall */
+    padding: 20px;
+    margin-bottom: 60px;
+    border-radius: 10px;
+    border : 0.02rem solid #c7f6fd;
+    background-color: #c7f6fd;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2); /* Add shadow for 3D effect */
+}
+.darkerGrey {
+    background-color: #A76D9A;
+}
+
+.darkerGrey:hover {
+    background-color: #7a4e70;
+}
+
+#fileInput{
+    display: none;
+    visibility: hidden;
+}
+
+.drawer {
+    height: 100%;
+    width: 30%;
+    background-color: #e9f0f3;
+    transition: transform 0.3s ease;
+    right: 0;
+    top: 0;
+    box-shadow: -2px 0 5px rgba(0,0,0,0.2);
+    font-family: 'Quicksand', sans-serif;
+    position: fixed; /*fixed position means that it will stay in the same place even if you scroll*/
+    overflow-x: hidden; /*prevents horizontal scrolling*/
+    z-index: 999; /*ensure drawer is above other elements*/
+    transform: translateX(100%); /*translate 100% of its width to the right (in the axis)*/
+}
+.drawer .close{
+    transform: translateX(100%);
+}
+.drawer.open {
+    transform: translateX(0);
+}
+
+.options {
+    margin-bottom: 7%;
+    cursor: pointer;
+}
+.options:hover {
+    background-color:  #a9d1d7;
+    transition: all 0.3s ease;  /* Smooth transition for all changes */
+    transform: translateX(3.5%);
+    border-radius: 7%; 
+    padding: 1%;
+    margin-right: 7%;
+}
+
+#language-select {
+    display: flex;
+    background-color:rgb(225, 242, 253);
+    color:  #4588a0;;
+    border: none;
+    border-radius: 1%;
+    padding: auto;
+    font-size: 1em;
+    cursor: pointer;
+    transition: background-color 0.3s;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+    width:30%;
+    margin :auto;
+}
+/* Style for the options in the dropdown */
+#language-select option {
+    background-color: white;
+    color: #4588a0;
+    padding: 10px;
+    font-family: 'Roboto', sans-serif;
+    
+}
+/* Optional hover effect */
+#language-select:hover {
+    background-color: #3a7286;
+}
+#books-grid {
+    display: flex;
+    flex-direction: column; /* Stack items vertically */
+    padding: 20px;
+    max-height: 70vh; /* Limits height to enable scrolling */
+    overflow-y: auto; /* Adds vertical scrollbar */
+    overflow-x: hidden; /* Prevents horizontal scrolling */
+}
+
+.language-section {
+    margin-bottom: 30px;
+    width: 100%;
+}
+
+.books-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 20px;
+    padding: 20px;
+}
+
+.book {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    cursor: pointer;
+    transition: transform 0.2s;
+}
+
+.book:hover {
+    transform: scale(1.05);
+}
+
+.book img {
+    width: 120px;
+    height: 180px;
+    object-fit: cover;
+    border-radius: 5px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+}
+
+.book-title {
+    margin-top: 8px;
+    text-align: center;
+    font-size: 0.9em;
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.language-section h2 {
+    margin-left: 20px;
+    color: #333;
+    font-family: 'Quicksand', sans-serif;
+}
+
+/* Style the scrollbar */
+#books-grid::-webkit-scrollbar {
+    width: 8px;
+}
+
+#books-grid::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 4px;
+}
+
+#books-grid::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 4px;
+}
+
+#books-grid::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}
+
+#languageUser {
+    display: block;
+    font-family: 'Roboto', sans-serif;
+    margin-bottom: 7%;
+    cursor: pointer;
+    border: none;
+    background-color: transparent;
+    font-size:15;
+    
+}
+
+#languageUser:hover {
+    background-color:  #a9d1d7;
+    transition: all 0.3s ease;  /* Smooth transition for all changes */
+    transform: translateX(3.5%);
+    border-radius: 7%; 
+    padding: 1%;
+    margin-right: 7%;
+}
+
+#languageUserOptions { /*animated drawer!*/
+    transform: translateX(1000%);
+    transition: transform 0.3s ease;
+}
+#languageUserOptions.show {
+transform: translateX(0); /* Move it into view */
+}
+
+.vertical-slider {
+display: inline-block;
+writing-mode: bt-lr; /* For Firefox */
+-webkit-appearance: slider-vertical; /* For Chrome */
+width: 3%;
+height: 100%;
+padding: 1%;
+margin: 0;
+
+}
+#bottom {
+display: flex;
+flex-direction: row;
+align-items: center;
+width: 100%; /* Set explicit width instead of auto */
+min-height: fit-content;
+min-width: fit-content;
+overflow: visible; /*prevents clipping*/
+padding: 10px;
+}
+
+#user-modal {
+display: none;
+}
+
+.user-modal {
+display: none;  /* This ensures the modal is hidden initially */
+justify-content: center;
+align-items: center;
+}
+
+.user-modal-content {
+position: relative;  /* Needed for absolute positioning, relative to the parent (modal) */
+padding: 20px;      /* Give some space around the content */
+}
+
+.user-modal .close {
+position: absolute;  /* Position relative to modal-content */
+right: 10px;        /* Distance from right edge */
+top: 10px;          /* Distance from top edge */
+font-size: 24px;    /* Make it bigger */
+cursor: pointer;    /* Show pointer on hover */
+font-weight: bold;  /* Make it bolder */
+}
+
+/* Optional: make it look nicer on hover */
+.user-modal .close:hover {
+color: #888;
+}
+
+/* Add this new CSS - specific to this modal's close button */
+.options-close {
+position: absolute;
+right: 10px;
+top: 10px;
+font-size: 24px;
+cursor: pointer;
+}
+
+/* Or even more specific if needed */
+#user-account-options-modal .options-close {
+position: absolute;
+right: 10px;
+top: 10px;
+font-size: 24px;
+cursor: pointer;
+}
+
+#inputs-account {
+display: flex;
+flex-direction: column;
+margin-bottom: 15px; 
+}
+
+#buttons-account {
+display: flex;
+flex-direction: column;
+
+}

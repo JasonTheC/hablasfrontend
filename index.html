@@ -5,501 +5,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.1.5/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/epubjs/dist/epub.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700&family=Roboto:wght@400;700&family=Quicksand:wght@400;700&family=Montserrat:wght@400;700&display=swap" rel="stylesheet"> <!-- Include Lato, Roboto, and Montserrat fonts -->
-
-
-<style>
-    body {
-        background-color:  #a9d1d7;
-        margin: 1%;
-        overflow: hidden;
-        width: 99vw; 
-        height: 90vh;
-        justify-content:center;
-        align-items: center; 
-
-        }
-    #input_sentence {
-        
-        margin-top:2%;
-        
-    }
-    div {
-        padding: 0.5%;
-        
-    }
-    
-    #title {
-        font-size: 1.9em;
-        font-family: 'Quicksand', sans-serif;
-        font-weight: 600;
-        color:white; 
-        padding: 1%;
-        text-align: left;
-        display: flex;
-        margin-left: 4%;
-    }
-
-    #div2viewer {
-        margin: auto;
-        font-family: 'Roboto', sans-serif;
-        font-weight: 300;
-        background-color: #f9f9f9; /* Light background color */
-        border: 1px solid #ccc; /* Light grey border! */
-        border-radius: 10px; /* Rounded corners */
-        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1); /* Subtle shadow for depth */
-        max-width: 800px; /* Maximum width */
-        width: 90%; /* Full width */
-        height: 70%; /* Automatic height */
-        background-blend-mode: overlay; /* Blend texture with background color */
-        padding: auto;
-        
-    }
-
-    #div2viewer:hover {
-        box-shadow: 0 6px 15px rgba(0, 0, 0, 0.2); /* Darker shadow on hover */
-    }
-
-    #div3 {
-        
-        font-family: 'Monserrat', sans-serif;
-        font-weight: 300;
-        padding: auto;
-        margin: auto;
-        margin-top: 2%;
-        
-	width:90%;
-    }
-    #file-input {
-        display: none;
-    }
-    #wrong {
-        color: red;
-        cursor: pointer;
-    }
-    #viewer {
-        width: auto;
-        height: 100%;
-        border: 1px solid #ccc;
-        overflow: auto;
-    }
-
-    #navigation {
-        display: none;
-    }
-
-    .movingBtns {
-        background-color: #A9A9A9;
-        color: white; /* White text */
-        border: none; /* Remove border */
-        border-radius: 5px; /* Rounded corners */
-        padding: 10px 20px; /* Padding */
-        text-align: center; /* Center text */
-        text-decoration: none; /* Remove underline */
-        display: inline-block; /* Inline-block for spacing */
-        font-size: 16px; /* Font size */
-        margin: 10px 2px; /* Margin around buttons */
-        cursor: pointer;
-        transition: background-color 0.3s,
-    
-    }
-    .movingBtns:hover {
-        
-        background-color:  #8c8b8b;
-        transition: all 0.3s ease;  /* Smooth transition for all changes */
-        transform: translateX(3.5%);
-    }
- 
-    #file {
-        display: flex;
-        background-color: #4588a0; 
-        font-family: 'Roboto', sans-serif;
-        color: white; /* White text */
-        border: none; /* Remove border */
-        border-radius: 5px; /* Rounded corners */
-        padding: 10px 20px; /* Padding */
-        font-size: 16px; /* Font size */
-        cursor: pointer; /* Pointer cursor on hover */
-        transition: background-color 0.3s; /* Smooth transition */
-        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2); /* Shadow for depth */
-        width: 25%;
-        }
-    
-    #selectedText {
-        flex: 5;
-    }
-
-    #robot {
-        background-color: #A76D9A;
-        flex-grow: 0;
-        margin-left: auto; 
-        width: auto;
-        height: 100%;
-        cursor: pointer;
-        margin: auto;
-        
-        
-    }
-
-    #return_sentence {
-        flex:5;
-        border-radius: 10px;
-        border : 0.02rem solid #6bd8ff;
-    }
-    img {
-            max-width: 25%; /* Ensure the image is responsive */
-            height: auto; /* Maintain aspect ratio */
-            display: block; /* Ensure the image is treated as a block element */
-            margin: auto auto; /* Center the image */
-    }
-
-    #settings {
-        float:right;
-        height:10vh;
-        margin-right: 0; 
-        padding: 1%;
-        cursor: pointer;
-    }
-    
-    
-    .modal {
-        display: none;
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background-color: rgba(0,0,0,0.4); 
-        z-index: 999; /*olivias trial*/
-    }
-    .modal-content {
-        position: relative; /* Makes this element a positioning context for its children
-        Any child with position: absolute will be positioned relative to this element
-        Like creating a coordinate system inside this element */
-        height: 80%;
-        display: flex;
-        flex-direction: column;
-        /* Makes flex items stack vertically instead of horizontally*/
-        background-color: #fefefe;
-        margin: 5%;
-        padding: 20px;
-        border: 1px solid #888;
-        width: 80%;
-        
-        font-family: 'Roboto', sans-serif;
-    }
-
-    .close {
-        margin-left: auto;
-        order:2;
-        cursor: pointer;
-    }
-    
-    #top-popout{
-      flex:1;
-      display: flex;
-      justify-content: flex-end; /* Add this */
-
-       
-    }
-    #modal-main {
-        display: flex;
-        flex-direction: column;
-        flex: 10;
-    }
-    
-
-    #translation {
-        font-size: 12px;
-    }
-   
-    #actionButtons {
-        display: flex; /*if i dont put this, the buttons will be in a column*/ 
-        flex-direction:row;
-        justify-content: space-between;
-        align-items: center;
-        flex: 0 0 auto; /* Don't grow, don't shrink, auto base size */
-        padding: 1rem; /* Give it some breathing room */
-    
-    }
-
-    #actionButtons img {
-       /* max-height:70%;
-        width:auto;
-        cursor: pointer;    /* Changes mouse cursor to a hand when hovering */
-        /*padding: 5px 10px; */ /* Adds space inside each arrow (5px top/bottom, 10px left/right) */
-        max-height:60%;
-        object-fit: contain;
-        
-    }
-    #bottom {
-        flex: 0 0 auto; /* Take only needed space */
-        
-    }
-        
-    .text-container {
-        flex: 9; /* Takes up all available space in the flex container */
-        overflow-y: auto; /* Adds vertical scroll when content is too tall */
-        padding: 20px;
-        margin-bottom: 60px;
-        border-radius: 10px;
-        border : 0.02rem solid #c7f6fd;
-        background-color: #c7f6fd;
-        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2); /* Add shadow for 3D effect */
-    }
-    .darkerGrey {
-        background-color: #A76D9A;
-    }
-
-    .darkerGrey:hover {
-        background-color: #7a4e70;
-    }
-
-    #fileInput{
-        display: none;
-        visibility: hidden;
-    }
-    
-    .drawer {
-        height: 100%;
-        width: 30%;
-        background-color: #e9f0f3;
-        transition: transform 0.3s ease;
-        right: 0;
-        top: 0;
-        box-shadow: -2px 0 5px rgba(0,0,0,0.2);
-        font-family: 'Quicksand', sans-serif;
-        position: fixed; /*fixed position means that it will stay in the same place even if you scroll*/
-        overflow-x: hidden; /*prevents horizontal scrolling*/
-        z-index: 999; /*ensure drawer is above other elements*/
-        transform: translateX(100%); /*translate 100% of its width to the right (in the axis)*/
-    }
-    .drawer .close{
-        transform: translateX(100%);
-    }
-    .drawer.open {
-        transform: translateX(0);
-    }
-
-    .options {
-        margin-bottom: 7%;
-        cursor: pointer;
-    }
-    .options:hover {
-        background-color:  #a9d1d7;
-        transition: all 0.3s ease;  /* Smooth transition for all changes */
-        transform: translateX(3.5%);
-        border-radius: 7%; 
-        padding: 1%;
-        margin-right: 7%;
-    }
-
-    #language-select {
-        display: flex;
-        background-color:rgb(225, 242, 253);
-        color:  #4588a0;;
-        border: none;
-        border-radius: 1%;
-        padding: auto;
-        font-size: 1em;
-        cursor: pointer;
-        transition: background-color 0.3s;
-        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
-        width:30%;
-        margin :auto;
-    }
-    /* Style for the options in the dropdown */
-    #language-select option {
-        background-color: white;
-        color: #4588a0;
-        padding: 10px;
-        font-family: 'Roboto', sans-serif;
-        
-    }
-    /* Optional hover effect */
-    #language-select:hover {
-        background-color: #3a7286;
-    }
-    #books-grid {
-        display: flex;
-        flex-direction: column; /* Stack items vertically */
-        padding: 20px;
-        max-height: 70vh; /* Limits height to enable scrolling */
-        overflow-y: auto; /* Adds vertical scrollbar */
-        overflow-x: hidden; /* Prevents horizontal scrolling */
-    }
-
-    .language-section {
-        margin-bottom: 30px;
-        width: 100%;
-    }
-
-    .books-container {
-        display: flex;
-        flex-direction: column; /* Stack books vertically */
-        gap: 15px;
-        padding: 10px;
-    }
-
-    .book {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        padding: 10px;
-        border: 1px solid #ddd;
-        border-radius: 8px;
-        transition: transform 0.2s;
-        background-color: white;
-        width: 100%;
-    }
-
-    .book:hover {
-        transform: scale(1.05);
-        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-    }
-
-    .book img {
-        width: 120px;
-        height: 160px;
-        object-fit: cover;
-        border-radius: 5px;
-        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-    }
-
-    .book-title {
-        margin-top: 10px;
-        font-family: 'Quicksand', sans-serif;
-        font-size: 0.9em;
-        text-align: center;
-    }
-
-    /* Style the scrollbar */
-    #books-grid::-webkit-scrollbar {
-        width: 8px;
-    }
-
-    #books-grid::-webkit-scrollbar-track {
-        background: #f1f1f1;
-        border-radius: 4px;
-    }
-
-    #books-grid::-webkit-scrollbar-thumb {
-        background: #888;
-        border-radius: 4px;
-    }
-
-    #books-grid::-webkit-scrollbar-thumb:hover {
-        background: #555;
-    }
-
-    #languageUser {
-        display: block;
-        font-family: 'Roboto', sans-serif;
-        margin-bottom: 7%;
-        cursor: pointer;
-        border: none;
-        background-color: transparent;
-        font-size:15;
-        
-    }
-
-    #languageUser:hover {
-        background-color:  #a9d1d7;
-        transition: all 0.3s ease;  /* Smooth transition for all changes */
-        transform: translateX(3.5%);
-        border-radius: 7%; 
-        padding: 1%;
-        margin-right: 7%;
-    }
-
-    #languageUserOptions { /*animated drawer!*/
-        transform: translateX(1000%);
-        transition: transform 0.3s ease;
-    }
-    #languageUserOptions.show {
-    transform: translateX(0); /* Move it into view */
-}
-
-.vertical-slider {
-    display: inline-block;
-    writing-mode: bt-lr; /* For Firefox */
-    -webkit-appearance: slider-vertical; /* For Chrome */
-    width: 3%;
-    height: 100%;
-    padding: 1%;
-    margin: 0;
-
-}
-#bottom {
-    display: flex;
-    flex-direction: row;
-    align-items: center;
-    width: 100%; /* Set explicit width instead of auto */
-    min-height: fit-content;
-    min-width: fit-content;
-    overflow: visible; /*prevents clipping*/
-    padding: 10px;
-}
-
-#user-modal {
-    display: none;
-}
-
-.user-modal {
-    display: none;  /* This ensures the modal is hidden initially */
-    justify-content: center;
-    align-items: center;
-}
-
-.user-modal-content {
-    position: relative;  /* Needed for absolute positioning, relative to the parent (modal) */
-    padding: 20px;      /* Give some space around the content */
-}
-
-.user-modal .close {
-    position: absolute;  /* Position relative to modal-content */
-    right: 10px;        /* Distance from right edge */
-    top: 10px;          /* Distance from top edge */
-    font-size: 24px;    /* Make it bigger */
-    cursor: pointer;    /* Show pointer on hover */
-    font-weight: bold;  /* Make it bolder */
-}
-
-/* Optional: make it look nicer on hover */
-.user-modal .close:hover {
-    color: #888;
-}
-
-/* Add this new CSS - specific to this modal's close button */
-.options-close {
-    position: absolute;
-    right: 10px;
-    top: 10px;
-    font-size: 24px;
-    cursor: pointer;
-}
-
-/* Or even more specific if needed */
-#user-account-options-modal .options-close {
-    position: absolute;
-    right: 10px;
-    top: 10px;
-    font-size: 24px;
-    cursor: pointer;
-}
-
-#inputs-account {
-    display: flex;
-    flex-direction: column;
-    margin-bottom: 15px; 
-}
-
-#buttons-account {
-    display: flex;
-    flex-direction: column;
-    
-}
-
-</style>
+<link rel="stylesheet" href="style.css">
 <body>
     
     <div id="title">
@@ -618,10 +124,10 @@
     let currentBook = null;
     let rendition = null;
     let selectedText = null;
-    let lines = null; 
+    let lines = []; 
     let lineNum = 0;
     let language = "";
-    let isRecording = false; //booleag flag
+    let isRecording = false; 
     let translationText = "";
 
     let mediaRecorder; 
@@ -661,7 +167,7 @@
         'Sr.', 'Jr.', 'etc.', 'e.g.', 'i.e.', '."'
     ];
 
-    let socket; // Declare socket variable. Built-in object of js
+    let socket = new WebSocket('ws://localhost:8765');; // Declare socket variable. Built-in object of js
     const booksModal = document.getElementById('books-modal');
 
     // First, get reference to your slider
@@ -685,31 +191,134 @@
 
 console.log ("starting script");
 function initializeWebSocket() {
-    console.log("initializing websocket");
-
-    socket = new WebSocket('wss://carriertech.uk:8675'); // Create the WebSocket connection
-    //socket = new WebSocket ('ws://localhost:8765'); //port appears in local_web_server.py (for Fuckoffee)
     socket.addEventListener('open',() => {
         console.log('WebSocket connection established');
     });
 
     socket.addEventListener('message', (event) => {
         console.log('WebSocket message received:', event.data);
+        const msg = JSON.parse(event.data);
+        
+        if (msg.books) {
+            // Group books by language
+            const booksByLanguage = msg.books.reduce((acc, book) => {
+                if (!acc[book.language]) {
+                    acc[book.language] = [];
+                }
+                acc[book.language].push(book);
+                return acc;
+            }, {});
+            
+            // Update language-select options
+            const languageSelect = document.getElementById('language-select');
+            languageSelect.innerHTML = '';
+            
+            Object.keys(booksByLanguage).forEach(language => {
+                const option = document.createElement('option');
+                option.value = language.toLowerCase();
+                option.textContent = language.charAt(0).toUpperCase() + language.slice(1);
+                languageSelect.appendChild(option);
+            });
+
+            // Update books grid
+            const booksGrid = document.getElementById('books-grid');
+            booksGrid.innerHTML = '';
+            
+            Object.entries(booksByLanguage).forEach(([language, languageBooks]) => {
+                const languageSection = document.createElement('div');
+                languageSection.className = 'language-section';
+                
+                const languageHeader = document.createElement('h2');
+                languageHeader.textContent = language.charAt(0).toUpperCase() + language.slice(1);
+                languageSection.appendChild(languageHeader);
+                
+                const booksContainer = document.createElement('div');
+                booksContainer.className = 'books-container';
+                
+                languageBooks.forEach(book => {
+                    const bookElement = document.createElement('div');
+                    bookElement.className = 'book';
+
+                    const img = document.createElement('img');
+                    // Check if cover is base64 data or path
+                    if (book.cover && book.cover.startsWith('data:')) {
+                        img.src = book.cover;
+                    } else {
+                        // Fallback to default cover if the base64 data is invalid
+                        img.src = 'images/default-cover.png';
+                        console.error('Invalid cover data for book:', book.filename);
+                    }
+                    img.alt = book.filename;
+                    
+                    const title = document.createElement('div');
+                    title.className = 'book-title';
+                    title.textContent = book.filename.replace('.epub', '');
+                    
+                    bookElement.appendChild(img);
+                    bookElement.appendChild(title);
+                    
+                    // Add click event to load the book
+                    bookElement.addEventListener('click', () => {
+                        try {
+                            // Create a Blob from the base64 data
+                            if (!book.epub) {
+                                console.error('No EPUB data received for book:', book.filename);
+                                return;
+                            }
+
+                            const epubData = book.epub;
+                            const base64Data = epubData.split(',')[1];
+                            if (!base64Data) {
+                                console.error('Invalid EPUB data format for book:', book.filename);
+                                return;
+                            }
+
+                            const byteString = atob(base64Data);
+                            const mimeString = epubData.split(',')[0].split(':')[1].split(';')[0];
+                            const ab = new ArrayBuffer(byteString.length);
+                            const ia = new Uint8Array(ab);
+                            
+                            for (let i = 0; i < byteString.length; i++) {
+                                ia[i] = byteString.charCodeAt(i);
+                            }
+                            
+                            const blob = new Blob([ab], {type: mimeString});
+                            renderEpub(blob);
+                            booksModal.style.display = 'none';
+                            languageSelect.value = language;
+                            
+                        } catch (error) {
+                            console.error('Error loading book:', error);
+                            alert('Error loading book. Please try again.');
+                        }
+                    });
+                    
+                    booksContainer.appendChild(bookElement);
+                });
+                
+                languageSection.appendChild(booksContainer);
+                booksGrid.appendChild(languageSection);
+            });
+        }
     });
 
     return socket;
-    }
+}
 
-availableBooksBtn.addEventListener('click', async () => {
-    try {
-        const response = await fetch('hablas-api.php');
-        const books = await response.json();
-        
-        const booksGrid = document.getElementById('books-grid');
-        booksGrid.innerHTML = '';
-        
+function loadAvailableBooks() {
+    if (!socket || socket.readyState !== WebSocket.OPEN) {
+        socket = initializeWebSocket();}
+    const request = {task: "get_books"};
+    socket.send(JSON.stringify(request));
+}
+
+// Add this to your existing WebSocket message handler
+socket.addEventListener('message', (event) => {
+    const msg = JSON.parse(event.data);
+    
+    if (msg.books) {
         // Group books by language
-        const booksByLanguage = books.reduce((acc, book) => {
+        const booksByLanguage = msg.books.reduce((acc, book) => {
             if (!acc[book.language]) {
                 acc[book.language] = [];
             }
@@ -719,50 +328,45 @@ availableBooksBtn.addEventListener('click', async () => {
         
         // Update language-select options
         const languageSelect = document.getElementById('language-select');
-        languageSelect.innerHTML = ''; // Clear existing options
+        languageSelect.innerHTML = '';
         
-        // Add options for each available language
-        console.log("OLIVIA'S TRIAL: language : ", language);
-        console.log("OLIVIA'S TRIAL: booksbylanguage", booksByLanguage);
-        Object.keys(booksByLanguage).forEach(language => { //language here is an empty parameter
-            console.log('language: ', language); //these are ALL the language options. NOT the language selected
-            const option = document.createElement('option'); //shows all the languages like this: <option value="deutsch">Deutsch</option>
-            
-            const languageMap = { //ignore, its not being used technically...
-                'english': 'en',
-                'french': 'fr',
-                'spanish': 'sp',
-                'italian': 'it',
-                'german': 'de'
-            };
-            option.value =  language.toLowerCase();
+        Object.keys(booksByLanguage).forEach(language => {
+            const option = document.createElement('option');
+            option.value = language.toLowerCase();
             option.textContent = language.charAt(0).toUpperCase() + language.slice(1);
             languageSelect.appendChild(option);
         });
 
-        // Rest of your existing code for creating the books grid...
+        // Update books grid
+        const booksGrid = document.getElementById('books-grid');
+        booksGrid.innerHTML = '';
+        
         Object.entries(booksByLanguage).forEach(([language, languageBooks]) => {
-            // Create language section
             const languageSection = document.createElement('div');
             languageSection.className = 'language-section';
             
-            // Add language header
             const languageHeader = document.createElement('h2');
             languageHeader.textContent = language.charAt(0).toUpperCase() + language.slice(1);
             languageSection.appendChild(languageHeader);
             
-            // Create books container for this language
             const booksContainer = document.createElement('div');
             booksContainer.className = 'books-container';
             
-            // Add books for this language
             languageBooks.forEach(book => {
                 const bookElement = document.createElement('div');
                 bookElement.className = 'book';
 
                 const img = document.createElement('img');
-                img.src = book.cover;
+                // Check if cover is base64 data or path
+                if (book.cover && book.cover.startsWith('data:')) {
+                    img.src = book.cover;
+                } else {
+                    // Fallback to default cover if the base64 data is invalid
+                    img.src = 'images/default-cover.png';
+                    console.error('Invalid cover data for book:', book.filename);
+                }
                 img.alt = book.filename;
+                
                 const title = document.createElement('div');
                 title.className = 'book-title';
                 title.textContent = book.filename.replace('.epub', '');
@@ -772,24 +376,54 @@ availableBooksBtn.addEventListener('click', async () => {
                 
                 // Add click event to load the book
                 bookElement.addEventListener('click', () => {
-                    renderEpub(book.path);
-                    booksModal.style.display = 'none';
+                    try {
+                        // Create a Blob from the base64 data
+                        if (!book.epub) {
+                            console.error('No EPUB data received for book:', book.filename);
+                            return;
+                        }
 
-                    languageSelect.value= language;
-                    console.log("OLIVIA'S TRIAL: language", language); //HERE is where we finally have the language of the book!!!!
+                        const epubData = book.epub;
+                        const base64Data = epubData.split(',')[1];
+                        if (!base64Data) {
+                            console.error('Invalid EPUB data format for book:', book.filename);
+                            return;
+                        }
+
+                        const byteString = atob(base64Data);
+                        const mimeString = epubData.split(',')[0].split(':')[1].split(';')[0];
+                        const ab = new ArrayBuffer(byteString.length);
+                        const ia = new Uint8Array(ab);
+                        
+                        for (let i = 0; i < byteString.length; i++) {
+                            ia[i] = byteString.charCodeAt(i);
+                        }
+                        
+                        const blob = new Blob([ab], {type: mimeString});
+                        renderEpub(blob);
+                        booksModal.style.display = 'none';
+                        languageSelect.value = language;
+                        
+                    } catch (error) {
+                        console.error('Error loading book:', error);
+                        alert('Error loading book. Please try again.');
+                    }
                 });
+                
                 booksContainer.appendChild(bookElement);
             });
             
             languageSection.appendChild(booksContainer);
             booksGrid.appendChild(languageSection);
         });
-        
-        booksModal.style.display = 'block';
-        drawer.classList.remove('open');
-    } catch (error) {
-        console.error('Error loading books:', error);
     }
+});
+
+// Call loadAvailableBooks when the available books button is clicked
+availableBooksBtn.addEventListener('click', () => {
+    loadAvailableBooks();
+    const booksModal = document.getElementById('books-modal');
+    booksModal.style.display = 'block';
 });
 
 // Close books modal
@@ -804,36 +438,62 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
         viewer.innerHTML = "";
         rendition = currentBook.renderTo("viewer", {
             height: "100%",
+            width: "100%",
             allowScriptedContent: true,
             script: true,
-            sandbox: "allow-same-origin allow-scripts allow-popups",
-            spread: "none"
+            spread: "none",
+            flow: "scrolled-doc",
+            manager: "continuous"
         });
         
-        rendition.display();
+        rendition.display().then(() => {
+            console.log("Book rendered successfully");
+            
+            // Get initial page content
+            const contents = rendition.getContents();
+            if (contents && contents.length > 0) {
+                const content = contents[0];
+                const pageText = content.document.body.textContent;
+                console.log("Initial page content:", pageText);
+                lines = pageText.split('.')
+                    .map(line => line.trim())
+                    .filter(line => line.length > 0)
+                    .map(line => line + '.');
+            }
+
+            // Add selection event listener
+            rendition.on("rendered", (section) => {
+                const contents = rendition.getContents();
+                contents.forEach(content => {
+                    content.document.addEventListener("selectionchange", () => {
+                        const selection = content.window.getSelection();
+                        if (selection && selection.toString().trim()) {
+                            selectedText = selection.toString().trim();
+                            console.log("Text selected:", selectedText);
+                            
+                            // Update lines array with selected text
+                            lines = selectedText.split('.')
+                                .map(line => line.trim())
+                                .filter(line => line.length > 0)
+                                .map(line => line + '.');
+                        }
+                    });
+                });
+            });
+        });
+
         navigationDiv.style.display = 'block';
         fileDiv.style.display = "none";
     }
     async function createBlobAndConnect() {
-        // Assuming you have the logic to create the blob here
         const audioBlob = new Blob(audioChunks, { type: 'audio/wav' }); // Create the blob
-
-        // Now establish the WebSocket connection
         socket = new WebSocket('wss://carriertech.uk:8675'); // Create the WebSocket connection
-        //socket = new WebSocket ('ws://localhost:8765'); //port appears in local_web_server.py (for Fuckoffee)
-        
-        /*if (!socket || socket.readyState !== WebSocket.OPEN) {
-            console.error('WebSocket connection not established');
-            socket = initializeWebSocket();
-        } */
+ 
 
         socket.addEventListener('open', () => {
-            //console.log('WebSocket connection established');
-            // You can send the blob or any other data here if needed
-           
-        const reader = new FileReader(); //fileReader instance to manipulate the blob
-        reader.onloadend = function() {  //it's like an "instruction for the future". When you have data (blob) and you finish loading, this is what you would have to do 
-            // The result will be a data URL, so we split to get the Base64 part
+
+        const reader = new FileReader(); 
+        reader.onloadend = function() { 
             const base64Blob = reader.result;
             const dataToSend = {
                 username: username,
@@ -846,12 +506,11 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
             console.log("datauser OLIVIA'STRIAL username: ", username, "password: ", password);
             socket.send(JSON.stringify(dataToSend)); // Send data (turning json object into string) after connection is established
         };
-        reader.readAsDataURL(audioBlob); // Read the blob as a data URL
+        reader.readAsDataURL(audioBlob); 
         audioChunks=[];
         });
 
         socket.addEventListener('message', async (event) => {
-            //actual message/data received from the WebSocket server (stringfy json)
             const msg = JSON.parse(event.data);
             console.log("OLIVIA'S TRIAL: msg: ", msg);
 
@@ -870,7 +529,6 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
                     });
                 }
             }
-            //returnSentenceDiv.textContent = event.data; // Display message from server. ex: "an audio has been received"
         });
 
         socket.addEventListener('close', () => {
@@ -881,71 +539,72 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
             console.error('WebSocket error:', error);
         });
     }
-    // Separate function for text extraction
+    // Update the extractVisibleText function
     function extractVisibleText() {
         console.log("extractVisibleText called");
-        const location = rendition.currentLocation();
-        console.log("Current location:", location);
-
-        const makeRangeCfi = (a, b) => {
-                const CFI = new ePub.CFI()
-                const start = CFI.parse(a), end = CFI.parse(b)
-                const cfi = {
-                    range: true,
-                    base: start.base,
-                    path: {
-                        steps: [],
-                        terminal: null
-                    },
-                    start: start.path,
-                    end: end.path
-                }
-                const len = cfi.start.steps.length
-                for (let i = 0; i < len; i++) {
-                    if (CFI.equalStep(cfi.start.steps[i], cfi.end.steps[i])) {
-                        if (i == len - 1) {
-                            if (cfi.start.terminal === cfi.end.terminal) {
-                                cfi.path.steps.push(cfi.start.steps[i])
-                                cfi.range = false
-                            }
-                        } else cfi.path.steps.push(cfi.start.steps[i])
-                    } else break
-                }
-                cfi.start.steps = cfi.start.steps.slice(cfi.path.steps.length)
-                cfi.end.steps = cfi.end.steps.slice(cfi.path.steps.length)
-
-                return 'epubcfi(' + CFI.segmentString(cfi.base)
-                    + '!' + CFI.segmentString(cfi.path)
-                    + ',' + CFI.segmentString(cfi.start)
-                    + ',' + CFI.segmentString(cfi.end)
-                    + ')'
+        
+        return new Promise((resolve, reject) => {
+            if (!rendition) {
+                console.log("No rendition available");
+                resolve(false);
+                return;
             }
-
-        if (location && location.start && location.end) {
-            const rangeCfi = makeRangeCfi(location.start.cfi, location.end.cfi);
-            console.log("Range CFI created:", rangeCfi);
             
-            currentBook.getRange(rangeCfi)
-                .then(range => {
-                    selectedText = range.toString();
-                    console.log("Raw selected text:", selectedText);
-                    
-                    // Clean up text
-                    selectedText = cleanText(selectedText);
-                    console.log("Cleaned selected text:", selectedText);
-                    
-                    lines = selectedText.split('.');
-                    console.log("Lines array:", lines);
-                    console.log("Number of lines:", lines.length);
-                })
-                .catch(error => console.error('Error getting range:', error));
-        } else {
-            console.log("Location is invalid:", location);
-        }
+            setTimeout(() => {
+                const contents = rendition.getContents();
+                if (!contents || contents.length === 0) {
+                    console.log("No contents available");
+                    resolve(false);
+                    return;
+                }
+
+                const content = contents[0];
+                if (!content || !content.window) {
+                    console.log("Invalid content or window");
+                    resolve(false);
+                    return;
+                }
+
+                // Try to get selected text first
+                const selection = content.window.getSelection();
+                let textToProcess = selection.toString().trim();
+                
+                // If no selection, get all text from the current page
+                if (!textToProcess) {
+                    textToProcess = content.document.body.textContent.trim();
+                }
+                
+                console.log("Raw text to process:", textToProcess);
+                
+                if (!textToProcess) {
+                    console.log("No text available");
+                    resolve(false);
+                    return;
+                }
+
+                // Improved sentence splitting
+                lines = textToProcess
+                    .split(/(?<=[.!?])\s+/) // Split on sentence endings followed by whitespace
+                    .map(line => line.trim())
+                    .filter(line => line.length > 0)
+                    .map(line => {
+                        // Ensure the line ends with proper punctuation
+                        if (!/[.!?]$/.test(line)) {
+                            return line + '.';
+                        }
+                        return line;
+                    });
+                
+                console.log("Processed lines:", lines);
+                console.log("Number of lines:", lines.length);
+                resolve(lines.length > 0);
+            }, 100);
+        });
     }
     
     // Separate text cleaning function
     function cleanText(text) {
+        // First handle abbreviations to prevent losing their meaning
         const regexMatch = /[A-Z]\./g;
         text = text.replace(regexMatch, match => match.replace('.', ''));
         
@@ -953,6 +612,13 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
             let clean = abbr.replaceAll(".", "");
             text = text.replaceAll(abbr, clean);
         });
+        
+        // Remove all non-alphanumeric characters except spaces
+        // This will remove characters like "»", "«", etc.
+        text = text.replace(/[^a-zA-Z0-9\s]/g, '');
+        
+        // Remove multiple spaces
+        text = text.replace(/\s+/g, ' ').trim();
         
         return text;
     }
@@ -985,45 +651,59 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
     });
 
 
-    prevArrowBtn.addEventListener('click', () => {
-        console.log("prev arrrow button clicked")
-            if (lineNum <= 0) {
-                // Do nothing when at the start
-            } else {
-                lineNum--;
-                selectDiv.innerHTML = lines[lineNum];
-                translate();
-            }
-        });
+    nextArrowBtn.addEventListener('click', () => {
+        console.log(`clicked on nextArrowBtn. line number: ${lineNum}`);
+        if (!lines || lines.length === 0) {
+            console.log("No text has been selected yet");
+            return;
+        }
+        
+        if (lineNum >= lines.length - 1) {
+            console.log("At the end of current text");
+            // Optionally, you could automatically go to next page here
+            return;
+        }
+        
+        lineNum++;
+        console.log(`Moving to line ${lineNum}: ${lines[lineNum]}`);
+        selectDiv.innerHTML = lines[lineNum];
+        translate();
+    });
 
-    nextArrowBtn.addEventListener('click',() => {
-            console.log(`clicked on nextArrowBtn. line number: ${lineNum}`);
-            if (lineNum == lines.length-1) {
-            
-            } else {
-                lineNum++;
-                selectDiv.innerHTML=lines[lineNum];
-                translate();
-            }
-            
-        })
+    prevArrowBtn.addEventListener('click', () => {
+        console.log("prev arrow button clicked");
+        if (!lines || lines.length === 0) {
+            console.log("No text has been selected yet");
+            return;
+        }
+        
+        if (lineNum <= 0) {
+            console.log("At the start of current text");
+            // Optionally, you could automatically go to previous page here
+            return;
+        }
+        
+        lineNum--;
+        console.log(`Moving to line ${lineNum}: ${lines[lineNum]}`);
+        selectDiv.innerHTML = lines[lineNum];
+        translate();
+    });
 
     selectBtn.addEventListener('click', () => {
-        console.log("Select button clicked");
-        console.log("Current rendition:", rendition);
-        
         if (!rendition) { 
             alert('Please load an EPUB file first');
             return;
         }
         
-        modalDiv.style.display = "block"; //
-        console.log(lines);
-        console.log(lineNum); 
-        selectDiv.innerHTML=lines[lineNum];
+        if (!extractVisibleText()) {
+            alert('Please select some text first');
+            return;
+        }
+        
+        modalDiv.style.display = "block";
+        lineNum = 0;
+        selectDiv.innerHTML = lines[lineNum];
         translate();
-
-
     });
 
     closeBtn.addEventListener('click', (event) => {
@@ -1067,108 +747,62 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
 
     nextPageBtn.addEventListener('click', () => {
         console.log("nextPageBtn clicked");
-        if (rendition) { //if an epub is loaded
-            rendition.next().then(extractVisibleText); //next is a method from epub.js to go to the next page
-        }
-    })
-
-    prevPageBtn.addEventListener('click',() =>{
-        console.log("prevPageBtn clicked");
-        if (rendition){
-            rendition.prev().then(extractVisibleText);
-        }
-    } )
-
-    // Fetch the book data from the API
-    fetch('hablas-api.php')
-        .then(response => response.json())
-        .then(books => {
-            console.log('Books:', books);
-            
-            // Group books by language
-            const booksByLanguage = books.reduce((acc, book) => {
-                if (!acc[book.language]) {
-                    acc[book.language] = [];
+        if (rendition) {
+            rendition.next().then(() => {
+                return new Promise(resolve => setTimeout(resolve, 100));
+            }).then(() => {
+                const contents = rendition.getContents();
+                if (contents && contents.length > 0) {
+                    const content = contents[0];
+                    // Get all text from the current page
+                    const pageText = content.document.body.textContent;
+                    console.log("New page content:", pageText);
+                    
+                    // Update lines array with page content
+                    lines = pageText.split('.')
+                        .map(line => line.trim())
+                        .filter(line => line.length > 0)
+                        .map(line => line + '.');
+                    
+                    // Reset line number and update display
+                    lineNum = 0;
+                    if (lines.length > 0) {
+                        selectDiv.innerHTML = lines[lineNum];
+                        translate();
+                    }
                 }
-                acc[book.language].push(book);
-                
-                return acc;
-            }, {});
-            
-            // Create book elements
-            const booksGrid = document.getElementById('books-grid');
-            
-            // For each language group
-            Object.entries(booksByLanguage).forEach(([language, languageBooks]) => {
-                // Create language section
-                const languageSection = document.createElement('div');
-                languageSection.className = 'language-section';
-                
-                // Add language header
-                const languageHeader = document.createElement('h2');
-                languageHeader.textContent = language.charAt(0).toUpperCase() + language.slice(1);
-                languageSection.appendChild(languageHeader);
-                
-                // Create books container for this language
-                const booksContainer = document.createElement('div');
-                booksContainer.className = 'books-container';
-                
-                // Add books for this language
-                languageBooks.forEach(book => {
-                    const bookElement = document.createElement('div');
-                    bookElement.className = 'book';
-                    
-                    const img = document.createElement('img');
-                    img.src = book.cover;
-                    img.alt = book.filename;
-                    
-                    const title = document.createElement('div');
-                    title.className = 'book-title';
-                    title.textContent = book.filename.replace('.epub', '');
-                    
-                    bookElement.appendChild(img);
-                    bookElement.appendChild(title);
-                    
-                    // Add click event to load the book
-                    bookElement.addEventListener('click', () => {
-                        const file = book.path;
-                        renderEpub(file);
-                        
-                        // Set up navigation
-                        rendition.on('rendered', extractVisibleText);
-                        
-                        document.getElementById('prev').addEventListener('click', () => {
-                            rendition.prev().then(extractVisibleText);
-                        });
-                        
-                        document.getElementById('next').addEventListener('click', () => {
-                            rendition.next().then(extractVisibleText);
-                        });
-                        
-                        // Hide books modal after selection
-                        bookElement.closest('.modal').style.display = 'none';
-                    });
-                    
-                    booksContainer.appendChild(bookElement);
-                });
-                
-                languageSection.appendChild(booksContainer);
-                booksGrid.appendChild(languageSection);
             });
-        })
-        .catch(error => console.error('Error:', error));
-
-    // Add event listener for the available books button
-    availableBooksBtn.addEventListener('click', () => {
-        const booksModal = document.getElementById('books-modal');
-        booksModal.style.display = 'block';
+        }
     });
 
-    // Close books modal
-    document.querySelectorAll('.modal .close').forEach(closeBtn => {
-        closeBtn.addEventListener('click', () => {
-            closeBtn.closest('.modal').style.display = 'none';
-        });
+    prevPageBtn.addEventListener('click', () => {
+        console.log("prevPageBtn clicked");
+        if (rendition) {
+            rendition.prev().then(() => {
+                return new Promise(resolve => setTimeout(resolve, 100));
+            }).then(() => {
+                const contents = rendition.getContents();
+                if (contents && contents.length > 0) {
+                    const content = contents[0];
+                    // Get all text from the current page
+                    const pageText = content.document.body.textContent;
+                    console.log("New page content:", pageText);
+                    
+                    // Update lines array with page content
+                    lines = pageText.split('.')
+                        .map(line => line.trim())
+                        .filter(line => line.length > 0)
+                        .map(line => line + '.');
+                    
+                    // Reset line number and update display
+                    lineNum = 0;
+                    if (lines.length > 0) {
+                        selectDiv.innerHTML = lines[lineNum];
+                        translate();
+                    }
+                }
+            });
+        }
     });
 
     textToSpeechBtn.addEventListener('click', () => { //using a Web Speech API (speechSynthesis part)
@@ -1303,31 +937,32 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
         document.getElementById('user-modal').style.display = 'block';
        }
 
-    loginButton.addEventListener('click', () => {
+    loginButton.addEventListener('click', async () => {  // Make this async
         loginButton.style.backgroundColor = '#FFB6C1';
-        username=usernameInput.value;
-        password=passwordInput.value;
+        username = usernameInput.value;
+        password = passwordInput.value;
 
         console.log("login button clicked");
         console.log("username is: ", username);
         console.log("password is: ", password); 
-        
 
-        if(!socket || socket.readyState !== WebSocket.OPEN) { //if socket is not open or not initialized
-            console.error('WebSocket connection not established'); 
+        // Initialize socket if needed and wait for connection
+        if (!socket || socket.readyState !== WebSocket.OPEN) {
             socket = initializeWebSocket();
+            // Wait for socket to connect
+            await new Promise((resolve, reject) => {
+                socket.addEventListener('open', resolve);
+                socket.addEventListener('error', reject);
+            });
         }
 
-        socket.addEventListener('open',() => {
-            console.log('WebSocket connection established');
-            const loginData = {
-                username: username,
-                password: password,
-            };  
-            socket.send(JSON.stringify(loginData)); 
-            console.log("loginData sent");   
-        }); 
-        
+        // Now that we know the socket is connected, send the data
+        const loginData = {
+            username: username,
+            password: password,
+        };  
+        socket.send(JSON.stringify(loginData)); 
+        console.log("loginData sent");   
     });
 
     signupButton.addEventListener('click', () => {
@@ -1343,5 +978,7 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
     function openUserAccountOptions() {
         document.getElementById('user-account-options-modal').style.display = 'block';
     }
+
+
 
 </script>
