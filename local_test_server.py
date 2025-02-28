@@ -15,6 +15,8 @@ from pathlib import Path
 import shutil
 import mimetypes
 from PIL import Image, ImageDraw, ImageFont
+import Levenshtein  # Add this import for Levenshtein distance
+from googletrans import Translator  # Add this import for translation
 
 
 LANG_ID = "fr"
@@ -24,6 +26,7 @@ AUDIO_DIR = "frenchtrial.wav"
 # Add these global variables at the top level after the imports
 loaded_processors = {}
 loaded_models = {}
+translator = Translator()  # Initialize the translator
 
 # Add these database constants after other constants
 DB_PATH = "users.db"
@@ -77,24 +80,122 @@ def stt(AUDIO_DIR, lang):
 class TextComparator:
     @staticmethod
     def generate_html_report(text1, text2, output_file='text_comparison_report.html'):
-        words1 = text1.lower().split()
-        words2 = text2.lower().split()
-        matcher = difflib.SequenceMatcher(None, words1, words2)       
-        marked_words2 = words2.copy()        
-        for tag, i1, i2, j1, j2 in matcher.get_opcodes():
-            print((tag,i1, i2, j1, j2))
-            if tag != 'equal':
-                for j in range(j1, j2):
-                    # Set id to the corresponding word in words1 if it exists, otherwise use empty string
-                    corresponding_word = words1[i1] if i1 < len(words1) else ""
-                    marked_words2[j] = f'<span id="{corresponding_word}" class="wrong" style="color:red;">{marked_words2[j]}</span>'
+        # Normalize text for comparison
+        def normalize_text(text):
+            text = text.lower()
+            # Replace punctuation with spaces
+            for char in ',.!?;:«»""()[]{}':
+                text = text.replace(char, ' ')
+            
+            # Handle apostrophes specially
+            text = text.replace("'", "'")  # Standardize apostrophes
+            
+            # Split into words and filter empty strings
+            return [word for word in text.split() if word]
         
-        marked_text2 = ' '.join(marked_words2)
+        # Get normalized words
+        original_words = normalize_text(text1)
+        spoken_words = normalize_text(text2)
         
-        similarity_ratio = matcher.ratio()
+        print(f"Original words: {original_words}")
+        print(f"Spoken words: {spoken_words}")
         
-       
-        return marked_text2, similarity_ratio
+        # Create a dynamic programming matrix for alignment
+        # This is similar to the Needleman-Wunsch algorithm for sequence alignment
+        m, n = len(original_words), len(spoken_words)
+        
+        # Initialize the score matrix
+        score = [[0 for _ in range(n+1)] for _ in range(m+1)]
+        
+        # Initialize the traceback matrix
+        traceback = [[None for _ in range(n+1)] for _ in range(m+1)]
+        
+        # Fill the first row and column with gap penalties
+        for i in range(m+1):
+            score[i][0] = -i
+            if i > 0:
+                traceback[i][0] = "up"
+        
+        for j in range(n+1):
+            score[0][j] = -j
+            if j > 0:
+                traceback[0][j] = "left"
+        
+        # Fill the score and traceback matrices
+        for i in range(1, m+1):
+            for j in range(1, n+1):
+                # Calculate similarity score between words
+                word_similarity = 1 - Levenshtein.distance(original_words[i-1], spoken_words[j-1]) / max(len(original_words[i-1]), len(spoken_words[j-1]))
+                
+                # Calculate scores for different moves
+                match_score = score[i-1][j-1] + (2 * word_similarity - 1)  # Reward for similar words, penalty for different
+                delete_score = score[i-1][j] - 0.5  # Gap penalty
+                insert_score = score[i][j-1] - 0.5  # Gap penalty
+                
+                # Choose the best move
+                best_score = max(match_score, delete_score, insert_score)
+                score[i][j] = best_score
+                
+                # Record the move in the traceback matrix
+                if best_score == match_score:
+                    traceback[i][j] = "diag"
+                elif best_score == delete_score:
+                    traceback[i][j] = "up"
+                else:
+                    traceback[i][j] = "left"
+        
+        # Traceback to find the alignment
+        aligned_original = []
+        aligned_spoken = []
+        i, j = m, n
+        
+        while i > 0 or j > 0:
+            if i > 0 and j > 0 and traceback[i][j] == "diag":
+                aligned_original.append(original_words[i-1])
+                aligned_spoken.append(spoken_words[j-1])
+                i -= 1
+                j -= 1
+            elif i > 0 and traceback[i][j] == "up":
+                aligned_original.append(original_words[i-1])
+                aligned_spoken.append(None)  # Gap in spoken
+                i -= 1
+            else:  # traceback[i][j] == "left"
+                aligned_original.append(None)  # Gap in original
+                aligned_spoken.append(spoken_words[j-1])
+                j -= 1
+        
+        # Reverse the alignments
+        aligned_original.reverse()
+        aligned_spoken.reverse()
+        
+        # Generate HTML output
+        marked_output = []
+        
+        for orig, spoken in zip(aligned_original, aligned_spoken):
+            if orig is None:
+                # Extra word in spoken text
+                marked_output.append(f'<span id="" class="wrong" style="color:red;">{spoken}</span>')
+            elif spoken is None:
+                # Missing word in spoken text (optional to include)
+                continue
+            else:
+                # Both words exist - check similarity
+                distance = Levenshtein.distance(orig, spoken)
+                max_len = max(len(orig), len(spoken))
+                ratio = distance / max_len if max_len > 0 else 0
+                
+                if distance > 2 and ratio > 0.3:
+                    marked_output.append(f'<span id="{orig}" class="wrong" style="color:red;">{spoken}</span>')
+                else:
+                    marked_output.append(spoken)
+        
+        # Join the marked words back into text
+        marked_text = ' '.join(marked_output)
+        
+        # Calculate overall similarity
+        similarity_ratio = difflib.SequenceMatcher(None, original_words, spoken_words).ratio()
+        
+        return marked_text, similarity_ratio, original_words, spoken_words
 
 def stt_task(data_object):
     print(f"language: {data_object['language']}") 
@@ -106,7 +207,17 @@ def stt_task(data_object):
             binary_data = base64.b64decode(actual_base64)
             audio_file.write(binary_data)
     the_words = stt(fpath,data_object["language"])
-    predicted_sentence, similarity_ratio = TextComparator.generate_html_report(data_object["sentence"], the_words)
+    predicted_sentence, similarity_ratio, original_words, spoken_words = TextComparator.generate_html_report(data_object["sentence"], the_words)
+    # Print detailed debug information
+    for i in range(min(len(original_words), len(spoken_words))):
+        distance = Levenshtein.distance(original_words[i], spoken_words[i])
+        max_len = max(len(original_words[i]), len(spoken_words[i]))
+        ratio = distance / max_len if max_len > 0 else 0
+        print(f"Word {i+1}: Original '{original_words[i]}' vs Spoken '{spoken_words[i]}'")
+        print(f"  - Levenshtein distance: {distance}")
+        print(f"  - Max length: {max_len}")
+        print(f"  - Distance ratio: {ratio:.2f}")
+        print(f"  - Marked as wrong: {distance > 2 and ratio > 0.3}")
     message_returned = {"pred_sentence":predicted_sentence}
 
     print("Received audio file and saved as 'received_audio.wav'")
@@ -256,6 +367,67 @@ async def get_available_books():
         print(f"Error getting available books: {e}")
         return []
 
+
+
+async def translate_task(data_object):
+    """Handle translation requests"""
+    source_text = data_object.get("text", "")
+    source_lang = data_object.get("source_lang", "en")
+    target_lang = data_object.get("target_lang", "fr")
+    
+    if not source_text:
+        return {"status": "error", "message": "No text provided for translation"}
+    
+    if source_lang == target_lang:
+        return {"status": "success", "translated_text": source_text}
+    
+    # Map language codes to standard codes if needed
+    source_lang_map = {
+        "francais": "fr",
+        "english": "en",
+        "español": "es",
+        "deutsch": "de",
+        "italiano": "it"
+    }
+    
+    # Convert language names to standard codes
+    if source_lang in source_lang_map:
+        source_lang = source_lang_map[source_lang]
+    
+    try:
+        # Use a simpler approach with direct translation
+        print(f"Attempting to translate from {source_lang} to {target_lang}")
+        
+        # Create a new translator instance for each request
+        translator_instance = Translator()
+        result = await translator_instance.translate(source_text, src=source_lang, dest=target_lang)
+        
+        if hasattr(result, 'text'):
+            translated_text = result.text
+            print(f"Translation successful: {translated_text}")
+            return {
+                "status": "success", 
+                "translated_text": translated_text,
+                "source_lang": source_lang,
+                "target_lang": target_lang
+            }
+        else:
+            print(f"Translation result has no 'text' attribute: {result}")
+            return {
+                "status": "error",
+                "message": "Translation result format unexpected",
+                "source_lang": source_lang,
+                "target_lang": target_lang
+            }
+    except Exception as e:
+        print(f"Translation error: {e}")
+        return {
+            "status": "error",
+            "message": str(e),
+            "source_lang": source_lang,
+            "target_lang": target_lang
+        }
+
 async def handle_connection(websocket):
     print(f"Client connected, {websocket.remote_address}")
     
@@ -277,6 +449,8 @@ async def handle_connection(websocket):
             message_returned = db.signup_task(data_object)
         elif data_object["task"] == "change_settings":
             message_returned = db.change_settings_task(data_object)
+        elif data_object["task"] == "translate":
+            message_returned = await translate_task(data_object)
             
         await websocket.send(json.dumps(message_returned))
     

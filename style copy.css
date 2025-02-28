@@ -41,10 +41,8 @@ div {
     width: 90%; /* Full width */
     height: 70%; /* Automatic height */
     background-blend-mode: overlay; /* Blend texture with background color */
-    padding: 0; /* Remove padding that might cause overflow */
-    display: flex; /* Make it a flex container */
-    flex-direction: column; /* Stack children vertically */
-    overflow: hidden; /* Prevent overflow */
+    padding: auto;
+    
 }
 
 #div2viewer:hover {
@@ -69,13 +67,11 @@ width:90%;
     cursor: pointer;
 }
 #viewer {
-    flex: 1;
-    position: relative;
-    height: 100%; /* Ensure viewer takes full height */
-    width: 100%; /* Take full width of container */
-    overflow: hidden; /* Hide scrollbars but allow ePub pagination */
+    width: auto;
+    height: 100%;
     border: 1px solid #ccc;
     user-select: text; /* Enables text selection */
+    position: relative;
 }
 
 #navigation {
@@ -428,7 +424,13 @@ img {
     margin-right: 7%;
 }
 
-
+#languageUserOptions { /*animated drawer!*/
+    transform: translateX(1000%);
+    transition: transform 0.3s ease;
+}
+#languageUserOptions.show {
+transform: translateX(0); /* Move it into view */
+}
 
 .vertical-slider {
 display: inline-block;
@@ -513,28 +515,12 @@ flex-direction: column;
 /* Add these new styles */
 .popup {
     background-color: white;
-    border: 1px solid #ccc;
+    padding: 10px;
     border-radius: 5px;
-    padding: 10px 25px 10px 10px;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.2);
-    min-width: 100px;
-    max-width: 300px;
-    position: relative;
-}
-
-.popup p {
-    margin: 0;
-    padding: 5px;
-    font-size: 16px;
-}
-
-.popup-close {
-    color: #aaa;
-    transition: color 0.2s;
-}
-
-.popup-close:hover {
-    color: #333;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    max-width: 80vw; /* Limit width on mobile */
+    word-wrap: break-word;
+    z-index: 1000;
 }
 
 /* Media queries for mobile devices */
@@ -619,114 +605,4 @@ flex-direction: column;
         width: 20px;
         height: 20px;
     }
-}
-
-/* Viewer container with side navigation buttons */
-#viewer-container {
-    display: flex;
-    align-items: stretch;
-    width: 100%;
-    height: 100%;
-    position: relative;
-    overflow: hidden; /* Prevent container overflow */
-}
-
-.side-nav-btn {
-    background: rgba(69, 136, 160, 0.2);
-    border: none;
-    width: 30px;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: background 0.2s;
-    z-index: 10;
-    flex-shrink: 0; /* Prevent buttons from shrinking */
-}
-
-.side-nav-btn:hover {
-    background: rgba(69, 136, 160, 0.4);
-}
-
-.side-nav-btn span {
-    color: #4588a0;
-    font-size: 18px;
-    font-weight: bold;
-}
-
-/* For mobile responsiveness */
-@media (max-width: 768px) {
-    .side-nav-btn {
-        width: 25px;
-    }
-    
-    .side-nav-btn span {
-        font-size: 14px;
-    }
-}
-
-.close-modal {
-    position: absolute;
-    top: 10px;
-    right: 10px;
-    color: #aaa;
-    font-size: 28px;
-    font-weight: bold;
-    cursor: pointer;
-    z-index: 10;
-    width: 30px;
-    height: 30px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background-color: rgba(0, 0, 0, 0.1);
-    border-radius: 50%;
-    padding: 5px;
-}
-
-.close-modal:hover,
-.close-modal:focus {
-    color: black;
-    text-decoration: none;
-    background-color: rgba(0, 0, 0, 0.2);
-}
-
-@media (max-width: 768px) {
-    .close-modal {
-        font-size: 32px;
-        width: 40px;
-        height: 40px;
-    }
-}
-
-/* Add this to your style.css file */
-#recording-status {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    margin-top: 15px;
-    padding: 10px;
-    background-color: rgba(0, 0, 0, 0.05);
-    border-radius: 8px;
-}
-
-.status-spinner {
-    width: 24px;
-    height: 24px;
-    border: 3px solid rgba(69, 136, 160, 0.3);
-    border-radius: 50%;
-    border-top-color: #4588a0;
-    animation: spin 1s ease-in-out infinite;
-    margin-bottom: 8px;
-}
-
-.status-message {
-    font-size: 14px;
-    color: #4588a0;
-    font-weight: 500;
-}
-
-@keyframes spin {
-    to { transform: rotate(360deg); }
 }
