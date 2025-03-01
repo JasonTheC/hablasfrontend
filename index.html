@@ -15,18 +15,20 @@
 
     <div id="div2viewer">
         <div id="viewer-container">
-            <button id="prev" class="side-nav-btn"><span>◀</span></button>
-            <div id="viewer"></div> 
-            <button id="next" class="side-nav-btn"><span>▶</span></button>
+            <button id="prev" class="side-nav-btn"><span>&laquo;</span></button>
+            <div id="viewer">
+                <div id="empty-viewer-message">
+                    <p>No book loaded</p>
+                    <button id="browse-books-btn">Browse Available Books</button>
+                </div>
+            </div> 
+            <button id="next" class="side-nav-btn"><span>&raquo;</span></button>
         </div>
     </div>
 
     <div id="div3">
         
-         <div id="file">
-            <img src="images/upload-icon-white.png" alt="upload symbol" />
-            <img src="images/epub-icon-white.png" alt="upload symbol" />
-        </div>
+         
     </div>
 
     <input type="file" id="fileInput" accept=".epub"/>
@@ -37,7 +39,7 @@
             <div id="settings-options">
                 <div id="available-books" class="options">Available books</div>
                 <div id="userLanguages"  class="options">Native Language</div>
-                <select id="languageUserOptions" default="en">
+                <select id="languageUserOptions" default="en" class="settings-select">
                     <option value="en">English</option>
                     <option value="es">Spanish</option> 
                     <option value="fr">Français</option>
@@ -45,18 +47,18 @@
                     <option value="it">Italian</option>
                 </select>
                 <div id="voice-gender" class="options">Voice Gender</div>
-                <select id="voice-gender-select">
+                <select id="voice-gender-select" class="settings-select">
                     <option value="female">Female</option>
                     <option value="male">Male</option>
                 </select>
-                <div id="user-account-options" class="options" onclick="openUserAccountOptions()">Your account</div>
-                <div id="log-out" class="options">Log out</div>
+
+                <div id="file">
+                    <img src="images/upload-icon-white.png" alt="upload symbol" />
+                    <img src="images/epub-icon-white.png" alt="upload symbol" />
+                </div>
             </div>
     </div>
 
-<div id="navigation" style="display: none;">
-    <!-- Navigation buttons moved to sides of viewer -->
-</div>
 
 <div id="books-modal" class="modal">
     <div class="modal-content">
@@ -138,7 +140,6 @@
     const nextArrowBtn = document.getElementsByClassName('arrowNext')[0];
     const returnSentenceDiv = document.getElementById('return_sentence');
     const languageSel =document.getElementById('language-select');
-    const navigationDiv = document.getElementById('navigation');
     const fileDiv = document.getElementById("file");
 
     const nextPageBtn = document.getElementById('next');
@@ -162,7 +163,7 @@
         'Sr.', 'Jr.', 'etc.', 'e.g.', 'i.e.', '."'
     ];
 
-    let socket = new WebSocket('ws://localhost:8765');; // Declare socket variable. Built-in object of js
+    let socket = new WebSocket('wss://carriertech.uk:8675');; // Declare socket variable. Built-in object of js
     const booksModal = document.getElementById('books-modal');
 
     // First, get reference to your slider
@@ -192,14 +193,434 @@
 
 console.log ("starting script");
 
+// Replace the existing WebSocket implementation with a more structured approach
+function createWebSocketConnection() {
+    // Singleton instance
+    let socketInstance = null;
+    let isConnecting = false;
+    let messageCallbacks = new Map();
+    let connectionQueue = [];
+    
+    // Create a promise-based WebSocket request function
+    async function makeWebSocketRequest(requestData) {
+        return new Promise(async (resolve, reject) => {
+            try {
+                // Generate a unique ID for this request
+                const requestId = Date.now().toString() + Math.random().toString(36).substring(2, 15);
+                requestData.id = requestId;
+                
+                // Ensure we have a connection
+                const socket = await getSocket();
+                
+                // Register callback for this specific request
+                messageCallbacks.set(requestId, (response) => {
+                    resolve(response);
+                    messageCallbacks.delete(requestId);
+                });
+                
+                // Send the request
+                socket.send(JSON.stringify(requestData));
+                
+                // Set timeout for request
+                setTimeout(() => {
+                    if (messageCallbacks.has(requestId)) {
+                        messageCallbacks.delete(requestId);
+                        reject(new Error("WebSocket request timed out"));
+                    }
+                }, 30000); // 30 second timeout
+            } catch (error) {
+                reject(error);
+            }
+        });
+    }
+    
+    // Get or create socket connection
+    async function getSocket() {
+        // If we already have a working connection, return it
+        if (socketInstance && socketInstance.readyState === WebSocket.OPEN) {
+            return socketInstance;
+        }
+        
+        // If we're in the process of connecting, wait for it
+        if (isConnecting) {
+            return new Promise((resolve, reject) => {
+                connectionQueue.push({ resolve, reject });
+            });
+        }
+        
+        // Start a new connection
+        isConnecting = true;
+        
+        try {
+            // Close existing socket if it exists
+            if (socketInstance) {
+                try {
+                    socketInstance.close();
+                } catch (e) {
+                    console.log("Error closing existing socket:", e);
+                }
+            }
+            
+            // Create new connection
+            socketInstance = new WebSocket('wss://carriertech.uk:8675');
+            
+            return new Promise((resolve, reject) => {
+                // Set up event handlers
+                socketInstance.addEventListener('open', () => {
+                    console.log('WebSocket connection established');
+                    isConnecting = false;
+                    
+                    // Resolve this promise
+                    resolve(socketInstance);
+                    
+                    // Resolve any queued promises
+                    connectionQueue.forEach(queued => queued.resolve(socketInstance));
+                    connectionQueue = [];
+                });
+                
+                socketInstance.addEventListener('close', (event) => {
+                    console.log(`WebSocket connection closed: ${event.code} ${event.reason}`);
+                    socketInstance = null;
+                    
+                    // If we're still connecting, this is an error
+                    if (isConnecting) {
+                        isConnecting = false;
+                        reject(new Error(`Failed to connect: ${event.code} ${event.reason}`));
+                        
+                        // Reject any queued promises
+                        connectionQueue.forEach(queued => 
+                            queued.reject(new Error(`Connection closed: ${event.code} ${event.reason}`))
+                        );
+                        connectionQueue = [];
+                    }
+                });
+                
+                socketInstance.addEventListener('error', (error) => {
+                    console.error('WebSocket error:', error);
+                    
+                    // If we're still connecting, this is an error
+                    if (isConnecting) {
+                        isConnecting = false;
+                        reject(error);
+                        
+                        // Reject any queued promises
+                        connectionQueue.forEach(queued => queued.reject(error));
+                        connectionQueue = [];
+                    }
+                });
+                
+                socketInstance.addEventListener('message', (event) => {
+                    try {
+                        const response = JSON.parse(event.data);
+                        console.log("Received WebSocket message:", response);
+                        
+                        // Hide recording status indicator
+                        const statusIndicator = document.getElementById('recording-status');
+                        if (statusIndicator) {
+                            statusIndicator.style.display = 'none';
+                        }
+                        
+                        // Check if this is a response to a specific request
+                        if (response.id && messageCallbacks.has(response.id)) {
+                            messageCallbacks.get(response.id)(response);
+                            return;
+                        }
+                        
+                        // Handle different types of responses
+                        if (response.books) {
+                            handleBooksResponse(response);
+                        } else if (response.hasOwnProperty('pred_sentence')) {
+                            handlePredSentenceResponse(response);
+                        } else if (response.hasOwnProperty('translation') || 
+                                  (response.status === 'success' && response.hasOwnProperty('translated_text'))) {
+                            handleTranslationResponse(response);
+                        } else {
+                            console.log("Unhandled response from server:", response);
+                        }
+                    } catch (error) {
+                        console.error("Error processing WebSocket message:", error);
+                    }
+                });
+            });
+        } catch (error) {
+            isConnecting = false;
+            throw error;
+        }
+    }
+    
+    // Return the public API
+    return {
+        // Make a WebSocket request and get a response
+        request: makeWebSocketRequest,
+        
+        // Get books from the server
+        getBooks: async function() {
+            return makeWebSocketRequest({ task: "get_books" });
+        },
+        
+        // Translate text
+        translate: async function(text, sourceLang, targetLang) {
+            return makeWebSocketRequest({
+                task: "translate",
+                text: text,
+                source_lang: sourceLang,
+                target_lang: targetLang
+            });
+        },
+        
+        // Speech to text
+        speechToText: async function(blob, language, sentence, username, password) {
+            return makeWebSocketRequest({
+                task: "stt",
+                username: username,
+                password: password,
+                language: language.substring(0,2),
+                blob: blob,
+                sentence: sentence
+            });
+        },
+        
+        // Login
+        login: async function(username, password) {
+            return makeWebSocketRequest({
+                username: username,
+                password: password
+            });
+        },
+        
+        // Close the connection
+        close: function() {
+            if (socketInstance && socketInstance.readyState === WebSocket.OPEN) {
+                socketInstance.close();
+                socketInstance = null;
+            }
+        }
+    };
+}
 
+// Create a single instance of the WebSocket connection manager
+const wsConnection = createWebSocketConnection();
 
+// Handler functions for different types of responses
+function handleBooksResponse(response) {
+    // Group books by language
+    const booksByLanguage = response.books.reduce((acc, book) => {
+        if (!acc[book.language]) {
+            acc[book.language] = [];
+        }
+        acc[book.language].push(book);
+        return acc;
+    }, {});
+    
+    // Update language-select options
+    const languageSelect = document.getElementById('language-select');
+    languageSelect.innerHTML = '';
+    
+    Object.keys(booksByLanguage).forEach(language => {
+        const option = document.createElement('option');
+        option.value = language.toLowerCase();
+        option.textContent = language.charAt(0).toUpperCase() + language.slice(1);
+        languageSelect.appendChild(option);
+    });
+
+    // Update books grid
+    const booksGrid = document.getElementById('books-grid');
+    booksGrid.innerHTML = '';
+    
+    Object.entries(booksByLanguage).forEach(([language, languageBooks]) => {
+        const languageSection = document.createElement('div');
+        languageSection.className = 'language-section';
+        
+        const languageHeader = document.createElement('h2');
+        languageHeader.textContent = language.charAt(0).toUpperCase() + language.slice(1);
+        languageSection.appendChild(languageHeader);
+        
+        const booksContainer = document.createElement('div');
+        booksContainer.className = 'books-container';
+        
+        languageBooks.forEach(book => {
+            const bookElement = document.createElement('div');
+            bookElement.className = 'book';
+
+            const img = document.createElement('img');
+            // Check if cover is base64 data or path
+            if (book.cover && book.cover.startsWith('data:')) {
+                img.src = book.cover;
+            } else {
+                // Fallback to default cover if the base64 data is invalid
+                img.src = 'images/default-cover.png';
+                console.error('Invalid cover data for book:', book.filename);
+            }
+            img.alt = book.filename;
+            
+            const title = document.createElement('div');
+            title.className = 'book-title';
+            title.textContent = book.filename.replace('.epub', '');
+            
+            bookElement.appendChild(img);
+            bookElement.appendChild(title);
+            
+            // Add click event to load the book
+            bookElement.addEventListener('click', () => {
+              
+                    // Create a Blob from the base64 data
+                    if (!book.epub) {
+                        console.error('No EPUB data received for book:', book.filename);
+                        return;
+                    }
+
+                    const epubData = book.epub;
+                    const base64Data = epubData.split(',')[1];
+                    if (!base64Data) {
+                        console.error('Invalid EPUB data format for book:', book.filename);
+                        return;
+                    }
+
+                    const byteString = atob(base64Data);
+                    const mimeString = epubData.split(',')[0].split(':')[1].split(';')[0];
+                    const ab = new ArrayBuffer(byteString.length);
+                    const ia = new Uint8Array(ab);
+                    
+                    for (let i = 0; i < byteString.length; i++) {
+                        ia[i] = byteString.charCodeAt(i);
+                    }
+                    
+                    const blob = new Blob([ab], {type: mimeString});
+                    renderEpub(blob);
+                    booksModal.style.display = 'none';
+                    languageSelect.value = language;
+                    
+                
+            });
+            
+            booksContainer.appendChild(bookElement);
+        });
+        
+        languageSection.appendChild(booksContainer);
+        booksGrid.appendChild(languageSection);
+    });
+}
+
+function handlePredSentenceResponse(response) {
+    returnSentenceDiv.innerHTML = response.pred_sentence;
+    
+    // Use a proper async function to handle this
+    handlePredSentence(response.pred_sentence);
+}
+
+function handleTranslationResponse(response) {
+    // Handle translation response
+    const translatedText = response.translation || response.translated_text;
+    translation.innerHTML = translatedText;
+    console.log("Updated translation with:", translatedText);
+}
+
+// Update functions that use WebSocket to use the new API
+async function loadAvailableBooks() {
+    try {
+        await wsConnection.getBooks();
+    } catch (error) {
+        console.error("Error loading books:", error);
+        alert("Failed to load books. Please try again.");
+    }
+}
+
+async function updateTranslation(text, sourceLang) {
+    console.log(`Translating text: "${text}" from ${sourceLang}`);
+    
+    // Show loading indicator
+    translation.textContent = "Translating...";
+    
+    // Get user's native language from settings
+    const targetLang = languageUserOptionsSelect.value;
+    console.log("targetLang: ", targetLang);
+ 
+    try {
+        await wsConnection.translate(text, sourceLang, targetLang);
+    } catch (error) {
+        console.error("Translation error:", error);
+        translation.textContent = "Translation failed. Please try again.";
+    }
+}
+
+async function createBlobAndConnect() {
+    const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+    
+    // Show status indicator with initial message
+    const statusIndicator = document.getElementById('recording-status');
+    const statusMessage = statusIndicator.querySelector('.status-message');
+    statusIndicator.style.display = 'flex';
+    statusMessage.textContent = 'Getting audio ready...';
+    
+    try {
+        // Convert blob to base64
+        const base64Blob = await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result);
+            reader.onerror = reject;
+            reader.readAsDataURL(audioBlob);
+        });
+        
+        // Update status message
+        statusMessage.textContent = 'Waiting for response...';
+        
+        // Send to server
+        await wsConnection.speechToText(
+            base64Blob, 
+            languageSel.value.substring(0,2), 
+            lines[lineNum],
+            username,
+            password
+        );
+        
+        // Clear audio chunks for next recording
+        audioChunks = [];
+        
+    } catch (error) {
+        console.error("Error processing audio:", error);
+        statusMessage.textContent = 'Error processing audio';
+        setTimeout(() => {
+            statusIndicator.style.display = 'none';
+        }, 2000);
+    }
+}
+
+// Update login button click handler
+loginButton.addEventListener('click', async () => {
+    loginButton.style.backgroundColor = '#FFB6C1';
+    username = usernameInput.value;
+    password = passwordInput.value;
+
+    console.log("login button clicked");
+    console.log("username is: ", username);
+    console.log("password is: ", password);
+
+    try {
+        const response = await wsConnection.login(username, password);
+        console.log("Login response:", response);
+        // Handle login response here
+    } catch (error) {
+        console.error("Login error:", error);
+        alert("Login failed. Please try again.");
+    }
+});
+
+// Initialize when the page loads
+window.addEventListener('DOMContentLoaded', () => {
+    initializeVoices();
+});
+
+// Update the browse books button event listener
+document.getElementById('browse-books-btn').addEventListener('click', () => {
+    loadAvailableBooks();
+    const booksModal = document.getElementById('books-modal');
+    booksModal.style.display = 'block';
+});
 
 function loadAvailableBooks() {
-    if (!socket || socket.readyState !== WebSocket.OPEN) {
-        socket = initializeWebSocket();}
-    const request = {task: "get_books"};
-    socket.send(JSON.stringify(request));
+    wsConnection.getBooks().catch(error => {
+        console.error("Error loading books:", error);
+    });
 }
 
 // Add this to your existing WebSocket message handler
@@ -397,7 +818,7 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
                                 <path d="M12 7v10" stroke="white" stroke-width="2"/>
                             </svg>`;
                         selectIcon.style.position = 'absolute';
-                        selectIcon.style.left = '-24px';
+                        selectIcon.style.left = '-3em';
                         selectIcon.style.top = '50%';
                         selectIcon.style.transform = 'translateY(-50%)';
                         
@@ -453,42 +874,68 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
                             const modal = document.getElementById('myModal');
                             
                             if (modal) {
+                                // IMPROVED MODAL POSITIONING FOR MOBILE
+                                const isMobile = window.innerWidth <= 768;
+                                const modalContent = modal.querySelector('.modal-content');
+                                
                                 // Calculate the position of the element relative to the viewer
-                                const relativeTop = elementRect.bottom - content.window.pageYOffset;
-                                const relativeBottom = elementRect.top - content.window.pageYOffset;
+                                const relativeTop = elementRect.top - content.window.pageYOffset;
+                                const relativeBottom = elementRect.bottom - content.window.pageYOffset;
+                                const elementCenter = elementRect.top + (elementRect.height / 2);
                                 
                                 // Calculate the absolute position in the parent document
-                                let absoluteTop = viewerRect.top + relativeTop + 20; // 20px gap below element
+                                let absoluteTop;
                                 
                                 // Get modal height (if already visible) or estimate it
-                                const modalContent = modal.querySelector('.modal-content');
                                 const modalHeight = modal.offsetHeight || 300; // Use 300px as fallback estimate
                                 
-                                // Check if modal would go off screen at the bottom
-                                if (absoluteTop + modalHeight > window.innerHeight) {
-                                    // Place above the element instead
-                                    absoluteTop = viewerRect.top + relativeBottom - modalHeight - 20; // 20px gap above element
+                                if (isMobile) {
+                                    // On mobile, center the modal over the element
+                                    absoluteTop = viewerRect.top + relativeTop - (modalHeight / 4);
+                                    
+                                    // Ensure modal stays within viewport
+                                    const maxTop = window.innerHeight - modalHeight - 20;
+                                    const minTop = 20; // Minimum 20px from top
+                                    absoluteTop = Math.max(minTop, Math.min(absoluteTop, maxTop));
+                                    
+                                    // Use full width on mobile with small margins
+                                    modalContent.style.width = `calc(100vw - 20px)`;
+                                    modalContent.style.maxWidth = '100%';
+                                    modal.style.left = '10px';
+                                } else {
+                                    // On desktop, position below or above the element
+                                    absoluteTop = viewerRect.top + relativeBottom + 20; // 20px gap below element
+                                    
+                                    // Check if modal would go off screen at the bottom
+                                    if (absoluteTop + modalHeight > window.innerHeight) {
+                                        // Place above the element instead
+                                        absoluteTop = viewerRect.top + relativeTop - modalHeight - 20; // 20px gap above element
+                                    }
+                                    
+                                    // Use the viewer's x position
+                                    const modalLeft = viewerRect.left + 20; // 20px margin from left of viewer
+                                    modal.style.left = `${modalLeft}px`;
+                                    
+                                    // Set width based on viewer
+                                    const modalWidth = viewerRect.width - 40; // 20px margin on each side
+                                    modalContent.style.width = `${modalWidth}px`;
                                 }
-                                
-                                // Use the viewer's x position
-                                const modalLeft = viewerRect.left + 20; // 20px margin from left of viewer
                                 
                                 // Position modal
                                 modal.style.position = 'fixed';
-                                modal.style.left = `${modalLeft}px`;
+                                if (absoluteTop < 0) {
+                                    absoluteTop = 0;
+                                }
                                 modal.style.top = `${absoluteTop}px`;
-                                
-                                // Set width based on viewer
-                                const modalWidth = viewerRect.width - 40; // 20px margin on each side
-                                modalContent.style.width = `${modalWidth}px`;
                                 
                                 modal.style.display = "block";
                                 console.log("Modal positioned at:", {
-                                    left: modalLeft, 
+                                    left: isMobile ? '10px' : modal.style.left, 
                                     top: absoluteTop, 
-                                    width: modalWidth,
+                                    width: modalContent.style.width,
                                     height: modalHeight,
-                                    elementBottom: elementRect.bottom,
+                                    isMobile: isMobile,
+                                    elementCenter: elementCenter,
                                     viewerTop: viewerRect.top
                                 });
                             } else {
@@ -510,125 +957,7 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
         });
 
         // Hide the navigation div since we're using side buttons
-        navigationDiv.style.display = 'none';
         fileDiv.style.display = "none";
-    }
-    async function createBlobAndConnect() {
-        const audioBlob = new Blob(audioChunks, { type: 'audio/wav' }); // Create the blob
-        
-        // Show status indicator with initial message
-        const statusIndicator = document.getElementById('recording-status');
-        const statusMessage = statusIndicator.querySelector('.status-message');
-        statusIndicator.style.display = 'flex';
-        statusMessage.textContent = 'Getting audio ready...';
-        const reader = new FileReader(); 
-        reader.onloadend = function() { 
-            const base64Blob = reader.result;
-            const dataToSend = {
-                task: "stt",
-                username: username,
-                password: password,
-                language: languageSel.value.substring(0,2),
-                blob:base64Blob,
-                sentence:lines[lineNum],
-            };
-               
-            socket.send(JSON.stringify(dataToSend)); // Send data (turning json object into string) after connection is established
-                
-            // Update status message
-            statusMessage.textContent = 'Waiting for response...';
-        };
-        reader.readAsDataURL(audioBlob); 
-        audioChunks=[];
-    };
-
-       
-    // Fix the extractVisibleText function to handle errors better
-    function extractVisibleText() {
-        console.log("extractVisibleText called");
-        const location = rendition.currentLocation();
-        console.log("Current location:", location);
-
-        const makeRangeCfi = (a, b) => {
-                const CFI = new ePub.CFI()
-                const start = CFI.parse(a), end = CFI.parse(b)
-                const cfi = {
-                    range: true,
-                    base: start.base,
-                    path: {
-                        steps: [],
-                        terminal: null
-                    },
-                    start: start.path,
-                    end: end.path
-                }
-                const len = cfi.start.steps.length
-                for (let i = 0; i < len; i++) {
-                    if (CFI.equalStep(cfi.start.steps[i], cfi.end.steps[i])) {
-                        if (i == len - 1) {
-                            if (cfi.start.terminal === cfi.end.terminal) {
-                                cfi.path.steps.push(cfi.start.steps[i])
-                                cfi.range = false
-                            }
-                        } else cfi.path.steps.push(cfi.start.steps[i])
-                    } else break
-                }
-                cfi.start.steps = cfi.start.steps.slice(cfi.path.steps.length)
-                cfi.end.steps = cfi.end.steps.slice(cfi.path.steps.length)
-
-                return 'epubcfi(' + CFI.segmentString(cfi.base)
-                    + '!' + CFI.segmentString(cfi.path)
-                    + ',' + CFI.segmentString(cfi.start)
-                    + ',' + CFI.segmentString(cfi.end)
-                    + ')'
-            }
-
-        if (location && location.start && location.end) {
-            const rangeCfi = makeRangeCfi(location.start.cfi, location.end.cfi);
-            console.log("Range CFI created:", rangeCfi);
-            
-            currentBook.getRange(rangeCfi)
-                .then(range => {
-                    if (range) {
-                        selectedText = range.toString();
-                        console.log("Raw selected text:", selectedText);
-                        
-                        // Clean up text
-                        selectedText = cleanText(selectedText);
-                        console.log("Cleaned selected text:", selectedText);
-                        
-                        lines = selectedText.split('.')
-                            .map(line => line.trim())
-                            .filter(line => line.length > 0)
-                            .map(line => line + '.');
-                        
-                        console.log("Lines array:", lines);
-                        console.log("Number of lines:", lines.length);
-                    } else {
-                        console.log("Range is null or undefined");
-                    }
-                })
-                .catch(error => {
-                    console.error('Error getting range:', error);
-                    // Initialize empty lines array to prevent further errors
-                    lines = [];
-                });
-        } else {
-            console.log("Location is invalid:", location);
-        }
-    }
-    
-    // Separate text cleaning function
-    function cleanText(text) {
-        const regexMatch = /[A-Z]\./g;
-        text = text.replace(regexMatch, match => match.replace('.', ''));
-        
-        abbreviations.forEach(abbr => {
-            let clean = abbr.replaceAll(".", "");
-            text = text.replaceAll(abbr, clean);
-        });
-        
-        return text;
     }
 
     recordBtn.addEventListener('click', async () => { //standarised procedure 
@@ -725,75 +1054,6 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
     function randomLanguage(){
         const languages = ['en', 'es', 'fr', 'de', 'it'];
         return languages[Math.floor(Math.random() * languages.length)];
-    }
-
-    // Replace any remote translation service calls with local WebSocket calls
-    async function translateText(text, sourceLang, targetLang) {
-     
-        const translationRequest = {
-            task: "translate",
-            text: text,
-            source_lang: sourceLang,
-            target_lang: targetLang
-        };
-        
-        // Send to WebSocket server
-            socket.send(JSON.stringify(translationRequest));
-
-    }
-
-    // Make sure the updateTranslation function is properly defined
-    function updateTranslation(text, sourceLang) {
-        console.log(`Translating text: "${text}" from ${sourceLang}`);
-        
-        // Show loading indicator
-        translation.textContent = "Translating...";
-        
-        // Get user's native language from settings
-        const targetLang = languageUserOptionsSelect.value;
-        console.log("targetLang: ", targetLang);
- 
-        // Create a unique message ID to track this specific translation request
-        const messageId = Date.now().toString();
-        
-        // Send translation request
-        const translationRequest = {
-            task: "translate",
-            id: messageId,
-            text: text,
-            source_lang: sourceLang,
-            target_lang: targetLang
-        };
-        
-        console.log("Sending translation request:", translationRequest);
-        
-      
-        socket.send(JSON.stringify(translationRequest));
-        
-        
-    }
-
-    // Update the handleTextSelection function to properly use updateTranslation
-    function handleTextSelection() {
-        const selection = window.getSelection();
-        const text = selection.toString().trim();
-        
-        if (text && text.length > 0) {
-            console.log("Selected text:", text);
-            selectedText = text;
-            
-            // Show the modal with the selected text
-            modalDiv.style.display = "block";
-            
-            // Get the target language from the language select dropdown
-            const targetLang = languageSel.value;
-            
-            // Store the selected text for later use
-            translationText = text;
-            
-            // Trigger translation immediately
-            updateTranslation(text, targetLang);
-        }
     }
 
     function textToSpeech(textToSpeak) {
@@ -941,34 +1201,6 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
         document.getElementById('user-modal').style.display = 'block';
        }
 
-    loginButton.addEventListener('click', async () => {  // Make this async
-        loginButton.style.backgroundColor = '#FFB6C1';
-        username = usernameInput.value;
-        password = passwordInput.value;
-
-        console.log("login button clicked");
-        console.log("username is: ", username);
-        console.log("password is: ", password); 
-
-        // Initialize socket if needed and wait for connection
-        if (!socket || socket.readyState !== WebSocket.OPEN) {
-            socket = initializeWebSocket();
-            // Wait for socket to connect
-            await new Promise((resolve, reject) => {
-                socket.addEventListener('open', resolve);
-                socket.addEventListener('error', reject);
-            });
-        }
-
-        // Now that we know the socket is connected, send the data
-        const loginData = {
-            username: username,
-            password: password,
-        };  
-        socket.send(JSON.stringify(loginData)); 
-        console.log("loginData sent");   
-    });
-
     signupButton.addEventListener('click', () => {
         signupButton.style.backgroundColor = '#FFB6C1';
         username=usernameInput.value;
@@ -997,12 +1229,6 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
             console.log("Available voices:", availableVoices);
         }
     }
-
-    // Initialize WebSocket when the page loads
-    window.addEventListener('DOMContentLoaded', () => {
-        socket = initializeWebSocket();
-        initializeVoices();
-    });
 
     // Add event listener for voice gender selection
     voiceGenderDisplay.addEventListener('click', () => {
@@ -1035,202 +1261,115 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
         }
     });
 
-    // Add this function to initialize and manage WebSocket connections
-    function initializeWebSocket() {
-        // Close existing socket if it exists
-        if (socket && (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING)) {
-            socket.close();
+    // Update the handleTextSelection function to properly use updateTranslation
+    function handleTextSelection() {
+        const selection = window.getSelection();
+        const text = selection.toString().trim();
+        
+        if (text && text.length > 0) {
+            console.log("Selected text:", text);
+            selectedText = text;
+            
+            // Show the modal with the selected text
+            modalDiv.style.display = "block";
+            
+            // Get the target language from the language select dropdown
+            const targetLang = languageSel.value;
+            
+            // Store the selected text for later use
+            translationText = text;
+            
+            // Trigger translation immediately
+            updateTranslation(text, targetLang);
         }
-        
-        // Create new WebSocket connection
-        const newSocket = new WebSocket('ws://localhost:8765');
-        
-        // Set up event handlers
-        newSocket.addEventListener('open', () => {
-            console.log('WebSocket connection established');
-        });
-        
-        newSocket.addEventListener('close', (event) => {
-            console.log(`WebSocket connection closed: ${event.code} ${event.reason}`);
-            // Attempt to reconnect after a delay
-            setTimeout(() => {
-                console.log('Attempting to reconnect WebSocket...');
-                socket = initializeWebSocket();
-            }, 3000); // Wait 3 seconds before reconnecting
-        });
-        
-        newSocket.addEventListener('error', (error) => {
-            console.error('WebSocket error:', error);
-        });
-        
-        // Set up the message handler
-        newSocket.addEventListener('message', (event) => {
-            const msg = JSON.parse(event.data);
-            console.log("Received WebSocket message:", msg);
-            
-            // Hide recording status indicator whenever we receive any message
-            const statusIndicator = document.getElementById('recording-status');
-            if (statusIndicator) {
-                statusIndicator.style.display = 'none';
-            }
-            
-            if (msg.books) {
-                // Group books by language
-                const booksByLanguage = msg.books.reduce((acc, book) => {
-                    if (!acc[book.language]) {
-                        acc[book.language] = [];
-                    }
-                    acc[book.language].push(book);
-                    return acc;
-                }, {});
-                
-                // Update language-select options
-                const languageSelect = document.getElementById('language-select');
-                languageSelect.innerHTML = '';
-                
-                Object.keys(booksByLanguage).forEach(language => {
-                    const option = document.createElement('option');
-                    option.value = language.toLowerCase();
-                    option.textContent = language.charAt(0).toUpperCase() + language.slice(1);
-                    languageSelect.appendChild(option);
-                });
-
-                // Update books grid
-                const booksGrid = document.getElementById('books-grid');
-                booksGrid.innerHTML = '';
-                
-                Object.entries(booksByLanguage).forEach(([language, languageBooks]) => {
-                    const languageSection = document.createElement('div');
-                    languageSection.className = 'language-section';
-                    
-                    const languageHeader = document.createElement('h2');
-                    languageHeader.textContent = language.charAt(0).toUpperCase() + language.slice(1);
-                    languageSection.appendChild(languageHeader);
-                    
-                    const booksContainer = document.createElement('div');
-                    booksContainer.className = 'books-container';
-                    
-                    languageBooks.forEach(book => {
-                        const bookElement = document.createElement('div');
-                        bookElement.className = 'book';
-
-                        const img = document.createElement('img');
-                        // Check if cover is base64 data or path
-                        if (book.cover && book.cover.startsWith('data:')) {
-                            img.src = book.cover;
-                        } else {
-                            // Fallback to default cover if the base64 data is invalid
-                            img.src = 'images/default-cover.png';
-                            console.error('Invalid cover data for book:', book.filename);
-                        }
-                        img.alt = book.filename;
-                        
-                        const title = document.createElement('div');
-                        title.className = 'book-title';
-                        title.textContent = book.filename.replace('.epub', '');
-                        
-                        bookElement.appendChild(img);
-                        bookElement.appendChild(title);
-                        
-                        // Add click event to load the book
-                        bookElement.addEventListener('click', () => {
-                            try {
-                                // Create a Blob from the base64 data
-                                if (!book.epub) {
-                                    console.error('No EPUB data received for book:', book.filename);
-                                    return;
-                                }
-
-                                const epubData = book.epub;
-                                const base64Data = epubData.split(',')[1];
-                                if (!base64Data) {
-                                    console.error('Invalid EPUB data format for book:', book.filename);
-                                    return;
-                                }
-
-                                const byteString = atob(base64Data);
-                                const mimeString = epubData.split(',')[0].split(':')[1].split(';')[0];
-                                const ab = new ArrayBuffer(byteString.length);
-                                const ia = new Uint8Array(ab);
-                                
-                                for (let i = 0; i < byteString.length; i++) {
-                                    ia[i] = byteString.charCodeAt(i);
-                                }
-                                
-                                const blob = new Blob([ab], {type: mimeString});
-                                renderEpub(blob);
-                                booksModal.style.display = 'none';
-                                languageSelect.value = language;
-                                
-                            } catch (error) {
-                                console.error('Error loading book:', error);
-                                alert('Error loading book. Please try again.');
-                            }
-                        });
-                        
-                        booksContainer.appendChild(bookElement);
-                    });
-                    
-                    languageSection.appendChild(booksContainer);
-                    booksGrid.appendChild(languageSection);
-                });
-            } else if (msg.hasOwnProperty('pred_sentence')) {
-                returnSentenceDiv.innerHTML = msg.pred_sentence;
-                
-                // Fix: Use a proper async function to handle this
-                handlePredSentence(msg.pred_sentence);
-            } else if (msg.hasOwnProperty('translation') || 
-                      (msg.status === 'success' && msg.hasOwnProperty('translated_text'))) {
-                // Handle translation response
-                const translatedText = msg.translation || msg.translated_text;
-                translation.innerHTML = translatedText;
-                console.log("Updated translation with:", translatedText);
-            } else {
-                console.log("got some reply from server ", msg);
-            }
-        });
-        
-        return newSocket;
     }
 
-    // Update the updateTranslation function to handle WebSocket reconnection
-    function updateTranslation(text, sourceLang) {
-        console.log(`Translating text: "${text}" from ${sourceLang}`);
-        
-        // Show loading indicator
-        translation.textContent = "Translating...";
-        
-        // Get user's native language from settings
-        const targetLang = languageUserOptionsSelect.value;
-        console.log("targetLang: ", targetLang);
-     
-        // Create a unique message ID to track this specific translation request
-        const messageId = Date.now().toString();
-        
-        // Send translation request
-        const translationRequest = {
-            task: "translate",
-            id: messageId,
-            text: text,
-            source_lang: sourceLang,
-            target_lang: targetLang
-        };
-        
-        console.log("Sending translation request:", translationRequest);
-        
-        // Check if socket is open, if not, reconnect
-        if (!socket || socket.readyState !== WebSocket.OPEN) {
-            console.log("WebSocket not open, reconnecting...");
-            socket = initializeWebSocket();
+    // Fix the extractVisibleText function to handle errors better
+    function extractVisibleText() {
+        console.log("extractVisibleText called");
+        const location = rendition.currentLocation();
+        console.log("Current location:", location);
+
+        const makeRangeCfi = (a, b) => {
+                const CFI = new ePub.CFI()
+                const start = CFI.parse(a), end = CFI.parse(b)
+                const cfi = {
+                    range: true,
+                    base: start.base,
+                    path: {
+                        steps: [],
+                        terminal: null
+                    },
+                    start: start.path,
+                    end: end.path
+                }
+                const len = cfi.start.steps.length
+                for (let i = 0; i < len; i++) {
+                    if (CFI.equalStep(cfi.start.steps[i], cfi.end.steps[i])) {
+                        if (i == len - 1) {
+                            if (cfi.start.terminal === cfi.end.terminal) {
+                                cfi.path.steps.push(cfi.start.steps[i])
+                                cfi.range = false
+                            }
+                        } else cfi.path.steps.push(cfi.start.steps[i])
+                    } else break
+                }
+                cfi.start.steps = cfi.start.steps.slice(cfi.path.steps.length)
+                cfi.end.steps = cfi.end.steps.slice(cfi.path.steps.length)
+
+                return 'epubcfi(' + CFI.segmentString(cfi.base)
+                    + '!' + CFI.segmentString(cfi.path)
+                    + ',' + CFI.segmentString(cfi.start)
+                    + ',' + CFI.segmentString(cfi.end)
+                    + ')'
+            }
+
+        if (location && location.start && location.end) {
+            const rangeCfi = makeRangeCfi(location.start.cfi, location.end.cfi);
+            console.log("Range CFI created:", rangeCfi);
             
-            // Wait for socket to open before sending
-            socket.addEventListener('open', () => {
-                socket.send(JSON.stringify(translationRequest));
-            });
+            currentBook.getRange(rangeCfi)
+                .then(range => {
+                    if (range) {
+                        selectedText = range.toString();
+                        console.log("Raw selected text:", selectedText);
+                        
+                        // Clean up text
+                        selectedText = cleanText(selectedText);
+                        console.log("Cleaned selected text:", selectedText);
+                        
+                        lines = selectedText.split('.')
+                            .map(line => line.trim())
+                            .filter(line => line.length > 0)
+                            .map(line => line + '.');
+                        
+                        console.log("Lines array:", lines);
+                        console.log("Number of lines:", lines.length);
+                    } else {
+                        console.log("Range is null or undefined");
+                    }
+                })
+                .catch(error => {
+                    console.error('Error getting range:', error);
+                    // Initialize empty lines array to prevent further errors
+                    lines = [];
+                });
         } else {
-            // Socket is open, send immediately
-            socket.send(JSON.stringify(translationRequest));
+            console.log("Location is invalid:", location);
         }
+    }
+    
+    // Separate text cleaning function
+    function cleanText(text) {
+        const regexMatch = /[A-Z]\./g;
+        text = text.replace(regexMatch, match => match.replace('.', ''));
+        
+        abbreviations.forEach(abbr => {
+            let clean = abbr.replaceAll(".", "");
+            text = text.replaceAll(abbr, clean);
+        });
+        
+        return text;
     }
 
 </script>

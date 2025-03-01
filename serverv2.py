@@ -249,7 +249,7 @@ async def handle_connection(websocket):
     try:
         data= await websocket.recv()
         data_object = json.loads(data)
-
+    
         """
         data_object = {
             "language": "fr",

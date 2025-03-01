@@ -536,7 +536,7 @@ class DatabaseManager:
         return message
         
 
-    def signup_task(self, data_object):
+    def signup_task(self, data_object):smb://192.168.1.105/MScopy/CarrierTech/Hablas/server.py
         """Handle user registration"""
         conn = sqlite3.connect(self.DB_PATH)
         cursor = conn.cursor()

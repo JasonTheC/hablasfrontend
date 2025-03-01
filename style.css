@@ -39,7 +39,7 @@ div {
     box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1); /* Subtle shadow for depth */
     max-width: 800px; /* Maximum width */
     width: 90%; /* Full width */
-    height: 70%; /* Automatic height */
+    height: 90%; /* Automatic height */
     background-blend-mode: overlay; /* Blend texture with background color */
     padding: 0; /* Remove padding that might cause overflow */
     display: flex; /* Make it a flex container */
@@ -116,7 +116,7 @@ width:90%;
     cursor: pointer; /* Pointer cursor on hover */
     transition: background-color 0.3s; /* Smooth transition */
     box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2); /* Shadow for depth */
-    width: 25%;
+    width: 70%;
     }
 
 #selectedText {
@@ -545,10 +545,7 @@ flex-direction: column;
         padding: 0;
     }
 
-    #div2viewer {
-        width: 95%;
-        height: 60%;
-    }
+
 
     .modal-content {
         margin: 2%;
@@ -729,4 +726,60 @@ flex-direction: column;
 
 @keyframes spin {
     to { transform: rotate(360deg); }
+}
+
+.settings-select {
+    width: 90%;
+    margin: 8px auto 16px;
+    padding: 8px;
+    border-radius: 4px;
+    border: 1px solid #ccc;
+    background-color: #f8f8f8;
+    font-size: 14px;
+    display: block;
+}
+
+/* Improve spacing in settings drawer */
+#settings-options {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 10px;
+}
+
+.options {
+    margin-top: 12px;
+    margin-bottom: 4px;
+    font-weight: bold;
+}
+
+#empty-viewer-message {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    width: 100%;
+    color: #4588a0;
+    font-family: 'Lato', sans-serif;
+}
+
+#empty-viewer-message p {
+    font-size: 1.5rem;
+    margin-bottom: 1rem;
+}
+
+#browse-books-btn {
+    background-color: #4588a0;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    padding: 10px 20px;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: background-color 0.3s;
+}
+
+#browse-books-btn:hover {
+    background-color: #366b7c;
 }
