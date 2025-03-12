@@ -1,66 +1,24 @@
 import asyncio, difflib, time #multiprocessser good for sockets
-start_time = time.time()
-print("importing libraries")
 
 import websockets , json # the json is bc we're sending a json object from the website
 import wave , base64
 import os #library for anything that has to do with your hard-drive
-end_time = time.time()
-print(f"Time taken to import libraries: {end_time - start_time} seconds")
-print("importing torch")
-start_time = time.time()
 import torch, sqlite3
-end_time = time.time()
-print(f"Time taken to import torch and sqlite3: {end_time - start_time} seconds")
-print("importing librosa")
-start_time = time.time()
+
 import librosa #library to analyse and process audio . soundfile is similar 
-end_time = time.time()
-print(f"Time taken to import librosa: {end_time - start_time} seconds")
-print("importing transformers")
-start_time = time.time()
 from transformers import Wav2Vec2ForCTC, Wav2Vec2Processor
-end_time = time.time()
-print(f"Time taken to import transformers: {end_time - start_time} seconds")
-print("importing ssl")
-start_time = time.time()
 import ssl  # Add this import at the top
-end_time = time.time()
-print(f"Time taken to import ssl: {end_time - start_time} seconds")
-print("importing secrets")
-start_time = time.time()
 import secrets  # Add secrets to generate tokens
-end_time = time.time()
-print(f"Time taken to import secrets: {end_time - start_time} seconds")
-print("importing datetime")
 from datetime import datetime, timedelta
-print("importing zipfile")
 import zipfile
-print("importing xml.etree.ElementTree")
 import xml.etree.ElementTree as ET
-print("importing pathlib")
 from pathlib import Path
 import shutil
-end_time = time.time()
-print(f"Time taken to import shutil: {end_time - start_time} seconds")
-start_time = time.time()
 import mimetypes
-end_time = time.time()
-print(f"Time taken to import mimetypes: {end_time - start_time} seconds")
-start_time = time.time()
 from PIL import Image, ImageDraw, ImageFont
-end_time = time.time()
-print(f"Time taken to import PIL: {end_time - start_time} seconds")
-start_time = time.time()
-print("importing Levenshtein")
-import Levenshtein  # Add this import for Levenshtein distance
-end_time = time.time()
-print(f"Time taken to import Levenshtein: {end_time - start_time} seconds")
-start_time = time.time()
-print("importing Translator")
 from googletrans import Translator  # Add this import for translation
-end_time = time.time()
-print(f"Time taken to import Translator: {end_time - start_time} seconds")
+import Levenshtein  # Add this import for Levenshtein distance
+from googletrans import Translator  # Add this import for translation
 import uuid  # Add this import for UUID generation
 
 
@@ -79,11 +37,11 @@ DEFAULT_COVER = "default-cover.png"
 db = None
 
 language_dict = {
-    #"en": "jonatasgrosman/wav2vec2-large-xlsr-53-english",
+    "en": "jonatasgrosman/wav2vec2-large-xlsr-53-english",
     "fr": "jonatasgrosman/wav2vec2-large-xlsr-53-french",
-    #"es": "jonatasgrosman/wav2vec2-large-xlsr-53-spanish",
-    #"it": "jonatasgrosman/wav2vec2-large-xlsr-53-french",
-    #"de": "jonatasgrosman/wav2vec2-large-xlsr-53-german",
+    "es": "jonatasgrosman/wav2vec2-large-xlsr-53-spanish",
+    "it": "jonatasgrosman/wav2vec2-large-xlsr-53-french",
+    "de": "jonatasgrosman/wav2vec2-large-xlsr-53-german",
 }
 
 def get_or_load_model(lang):
@@ -113,37 +71,21 @@ def stt(AUDIO_DIR, lang):
 class TextComparator:
     @staticmethod
     def generate_html_report(text1, text2, output_file='text_comparison_report.html'):
-        # Normalize text for comparison
         def normalize_text(text):
             text = text.lower()
-            # Replace punctuation with spaces
             for char in ',.!?;:«»""()[]{}':
                 text = text.replace(char, ' ')
-            
-            # Handle apostrophes specially
-            text = text.replace("'", "'")  # Standardize apostrophes
-            
-            # Split into words and filter empty strings
+            text = text.replace("'", "'")  
             return [word for word in text.split() if word]
         
-        # Get normalized words
         original_words = normalize_text(text1)
         spoken_words = normalize_text(text2)
         
         print(f"Original words: {original_words}")
         print(f"Spoken words: {spoken_words}")
-        
-        # Create a dynamic programming matrix for alignment
-        # This is similar to the Needleman-Wunsch algorithm for sequence alignment
         m, n = len(original_words), len(spoken_words)
-        
-        # Initialize the score matrix
         score = [[0 for _ in range(n+1)] for _ in range(m+1)]
-        
-        # Initialize the traceback matrix
         traceback = [[None for _ in range(n+1)] for _ in range(m+1)]
-        
-        # Fill the first row and column with gap penalties
         for i in range(m+1):
             score[i][0] = -i
             if i > 0:
@@ -153,23 +95,17 @@ class TextComparator:
             score[0][j] = -j
             if j > 0:
                 traceback[0][j] = "left"
-        
-        # Fill the score and traceback matrices
         for i in range(1, m+1):
             for j in range(1, n+1):
-                # Calculate similarity score between words
                 word_similarity = 1 - Levenshtein.distance(original_words[i-1], spoken_words[j-1]) / max(len(original_words[i-1]), len(spoken_words[j-1]))
                 
-                # Calculate scores for different moves
                 match_score = score[i-1][j-1] + (2 * word_similarity - 1)  # Reward for similar words, penalty for different
                 delete_score = score[i-1][j] - 0.5  # Gap penalty
                 insert_score = score[i][j-1] - 0.5  # Gap penalty
                 
-                # Choose the best move
                 best_score = max(match_score, delete_score, insert_score)
                 score[i][j] = best_score
                 
-                # Record the move in the traceback matrix
                 if best_score == match_score:
                     traceback[i][j] = "diag"
                 elif best_score == delete_score:
@@ -258,8 +194,7 @@ def stt_task(data_object):
             "username": data_object["username"],
             "book": data_object["current_book"],
             "page": data_object["page"]
-        }, "", "")  # Empty strings for utterance_fname and predicted_sentence
-    
+        }, "", "") 
 
     print("Received audio file and saved as 'received_audio.wav'")
     return message_returned
@@ -268,7 +203,6 @@ def extract_epub_cover(epub_path: Path, cover_dir: Path) -> str:
     """Extract cover image from EPUB file using the same approach as the PHP code"""
     try:
         with zipfile.ZipFile(epub_path) as zip_file:
-            # First try META-INF/container.xml
             try:
                 container = ET.fromstring(zip_file.read('META-INF/container.xml'))
                 rootfile_path = container.find('.//{urn:oasis:names:tc:opendocol:xmlns:container}rootfile').get('full-path')
@@ -904,15 +838,25 @@ async def main():
     db = DatabaseManager("usersHablas.db")
     db.init_database();
     preload_all_models()
-    print("Preloaded all models")
+    
+    # Create SSL context
+    ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    ssl_context.load_cert_chain(
+        '/media/nas/SSLCerts/carriertech.uk/fullchain.pem',
+        '/media/nas/SSLCerts/carriertech.uk/privkey.pem'
+    )
 
-    async with websockets.serve(handle_connection, "localhost", 8765) as server:
-        print("WebSocket server started on local NOT wss://carriertech.uk:8765")
-        await asyncio.Future()  # Run forever 
+    # Start the WebSocket server with SSL
+    async with websockets.serve(
+        handle_connection, 
+        "0.0.0.0",  # Changed from localhost to accept external connections
+        8675, 
+        ssl=ssl_context
+    ):
+        print("WebSocket server started on wss://carriertech.uk:8675")
+        await asyncio.Future()  # Run forever
+
 
 if __name__ == "__main__": #when you use a multi processer load, you use this so it doesnt crash. with asyncio you always have to do it
-    print("we're initializing where tf is the error??")
     asyncio.run(main()) 
-
-
 

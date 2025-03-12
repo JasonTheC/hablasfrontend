@@ -37,7 +37,7 @@
             <span id="close-drawer" class="close">&times;</span>
             <h2>Settings</h2>
             <div id="settings-options">
-                <input type="text" id="user-name" placeholder="Username">
+                <input type="text" id="user-name" placeholder="Email">
                 <input type="password" id="user-password" placeholder="Password">
                 <div id="login-singup" style="display: flex; width: 100%; gap: 10px; border-bottom: 1px solid #ccc; padding-bottom: 10px;">
                     <div id="login-button" class="options" style="flex: 1;">Login</div>
@@ -120,7 +120,6 @@
     let language = "";
     let isRecording = false; 
     let translationText = "";
-
     let mediaRecorder; 
     let audioChunks = []; //buffer
 
@@ -184,7 +183,7 @@
     let selectedVoiceGender = 'female'; // Default to female
     let selectedBook = null;
     let selectedPage = null;
-
+    let sourceLang = "";
 console.log ("starting script");
 
 // Add this function at the start of your script
@@ -222,6 +221,7 @@ function createWebSocketConnection() {
     
     // Create a promise-based WebSocket request function
     async function makeWebSocketRequest(requestData) {
+        console.log("makeWebSocketRequest: ", requestData);
         return new Promise(async (resolve, reject) => {
             try {
                 // Generate a unique ID for this request
@@ -363,19 +363,16 @@ function createWebSocketConnection() {
                         const response = JSON.parse(event.data);
                         console.log("Received WebSocket message:", response);
                         
-                        // Hide recording status indicator
                         const statusIndicator = document.getElementById('recording-status');
                         if (statusIndicator) {
                             statusIndicator.style.display = 'none';
                         }
                         
-                        // Check if this is a response to a specific request
                         if (response.id && messageCallbacks.has(response.id)) {
                             messageCallbacks.get(response.id)(response);
                             return;
                         }
                         
-                        // Handle different types of responses
                         if (response.books) {
                             handleBooksResponse(response);
                         } else if (response.hasOwnProperty('pred_sentence')) {
@@ -388,6 +385,8 @@ function createWebSocketConnection() {
                         } else if (response.status === 'success' && response.hasOwnProperty('epub')) {
                             // Handle book data response
                             handleBookDataResponse(response);
+                        } else if (response.message === "Invalid credentials") {
+                            alert("Invalid credentials, have you signed up?");
                         } else {
                             console.log("Unhandled response from server:", response);
                         }
@@ -428,25 +427,28 @@ function createWebSocketConnection() {
         },
         
         // Translate text
-        translate: async function(text, sourceLang, targetLang) {
+        translate: async function(text, sourceLang, targetLang, book, page, username) {
             return makeWebSocketRequest({
                 task: "translate",
                 text: text,
                 source_lang: sourceLang,
-                target_lang: targetLang
+                target_lang: targetLang,
+                current_book: book,
+                page: page,
+                username: username
             });
         },
         
         // Speech to text
-        speechToText: async function(blob, language, sentence, username, password) {
+        speechToText: async function(blob, language, sentence, username, book, page) {
             return makeWebSocketRequest({
                 task: "stt",
                 username: username,
-                language: language.substring(0,2),
+                language: language,
                 blob: blob,
                 sentence: sentence,
-                page: selectedPage,
-                book: selectedBook
+                current_book: book,
+                page: page
             });
         },
         
@@ -454,7 +456,15 @@ function createWebSocketConnection() {
         login: async function(username, password) {
             return makeWebSocketRequest({
                 username: username,
-                password: password
+                password: password,
+                task: "login"
+            });
+        },
+        signup: async function(username, password) {
+            return makeWebSocketRequest({
+                username: username,
+                password: password,
+                task: "signup"
             });
         },
         
@@ -560,7 +570,6 @@ function handleBooksResponse(response) {
                     const response = await wsConnection.request({
                         task: "get_book_data",
                         filename: book.filename,
-                        language: language
                     });
                     
                     if (response.error) {
@@ -624,211 +633,103 @@ function handleTranslationResponse(response) {
 
 function handleTokenResponse(response) {
     console.log("Token response:", response);
-    localStorage.setItem('token', response.token)
-    if (response.hasOwnProperty('book')){
+    localStorage.setItem('token', response.token);
+    username = response.username;
+    console.log("username: ", username);
+    
+    // Update UI to show logged-in state - pass the response object
+    updateAuthUI(true, response.username, response);
+    
+    // Close the settings drawer
+    drawer.classList.remove('open');
+}
+
+function updateAuthUI(isLoggedIn, username = '', responseData = null) {
+    const loginSignupContainer = document.getElementById('login-singup');
+    const usernameInput = document.getElementById('user-name');
+    const passwordInput = document.getElementById('user-password');
+    
+    if (isLoggedIn) {
+        // Hide login/signup elements
+        loginSignupContainer.style.display = 'none';
+        usernameInput.style.display = 'none';
+        passwordInput.style.display = 'none';
+        sourceLang = responseData.language;
+        console.log("sourceLang: ", sourceLang);
+        // Add logged-in user display
+        const userInfoDiv = document.createElement('div');
+        userInfoDiv.id = 'user-info';
+        userInfoDiv.className = 'options';
+        userInfoDiv.innerHTML = `
+            <div style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
+                <span>Logged in as: ${username}</span>
+                <button id="logout-button" class="small-button">Logout</button>
+            </div>
+        `;
         
+        // Insert after the login elements
+        const settingsOptions = document.getElementById('settings-options');
+        settingsOptions.insertBefore(userInfoDiv, document.getElementById('available-books'));
+        
+        // Add logout functionality
+        document.getElementById('logout-button').addEventListener('click', handleLogout);
+
+        // Load user's current book if available - use responseData instead of response
+        if (responseData && responseData.current_book && responseData.epub) {
+            selectedBook = responseData.current_book;
+            selectedPage = responseData.page || 0;
+            language = responseData.language;
+            console.log("Loading user's current book:", selectedBook);
+            
+            // Convert base64 to blob
+            const base64Data = responseData.epub.split(',')[1];
+            const mimeString = responseData.epub.split(',')[0].split(':')[1].split(';')[0];
+            const byteString = atob(base64Data);
+            const ab = new ArrayBuffer(byteString.length);
+            const ia = new Uint8Array(ab);
+            
+            for (let i = 0; i < byteString.length; i++) {
+                ia[i] = byteString.charCodeAt(i);
+            }
+            
+            const blob = new Blob([ab], {type: mimeString});
+            
+            // Render the book
+            renderEpub(blob).then(() => {
+                if (selectedPage && rendition) {
+                    rendition.display(selectedPage);
+                }
+            }).catch(error => {
+                console.error('Error rendering book:', error);
+            });
+        }
+    } else {
+        // Show login/signup elements
+        loginSignupContainer.style.display = 'flex';
+        usernameInput.style.display = 'block';
+        passwordInput.style.display = 'block';
+        
+        // Remove user info if it exists
+        const userInfo = document.getElementById('user-info');
+        if (userInfo) {
+            userInfo.remove();
+        }
     }
 }
 
-// Add this new function to handle book data responses
-function handleBookDataResponse(response) {
-    try {
-        console.log("Received book data:", response.filename);
-        
-        if (!response.epub) {
-            throw new Error('No EPUB data received');
-        }
-        
-        const epubData = response.epub;
-        const base64Data = epubData.split(',')[1];
-        if (!base64Data) {
-            throw new Error('Invalid EPUB data format');
-        }
-        
-        const byteString = atob(base64Data);
-        const mimeString = epubData.split(',')[0].split(':')[1].split(';')[0];
-        const ab = new ArrayBuffer(byteString.length);
-        const ia = new Uint8Array(ab);
-        
-        for (let i = 0; i < byteString.length; i++) {
-            ia[i] = byteString.charCodeAt(i);
-        }
-        
-        const blob = new Blob([ab], {type: mimeString});
-        renderEpub(blob);
-        booksModal.style.display = 'none';
-        
-        // Set the language select to match the book's language
-        const languageSelect = document.getElementById('language-select');
-        if (languageSelect) {
-            languageSelect.value = response.language.toLowerCase();
-        }
-        
-        selectedBook = response.filename;
-        console.log("Selected book:", selectedBook);
-    } catch (error) {
-        console.error('Error processing book data:', error);
-        alert('Error loading book: ' + error.message);
-    }
-}
-
-// Update functions that use WebSocket to use the new API
-async function loadAvailableBooks() {
-    const booksGrid = document.getElementById('books-grid');
-    if (booksGrid) {
-        booksGrid.innerHTML = '<div class="loading-message">Loading books...</div>';
-    }
+function handleLogout() {
+    // Clear stored token
+    localStorage.removeItem('token');
     
-    try {
-        // Check connection before sending
-        if (!wsConnection.isConnected()) {
-            if (booksGrid) {
-                booksGrid.innerHTML = '<div class="loading-message">Reconnecting...</div>';
-            }
-            await wsConnection.forceReconnect();
-        }
-        
-        // Try loading books with retries
-        let attempts = 0;
-        const MAX_ATTEMPTS = 3;
-        
-        while (attempts < MAX_ATTEMPTS) {
-            try {
-                await wsConnection.getBooks();
-                break; // Success - exit the loop
-            } catch (error) {
-                attempts++;
-                console.error(`Loading books attempt ${attempts} failed:`, error);
-                
-                if (attempts >= MAX_ATTEMPTS) {
-                    throw error;
-                }
-                
-                // Update status and wait before retry
-                if (booksGrid) {
-                    booksGrid.innerHTML = `<div class="loading-message">Retrying (${attempts}/${MAX_ATTEMPTS})...</div>`;
-                }
-                await new Promise(resolve => setTimeout(resolve, 1000));
-            }
-        }
-    } catch (error) {
-        console.error("Error loading books:", error);
-        if (booksGrid) {
-            booksGrid.innerHTML = '<div class="loading-message error">Failed to load books. Please try again.</div>';
-        }
-        alert("Failed to load books. Please try again.");
-    }
-}
-
-async function updateTranslation(text, sourceLang) {
-    console.log(`Translating text: "${text}" from ${sourceLang}`);
+    // Update UI
+    updateAuthUI(false);
     
-    // Show loading indicator
-    translation.textContent = "Translating...";
+    // Reset any user-specific state
+    username = '';
+    password = '';
     
-    // Get user's native language from settings
-    const targetLang = languageUserOptionsSelect.value;
-    console.log("targetLang: ", targetLang);
- 
-    try {
-        // Check connection before sending
-        if (!wsConnection.isConnected()) {
-            translation.textContent = "Reconnecting...";
-            await wsConnection.forceReconnect();
-        }
-        
-        // Try translation with retries
-        let attempts = 0;
-        const MAX_ATTEMPTS = 3;
-        
-        while (attempts < MAX_ATTEMPTS) {
-            try {
-                await wsConnection.translate(text, sourceLang, targetLang);
-                break; // Success - exit the loop
-            } catch (error) {
-                attempts++;
-                console.error(`Translation attempt ${attempts} failed:`, error);
-                
-                if (attempts >= MAX_ATTEMPTS) {
-                    throw error;
-                }
-                
-                // Update status and wait before retry
-                translation.textContent = `Retrying translation (${attempts}/${MAX_ATTEMPTS})...`;
-                await new Promise(resolve => setTimeout(resolve, 1000));
-            }
-        }
-    } catch (error) {
-        console.error("Translation error:", error);
-        translation.textContent = "Translation failed. Please try again.";
-    }
-}
-
-async function createBlobAndConnect() {
-    const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
-    
-    // Show status indicator with initial message
-    const statusIndicator = document.getElementById('recording-status');
-    const statusMessage = statusIndicator.querySelector('.status-message');
-    statusIndicator.style.display = 'flex';
-    statusMessage.textContent = 'Getting audio ready...';
-    
-    try {
-        // Convert blob to base64
-        const base64Blob = await new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onloadend = () => resolve(reader.result);
-            reader.onerror = reject;
-            reader.readAsDataURL(audioBlob);
-        });
-        
-        // Update status message
-        statusMessage.textContent = 'Waiting for response...';
-        
-        // Check connection before sending
-        if (!wsConnection.isConnected()) {
-            statusMessage.textContent = 'Reconnecting...';
-            await wsConnection.forceReconnect();
-        }
-        
-        // Send to server with retry logic
-        let attempts = 0;
-        const MAX_ATTEMPTS = 3;
-        
-        while (attempts < MAX_ATTEMPTS) {
-            try {
-                await wsConnection.speechToText(
-                    base64Blob, 
-                    languageSel.value.substring(0,2), 
-                    lines[lineNum],
-                    username,
-                    password
-                );
-                
-                // Success - clear audio chunks for next recording
-                audioChunks = [];
-                break;
-            } catch (error) {
-                attempts++;
-                console.error(`Speech to text attempt ${attempts} failed:`, error);
-                
-                if (attempts >= MAX_ATTEMPTS) {
-                    throw error;
-                }
-                
-                // Update status and wait before retry
-                statusMessage.textContent = `Retrying (${attempts}/${MAX_ATTEMPTS})...`;
-                await new Promise(resolve => setTimeout(resolve, 1000));
-            }
-        }
-        
-    } catch (error) {
-        console.error("Error processing audio:", error);
-        statusMessage.textContent = 'Error processing audio';
-        setTimeout(() => {
-            statusIndicator.style.display = 'none';
-        }, 2000);
-    }
+    // Close the settings drawer
+    drawer.classList.remove('open');
 }
 
 // Update login button click handler
@@ -837,18 +738,162 @@ loginButton.addEventListener('click', async () => {
     username = usernameInput.value;
     password = passwordInput.value;
 
-    console.log("login button clicked");
-    console.log("username is: ", username);
-    console.log("password is: ", password);
+    if (!isValidEmail(username)) {
+        alert("Please enter a valid email address");
+        return; 
+    }
+
+    if (!password || password.trim() === "") {
+        alert("Password cannot be empty");
+        return; 
+    }
+
+   
+    const response = await wsConnection.login(username, password);
+    console.log("Login response:", response);
+    
+    if (response.status === "success" && response.token) {
+        localStorage.setItem('token', response.token);
+        localStorage.setItem('username', username);
+        
+        // Update UI to show logged-in state
+        updateAuthUI(true, username);
+        
+        // Close the settings drawer
+        drawer.classList.remove('open');
+    } else {
+        alert(response.message || "Login failed. Please try again.");
+    }
+ 
+});
+
+async function updateTranslation(text) {
+    console.log(`Translating text: "${text}" from ${sourceLang}`);
+    
+    translation.textContent = "Translating...";
+    
+    // Get user's native language from settings
+    const targetLang = languageUserOptionsSelect.value;
+    console.log("targetLang: ", targetLang);
+    console.log("sourceLang: ", sourceLang);
+    console.log("username: ", username);
+    try {
+        // Check connection before sending
+        if (!wsConnection.isConnected()) {
+            translation.textContent = "Reconnecting...";
+            await wsConnection.forceReconnect();
+        }
+        
+        await wsConnection.translate(
+            text, 
+            sourceLang, 
+            targetLang, 
+            selectedBook, 
+            selectedPage,
+            username 
+        );
+    } catch (error) {
+        console.error("Translation error:", error);
+        translation.textContent = "Translation failed. Please try again.";
+    }
+}
+
+// Update signup button click handler
+signupButton.addEventListener('click', async () => {
+    signupButton.style.backgroundColor = '#FFB6C1';
+    username = usernameInput.value;
+    password = passwordInput.value;
+
+    if (!isValidEmail(username)) {
+        alert("Please enter a valid email address");
+        return;
+    }
+
+    if (!password || password.trim() === "") {
+        alert("Password cannot be empty");
+        return;
+    }
 
     try {
-        const response = await wsConnection.login(username, password);
-        console.log("Login response:", response);
-        // Handle login response here
+        const response = await wsConnection.signup(username, password);
+        console.log("Signup response:", response);
+        
+        if (response.status === "success" && response.token) {
+            localStorage.setItem('token', response.token);
+            localStorage.setItem('username', username);
+            
+            // Update UI to show logged-in state
+            updateAuthUI(true, username);
+            
+            // Close the settings drawer
+            drawer.classList.remove('open');
+            
+            alert("Account created successfully!");
+        } else {
+            alert(response.message || "Signup failed. Please try again.");
+        }
     } catch (error) {
-        console.error("Login error:", error);
-        alert("Login failed. Please try again.");
+        console.error("Signup error:", error);
+        alert("Signup failed. Please try again.");
     }
+});
+
+// Update token verification on page load
+window.addEventListener('DOMContentLoaded', async () => {
+    initializeVoices();
+    
+    // Check for stored token and username
+    const storedToken = localStorage.getItem('token');
+    const storedUsername = localStorage.getItem('username');
+    console.log("storedToken: ", storedToken);
+    console.log("storedUsername: ", storedUsername);
+    
+    if (storedToken) {
+      
+            // Ensure WebSocket connection is ready
+            if (!wsConnection.isConnected()) {
+                console.log("Reconnecting WebSocket...");
+                await wsConnection.forceReconnect();
+            }
+
+            const response = await wsConnection.request({
+                task: "verify_token",
+                token: storedToken
+            });
+            
+            if (response.status === "success") {
+                username = response.username;
+                updateAuthUI(true, username);
+                
+                if (response.current_book && response.epub) {
+                    selectedBook = response.current_book;
+                    selectedPage = response.page || 0;
+                    console.log("Loading user's current book:", selectedBook);
+                    
+                    // Convert base64 to blob
+                    const base64Data = response.epub.split(',')[1];
+                    const mimeString = response.epub.split(',')[0].split(':')[1].split(';')[0];
+                    const byteString = atob(base64Data);
+                    const ab = new ArrayBuffer(byteString.length);
+                    const ia = new Uint8Array(ab);
+                    
+                    for (let i = 0; i < byteString.length; i++) {
+                        ia[i] = byteString.charCodeAt(i);
+                    }
+                    
+                    const blob = new Blob([ab], {type: mimeString});
+                    
+                    // Render the book
+                    await renderEpub(blob);
+                    if (selectedPage && rendition) {
+                        rendition.display(selectedPage);
+                    }
+                }
+                
+                console.log("Auto-login successful");
+            
+       
+    }}
 });
 
 // Initialize when the page loads
@@ -859,11 +904,7 @@ window.addEventListener('DOMContentLoaded', () => {
         console.log("No stored token found");
         return;
     }
-    wsConnection.verifyToken(storedToken).catch(error => {
-        console.error("Token verification failed:", error);
-        localStorage.removeItem('token');
-        return;
-    });
+  
 });
 
 // Update the browse books button event listener
@@ -1108,7 +1149,7 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
                             // Update translation
                             const translationDiv = document.getElementById('translation');
                             if (translationDiv) {
-                               updateTranslation(selectedText, languageSel.value);
+                               updateTranslation(selectedText);
                             }
                             
                             // Prevent the click from propagating to the window
@@ -1372,20 +1413,6 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
         document.getElementById('user-modal').style.display = 'block';
        }
 
-    signupButton.addEventListener('click', () => {
-        signupButton.style.backgroundColor = '#FFB6C1';
-        username=usernameInput.value;
-        password=passwordInput.value;
-        console.log("signup button clicked");
-        console.log("username is: ", username);
-        console.log("password is: ", password);
-
-    });
-
-    function openUserAccountOptions() {
-        document.getElementById('user-account-options-modal').style.display = 'block';
-    }
-
     function initializeVoices() {
         // Get the available voices
         availableVoices = window.speechSynthesis.getVoices();
@@ -1428,11 +1455,11 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
     // Make sure language selection changes trigger retranslation
     languageSel.addEventListener('change', function() {
         if (translationText) {
-            updateTranslation(translationText, this.value);
+            sourceLang = this.value;
+            updateTranslation(translationText);
         }
     });
 
-    // Update the handleTextSelection function to properly use updateTranslation
     function handleTextSelection() {
         const selection = window.getSelection();
         const text = selection.toString().trim();
@@ -1440,18 +1467,11 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
         if (text && text.length > 0) {
             console.log("Selected text:", text);
             selectedText = text;
-            
-            // Show the modal with the selected text
             modalDiv.style.display = "block";
+            sourceLang = languageSel.value;
             
-            // Get the target language from the language select dropdown
-            const targetLang = languageSel.value;
-            
-            // Store the selected text for later use
             translationText = text;
-            
-            // Trigger translation immediately
-            updateTranslation(text, targetLang);
+            updateTranslation(text);
         }
     }
 
@@ -1541,6 +1561,11 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
         });
         
         return text;
+    }
+
+    function isValidEmail(email) {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        return emailRegex.test(email);
     }
 
 </script>
