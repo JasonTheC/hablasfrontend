@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.1.5/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/epubjs/dist/epub.min.js"></script>
@@ -1076,6 +1076,10 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
                         element.addEventListener('click', (event) => {
                             console.log("Element clicked:", element.textContent.substring(0, 30) + "...");
                             
+                            // Check if device is mobile
+                            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+                            console.log("Is mobile device:", isMobile);
+                            
                             // Remove previous selection
                             content.document.querySelectorAll('.selected-line').forEach(el => {
                                 el.classList.remove('selected-line');
@@ -1094,93 +1098,104 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
                                 circleElement.setAttribute('fill-opacity', '1');
                             }
                             
-                            // Get the text and show alert
-                            selectedText = element.textContent.trim();
-                            lines = [selectedText];
-                            lineNum = 0;
+                            // Get element's bounding box relative to the window
+                            const elementRect = element.getBoundingClientRect();
+                            console.log("Element bounds:", {
+                                top: elementRect.top,
+                                bottom: elementRect.bottom,
+                                height: elementRect.height
+                            });
                             
                             // Position and show modal
-                            const elementRect = element.getBoundingClientRect();
-                            const viewerRect = document.getElementById('viewer').getBoundingClientRect();
                             const modal = document.getElementById('myModal');
+                            const modalContent = modal.querySelector('.modal-content');
                             
                             if (modal) {
-                                // IMPROVED MODAL POSITIONING FOR MOBILE
-                                const isMobile = window.innerWidth <= 768;
-                                const modalContent = modal.querySelector('.modal-content');
+                                // Calculate position relative to viewport
+                                const padding = isMobile ? 10 : 20; // Less padding on mobile
                                 
-                                // Calculate the position of the element relative to the viewer
-                                const relativeTop = elementRect.top - content.window.pageYOffset;
-                                const relativeBottom = elementRect.bottom - content.window.pageYOffset;
-                                const elementCenter = elementRect.top + (elementRect.height / 2);
+                                // Get element's position relative to iframe
+                                const elementRect = element.getBoundingClientRect();
+                                console.log("Element position within iframe:", elementRect);
                                 
-                                // Calculate the absolute position in the parent document
-                                let absoluteTop;
+                                // Get the iframe/viewer position relative to main window
+                                const viewerContainer = document.getElementById('viewer-container');
+                                const viewerRect = viewerContainer.getBoundingClientRect();
+                                console.log("Viewer container position:", viewerRect);
                                 
-                                // Get modal height (if already visible) or estimate it
-                                const modalHeight = modal.offsetHeight || 300; // Use 300px as fallback estimate
+                                // Calculate absolute position by combining both
+                                let absoluteTop = viewerRect.top + elementRect.top;
+                                let absoluteBottom = viewerRect.top + elementRect.bottom;
                                 
+                                console.log("Calculated absolute position:", {
+                                    top: absoluteTop,
+                                    bottom: absoluteBottom
+                                });
+                                console.log("window.innerHeight: ", window.innerHeight);
+                                console.log("window.innerWidth: ", window.innerWidth);
+                                if ((absoluteBottom + modalContent.offsetHeight) > window.innerHeight) {
+                                    absoluteBottom = absoluteTop - modalContent.offsetHeight - padding;
+                                    if (absoluteBottom < 0) {
+                                        absoluteBottom = absoluteTop;
+                                    }
+                                } else {
+                                    absoluteBottom = absoluteBottom + padding;
+                                }
+                                // Reset all positioning to prevent any inherited styles
+                                modal.style.cssText = `
+                                    position: fixed !important;
+                                    top: ${absoluteBottom}px !important;
+                                    left: ${isMobile ? '10px' : ((window.innerWidth - (Math.min(window.innerWidth - 40, 800))) / 2) + 'px'} !important;
+                                    display: block !important;
+                                    z-index: 9999 !important;
+                                    bottom: auto !important;
+                                    transform: none !important;
+                                    margin: 0 !important;
+                                `;
+                                
+                                console.log("Modal style set to:", modal.style.cssText);
+                                
+                                // Set modal content width
                                 if (isMobile) {
-                                    // On mobile, center the modal over the element
-                                    absoluteTop = viewerRect.top + relativeTop - (modalHeight / 4);
-                                    
-                                    // Ensure modal stays within viewport
-                                    const maxTop = window.innerHeight - modalHeight - 20;
-                                    const minTop = 20; // Minimum 20px from top
-                                    absoluteTop = Math.max(minTop, Math.min(absoluteTop, maxTop));
-                                    
-                                    // Use full width on mobile with small margins
                                     modalContent.style.width = `calc(100vw - 20px)`;
                                     modalContent.style.maxWidth = '100%';
-                                    modal.style.left = '10px';
                                 } else {
-                                    // On desktop, position below or above the element
-                                    absoluteTop = viewerRect.top + relativeBottom + 20; // 20px gap below element
-                                    
-                                    // Check if modal would go off screen at the bottom
-                                    if (absoluteTop + modalHeight > window.innerHeight) {
-                                        // Place above the element instead
-                                        absoluteTop = viewerRect.top + relativeTop - modalHeight - 20; // 20px gap above element
-                                    }
-                                    
-                                    // Use the viewer's x position
-                                    const modalLeft = viewerRect.left + 20; // 20px margin from left of viewer
-                                    modal.style.left = `${modalLeft}px`;
-                                    
-                                    // Set width based on viewer
-                                    const modalWidth = viewerRect.width - 40; // 20px margin on each side
+                                    const modalWidth = Math.min(window.innerWidth - 40, 800);
                                     modalContent.style.width = `${modalWidth}px`;
                                 }
                                 
-                                // Position modal
-                                modal.style.position = 'fixed';
-                                if (absoluteTop < 0) {
-                                    absoluteTop = 0;
-                                }
-                                modal.style.top = `${absoluteTop}px`;
+                                // Ensure modal is visible by scrolling if necessary
+                                setTimeout(() => {
+                                    const modalHeight = modalContent.offsetHeight || 300;
+                                    console.log("Modal actual dimensions:", {
+                                        height: modalContent.offsetHeight,
+                                        top: modal.getBoundingClientRect().top,
+                                        bottom: modal.getBoundingClientRect().bottom
+                                    });
+                                    
+                                    const modalBottom = absoluteBottom + padding + modalHeight;
+                                    if (modalBottom  > window.innerHeight) {
+                                        absoluteBottom = absoluteTop - modalContent.offsetHeight - padding;
+                                        if (absoluteBottom < 0) {
+                                            absoluteBottom = absoluteTop;
+                                        }
+                                        modal.style.top = `${absoluteBottom}px`;
+                                    }
+                                }, 50); // Short delay to ensure the modal has rendered
                                 
-                                modal.style.display = "block";
-                                console.log("Modal positioned at:", {
-                                    left: isMobile ? '10px' : modal.style.left, 
-                                    top: absoluteTop, 
-                                    width: modalContent.style.width,
-                                    height: modalHeight,
-                                    isMobile: isMobile,
-                                    elementCenter: elementCenter,
-                                    viewerTop: viewerRect.top
-                                });
-                            } else {
-                                console.error("Modal element not found");
+                                // Get the text and update translation
+                                selectedText = element.textContent.trim();
+                                lines = [selectedText];
+                                lineNum = 0;
+                                
+                                const translationDiv = document.getElementById('translation');
+                                if (translationDiv) {
+                                    updateTranslation(selectedText);
+                                }
+                                
+                                // Prevent the click from propagating
+                                event.stopPropagation();
                             }
-                            
-                            // Update translation
-                            const translationDiv = document.getElementById('translation');
-                            if (translationDiv) {
-                               updateTranslation(selectedText);
-                            }
-                            
-                            // Prevent the click from propagating to the window
-                            event.stopPropagation();
                         });
                     });
                 });
@@ -1267,6 +1282,7 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
         }
     });
 
+    
     nextPageBtn.addEventListener('click', () => {
         console.log("nextPageBtn clicked");
         if (rendition) { //if an epub is loaded
