@@ -1,22 +1,66 @@
-import asyncio, difflib #multiprocessser good for sockets
+import asyncio, difflib, time #multiprocessser good for sockets
+start_time = time.time()
+print("importing libraries")
+
 import websockets , json # the json is bc we're sending a json object from the website
 import wave , base64
 import os #library for anything that has to do with your hard-drive
+end_time = time.time()
+print(f"Time taken to import libraries: {end_time - start_time} seconds")
+print("importing torch")
+start_time = time.time()
 import torch, sqlite3
+end_time = time.time()
+print(f"Time taken to import torch and sqlite3: {end_time - start_time} seconds")
+print("importing librosa")
+start_time = time.time()
 import librosa #library to analyse and process audio . soundfile is similar 
-import os #library for anything that has to do with your hard-drive
+end_time = time.time()
+print(f"Time taken to import librosa: {end_time - start_time} seconds")
+print("importing transformers")
+start_time = time.time()
 from transformers import Wav2Vec2ForCTC, Wav2Vec2Processor
+end_time = time.time()
+print(f"Time taken to import transformers: {end_time - start_time} seconds")
+print("importing ssl")
+start_time = time.time()
 import ssl  # Add this import at the top
+end_time = time.time()
+print(f"Time taken to import ssl: {end_time - start_time} seconds")
+print("importing secrets")
+start_time = time.time()
 import secrets  # Add secrets to generate tokens
+end_time = time.time()
+print(f"Time taken to import secrets: {end_time - start_time} seconds")
+print("importing datetime")
 from datetime import datetime, timedelta
+print("importing zipfile")
 import zipfile
+print("importing xml.etree.ElementTree")
 import xml.etree.ElementTree as ET
+print("importing pathlib")
 from pathlib import Path
 import shutil
+end_time = time.time()
+print(f"Time taken to import shutil: {end_time - start_time} seconds")
+start_time = time.time()
 import mimetypes
+end_time = time.time()
+print(f"Time taken to import mimetypes: {end_time - start_time} seconds")
+start_time = time.time()
 from PIL import Image, ImageDraw, ImageFont
+end_time = time.time()
+print(f"Time taken to import PIL: {end_time - start_time} seconds")
+start_time = time.time()
+print("importing Levenshtein")
 import Levenshtein  # Add this import for Levenshtein distance
+end_time = time.time()
+print(f"Time taken to import Levenshtein: {end_time - start_time} seconds")
+start_time = time.time()
+print("importing Translator")
 from googletrans import Translator  # Add this import for translation
+end_time = time.time()
+print(f"Time taken to import Translator: {end_time - start_time} seconds")
 
 
 LANG_ID = "fr"
@@ -58,16 +102,9 @@ def get_or_load_model(lang):
     return loaded_processors[lang], loaded_models[lang]
 
 def stt(AUDIO_DIR, lang):
-    # Get or load the model and processor
-    processor, model = get_or_load_model(lang)
-    
-    # Pre-processing the data
+    processor, model = get_or_load_model(lang)    
     audio = librosa.load(AUDIO_DIR, sr=16_000)
-
-    # Tokenizing the data
     inputs = processor(audio[0], sampling_rate=audio[1], return_tensors="pt")
-
-    # Inference process
     with torch.no_grad():
         logits = model(inputs.input_values, attention_mask=inputs.attention_mask).logits
     
@@ -200,7 +237,7 @@ class TextComparator:
 def stt_task(data_object):
     print(f"language: {data_object['language']}") 
 
-    fpath="received_audio.wav" #name of the audio in the server (our computer in this case)
+    fpath=f"{data_object['username']}_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.wav" #name of the audio in the server (our computer in this case)
     with open(fpath, "wb") as audio_file: #received_audio is f.open, initialising this file. audio_file is the variable
             base64_string = data_object["blob"]
             actual_base64 = base64_string.split(',')[1]  # Get the Base64 part
@@ -219,7 +256,7 @@ def stt_task(data_object):
         print(f"  - Distance ratio: {ratio:.2f}")
         print(f"  - Marked as wrong: {distance > 2 and ratio > 0.3}")
     message_returned = {"pred_sentence":predicted_sentence}
-
+    db.set_current_book_task(data_object, fpath, predicted_sentence)
     print("Received audio file and saved as 'received_audio.wav'")
     return message_returned
 
@@ -346,16 +383,15 @@ async def get_available_books():
                         else:
                             cover_file = COVERS_DIR.parent / cover_path
                         
-                        print(f"Converting files to base64 for {epub_path.name}")
+                        print(f"Converting cover to base64 for {epub_path.name}")
                         cover_base64 = get_file_as_base64(cover_file)
-                        epub_base64 = get_file_as_base64(epub_path)
                         
                         books.append({
                             "filename": epub_path.name,
                             "language": language,
                             "path": str(epub_path.relative_to(EPUB_DIR.parent)),
-                            "cover": cover_base64,
-                            "epub": epub_base64
+                            "cover": cover_base64
+                            # Removed the epub base64 data to make the response lighter
                         })
                         print(f"Successfully processed book: {epub_path.name}")
                     except Exception as e:
@@ -367,10 +403,35 @@ async def get_available_books():
         print(f"Error getting available books: {e}")
         return []
 
-
+async def get_book_data(data_object):
+    """Get specific book data by filename and language"""
+    try:
+        filename = data_object.get("filename")
+        language = data_object.get("language")
+        
+        if not filename or not language:
+            return {"status": "error", "message": "Missing filename or language"}
+        
+        # Construct the full path to the book
+        epub_path = EPUB_DIR / language / filename
+        
+        if not epub_path.exists():
+            return {"status": "error", "message": f"Book not found: {filename}"}
+        
+        # Convert the EPUB file to base64
+        epub_base64 = get_file_as_base64(epub_path)
+        
+        return {
+            "status": "success",
+            "filename": filename,
+            "language": language,
+            "epub": epub_base64
+        }
+    except Exception as e:
+        print(f"Error getting book data: {e}")
+        return {"status": "error", "message": str(e)}
 
 async def translate_task(data_object):
-    """Handle translation requests"""
     source_text = data_object.get("text", "")
     source_lang = data_object.get("source_lang", "en")
     target_lang = data_object.get("target_lang", "fr")
@@ -400,7 +461,7 @@ async def translate_task(data_object):
         
         # Create a new translator instance for each request
         translator_instance = Translator()
-        result = await translator_instance.translate(source_text, src=source_lang, dest=target_lang)
+        result = translator_instance.translate(source_text, src=source_lang, dest=target_lang)
         
         if hasattr(result, 'text'):
             translated_text = result.text
@@ -428,6 +489,41 @@ async def translate_task(data_object):
             "target_lang": target_lang
         }
 
+async def verify_token_task(data_object):
+    """Verify a login token and return user data if valid"""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    
+    token = data_object.get("token")
+    if not token:
+        return {"status": "error", "message": "No token provided"}
+    
+    # Check if token exists and is not expired
+    cursor.execute("""
+        SELECT username, current_book, page, utterrance_fname, predicted_sentence, 
+               preferred_language
+        FROM users 
+        WHERE login_token = ? AND token_expiry > ?
+    """, (token, datetime.now()))
+    
+    user = cursor.fetchone()
+    conn.close()
+    
+    if not user:
+        return {"status": "error", "message": "Invalid or expired token"}
+    
+    # Return user data
+    return {
+        "status": "success",
+        "username": user[0],
+        "current_book": user[1],
+        "page": user[2],
+        "utterance_fname": user[3],
+        "predicted_sentence": user[4],
+        "preferred_language": user[5],
+        "token": token  # Return the same token back
+    }
+
 async def handle_connection(websocket):
     print(f"Client connected, {websocket.remote_address}")
     
@@ -437,20 +533,25 @@ async def handle_connection(websocket):
         
         message_returned = {"error": "Invalid task"}  # Default message
         
-        if data_object["task"] == "get_books":
+        if data_object.get("task") == "get_books":
             # Handle book listing request
             books = await get_available_books()
             message_returned = {"books": books}
-        elif data_object["task"] == "stt":
+        elif data_object.get("task") == "get_book_data":
+            # Handle specific book data request
+            message_returned = await get_book_data(data_object)
+        elif data_object.get("task") == "stt":
             message_returned = stt_task(data_object)
-        elif data_object["task"] == "login":
+        elif data_object.get("task") == "login":
             message_returned = db.login_task(data_object)
-        elif data_object["task"] == "signup":
+        elif data_object.get("task") == "signup":
             message_returned = db.signup_task(data_object)
-        elif data_object["task"] == "change_settings":
+        elif data_object.get("task") == "change_settings":
             message_returned = db.change_settings_task(data_object)
-        elif data_object["task"] == "translate":
+        elif data_object.get("task") == "translate":
             message_returned = await translate_task(data_object)
+        elif data_object.get("task") == "verify_token":
+            message_returned = await verify_token_task(data_object)
             
         await websocket.send(json.dumps(message_returned))
     
@@ -468,6 +569,7 @@ def preload_all_models():
         print(f"Loading {lang} model...")
         get_or_load_model(lang)
     print("All models loaded!")
+
 class DatabaseManager:
     def __init__(self, db_path):
         self.DB_PATH = db_path #a constructor defines what parameters are needed to create an object
@@ -494,7 +596,6 @@ class DatabaseManager:
         conn.close()
 
     async def login_task(self, data_object):
-        """Handle user login"""
         conn = sqlite3.connect(self.DB_PATH)
         cursor = conn.cursor()
         
@@ -506,9 +607,10 @@ class DatabaseManager:
         user = cursor.fetchone()
         
         if user:
+            print(user)
             # Generate new token and set expiry to 24 hours from now
             token = secrets.token_urlsafe(32)
-            expiry = datetime.now() + timedelta(days=1)
+            expiry = datetime.now() + timedelta(days=10000)
             
             cursor.execute("""
                 UPDATE users 
@@ -522,6 +624,9 @@ class DatabaseManager:
                 "token": token,
                 "username": username,
                 "current_book": user[2],
+                "page": user[3],
+                "utterance_fname": user[4],
+                "predicted_sentence": user[5],
                 "book_position": user[3],
                 "preferred_language": user[4],
                 "type": "login"
@@ -536,8 +641,7 @@ class DatabaseManager:
         return message
         
 
-    def signup_task(self, data_object):smb://192.168.1.105/MScopy/CarrierTech/Hablas/server.py
-        """Handle user registration"""
+    def signup_task(self, data_object):
         conn = sqlite3.connect(self.DB_PATH)
         cursor = conn.cursor()
         
@@ -559,6 +663,19 @@ class DatabaseManager:
         conn.close()
         
         return {"status": "success", "message": "User created successfully"}
+
+    def set_current_book_task(self, data_object, utterrance_fname, predicted_sentence):
+        conn = sqlite3.connect(self.DB_PATH)
+        cursor = conn.cursor()
+        
+        username = data_object.get("username")
+        current_book = data_object.get("book")
+        page = data_object.get("page")
+
+        cursor.execute("UPDATE users SET current_book = ?, page = ?, utterrance_fname = ?, predicted_sentence = ? WHERE username = ?",
+                    (current_book, page, utterrance_fname, predicted_sentence, username))
+        conn.commit()
+        conn.close()
 
     def change_settings_task(self, data_object):
         """Handle user settings updates"""

@@ -37,12 +37,6 @@
             <span id="close-drawer" class="close">&times;</span>
             <h2>Settings</h2>
             <div id="settings-options">
-                <input type="text" id="user-name" placeholder="Username">
-                <input type="password" id="user-password" placeholder="Password">
-                <div id="login-singup" style="display: flex; width: 100%; gap: 10px; border-bottom: 1px solid #ccc; padding-bottom: 10px;">
-                    <div id="login-button" class="options" style="flex: 1;">Login</div>
-                    <div id="signup-button" class="options" style="flex: 1;">Sign up</div>
-                 </div>
                 <div id="available-books" class="options">Available books</div>
                 <div id="userLanguages"  class="options">Native Language</div>
                 <select id="languageUserOptions" default="en" class="settings-select">
@@ -98,7 +92,21 @@
     </div>
 </div>
 
-
+<div id="user-modal" class="modal user-modal">
+    <div class="modal-content user-modal-content">
+        <span class="close">&times;</span>
+        <p>User account interaction</p>
+        <div id="inputs-account">
+            <input type="text" id="user-name" placeholder="Username">
+            <input type="password" id="user-password" placeholder="Password">
+        </div>
+        <div id="buttons-account">
+            <button id="login-button">Login</button>
+            <button id="signup-button">Sign up</button>
+            <button id="forgot-password-button">Forgot password?</button>
+        </div>
+    </div>
+</div>
 
 <div id="user-account-options-modal" class="modal user-account-options-modal">
     <div class="modal-content user-account-options-modal-content">
@@ -182,8 +190,6 @@
     let voiceGenderOptionsOpen = false;
     let availableVoices = [];
     let selectedVoiceGender = 'female'; // Default to female
-    let selectedBook = null;
-    let selectedPage = null;
 
 console.log ("starting script");
 
@@ -383,11 +389,6 @@ function createWebSocketConnection() {
                         } else if (response.hasOwnProperty('translation') || 
                                   (response.status === 'success' && response.hasOwnProperty('translated_text'))) {
                             handleTranslationResponse(response);
-                        } else if (response.hasOwnProperty('token')) {
-                            handleTokenResponse(response);
-                        } else if (response.status === 'success' && response.hasOwnProperty('epub')) {
-                            // Handle book data response
-                            handleBookDataResponse(response);
                         } else {
                             console.log("Unhandled response from server:", response);
                         }
@@ -442,11 +443,10 @@ function createWebSocketConnection() {
             return makeWebSocketRequest({
                 task: "stt",
                 username: username,
+                password: password,
                 language: language.substring(0,2),
                 blob: blob,
-                sentence: sentence,
-                page: selectedPage,
-                book: selectedBook
+                sentence: sentence
             });
         },
         
@@ -475,15 +475,6 @@ function createWebSocketConnection() {
         forceReconnect: function() {
             reconnectAttempts = 0;
             return getSocket();
-        },
-        
-        // Get specific book data
-        getBookData: async function(filename, language) {
-            return makeWebSocketRequest({
-                task: "get_book_data",
-                filename: filename,
-                language: language
-            });
         }
     };
 }
@@ -550,33 +541,22 @@ function handleBooksResponse(response) {
             bookElement.appendChild(img);
             bookElement.appendChild(title);
             
-            // Add click event to load the book (now using the async function)
-            bookElement.addEventListener('click', async () => {
-                try {
-                    // Show loading indicator
-                    title.textContent = "Loading...";
-                    
-                    // Request the specific book data
-                    const response = await wsConnection.request({
-                        task: "get_book_data",
-                        filename: book.filename,
-                        language: language
-                    });
-                    
-                    if (response.error) {
-                        throw new Error(response.error);
+            // Add click event to load the book
+            bookElement.addEventListener('click', () => {
+              
+                    // Create a Blob from the base64 data
+                    if (!book.epub) {
+                        console.error('No EPUB data received for book:', book.filename);
+                        return;
                     }
-                    
-                    if (!response.epub) {
-                        throw new Error('No EPUB data received');
-                    }
-                    
-                    const epubData = response.epub;
+
+                    const epubData = book.epub;
                     const base64Data = epubData.split(',')[1];
                     if (!base64Data) {
-                        throw new Error('Invalid EPUB data format');
+                        console.error('Invalid EPUB data format for book:', book.filename);
+                        return;
                     }
-                    
+
                     const byteString = atob(base64Data);
                     const mimeString = epubData.split(',')[0].split(':')[1].split(';')[0];
                     const ab = new ArrayBuffer(byteString.length);
@@ -590,15 +570,8 @@ function handleBooksResponse(response) {
                     renderEpub(blob);
                     booksModal.style.display = 'none';
                     languageSelect.value = language;
-                    selectedBook = book.filename;
-                    console.log("selected ", selectedBook);
-                } catch (error) {
-                    console.error('Error loading book:', error);
-                    alert('Error loading book: ' + error.message);
                     
-                    // Restore original title
-                    title.textContent = book.filename.replace('.epub', '');
-                }
+                
             });
             
             booksContainer.appendChild(bookElement);
@@ -620,56 +593,6 @@ function handleTranslationResponse(response) {
     const translatedText = response.translation || response.translated_text;
     translation.innerHTML = translatedText;
     console.log("Updated translation with:", translatedText);
-}
-
-function handleTokenResponse(response) {
-    console.log("Token response:", response);
-    localStorage.setItem('token', response.token)
-    if (response.hasOwnProperty('book')){
-        
-    }
-}
-
-// Add this new function to handle book data responses
-function handleBookDataResponse(response) {
-    try {
-        console.log("Received book data:", response.filename);
-        
-        if (!response.epub) {
-            throw new Error('No EPUB data received');
-        }
-        
-        const epubData = response.epub;
-        const base64Data = epubData.split(',')[1];
-        if (!base64Data) {
-            throw new Error('Invalid EPUB data format');
-        }
-        
-        const byteString = atob(base64Data);
-        const mimeString = epubData.split(',')[0].split(':')[1].split(';')[0];
-        const ab = new ArrayBuffer(byteString.length);
-        const ia = new Uint8Array(ab);
-        
-        for (let i = 0; i < byteString.length; i++) {
-            ia[i] = byteString.charCodeAt(i);
-        }
-        
-        const blob = new Blob([ab], {type: mimeString});
-        renderEpub(blob);
-        booksModal.style.display = 'none';
-        
-        // Set the language select to match the book's language
-        const languageSelect = document.getElementById('language-select');
-        if (languageSelect) {
-            languageSelect.value = response.language.toLowerCase();
-        }
-        
-        selectedBook = response.filename;
-        console.log("Selected book:", selectedBook);
-    } catch (error) {
-        console.error('Error processing book data:', error);
-        alert('Error loading book: ' + error.message);
-    }
 }
 
 // Update functions that use WebSocket to use the new API
@@ -854,16 +777,6 @@ loginButton.addEventListener('click', async () => {
 // Initialize when the page loads
 window.addEventListener('DOMContentLoaded', () => {
     initializeVoices();
-    const storedToken = localStorage.getItem('token');
-    if (!storedToken) {
-        console.log("No stored token found");
-        return;
-    }
-    wsConnection.verifyToken(storedToken).catch(error => {
-        console.error("Token verification failed:", error);
-        localStorage.removeItem('token');
-        return;
-    });
 });
 
 // Update the browse books button event listener
@@ -878,6 +791,131 @@ function loadAvailableBooks() {
         console.error("Error loading books:", error);
     });
 }
+
+// Add this to your existing WebSocket message handler
+socket.addEventListener('message', (event) => {
+    const msg = JSON.parse(event.data);
+    
+    // Hide recording status indicator whenever we receive any message
+    const statusIndicator = document.getElementById('recording-status');
+    if (statusIndicator) {
+        statusIndicator.style.display = 'none';
+    }
+    
+    if (msg.books) {
+        // Group books by language
+        const booksByLanguage = msg.books.reduce((acc, book) => {
+            if (!acc[book.language]) {
+                acc[book.language] = [];
+            }
+            acc[book.language].push(book);
+            return acc;
+        }, {});
+        
+        // Update language-select options
+        const languageSelect = document.getElementById('language-select');
+        languageSelect.innerHTML = '';
+        
+        Object.keys(booksByLanguage).forEach(language => {
+            const option = document.createElement('option');
+            option.value = language.toLowerCase();
+            option.textContent = language.charAt(0).toUpperCase() + language.slice(1);
+            languageSelect.appendChild(option);
+        });
+
+        // Update books grid
+        const booksGrid = document.getElementById('books-grid');
+        booksGrid.innerHTML = '';
+        
+        Object.entries(booksByLanguage).forEach(([language, languageBooks]) => {
+            const languageSection = document.createElement('div');
+            languageSection.className = 'language-section';
+            
+            const languageHeader = document.createElement('h2');
+            languageHeader.textContent = language.charAt(0).toUpperCase() + language.slice(1);
+            languageSection.appendChild(languageHeader);
+            
+            const booksContainer = document.createElement('div');
+            booksContainer.className = 'books-container';
+            
+            languageBooks.forEach(book => {
+                const bookElement = document.createElement('div');
+                bookElement.className = 'book';
+
+                const img = document.createElement('img');
+                // Check if cover is base64 data or path
+                if (book.cover && book.cover.startsWith('data:')) {
+                    img.src = book.cover;
+                } else {
+                    // Fallback to default cover if the base64 data is invalid
+                    img.src = 'images/default-cover.png';
+                    console.error('Invalid cover data for book:', book.filename);
+                }
+                img.alt = book.filename;
+                
+                const title = document.createElement('div');
+                title.className = 'book-title';
+                title.textContent = book.filename.replace('.epub', '');
+                
+                bookElement.appendChild(img);
+                bookElement.appendChild(title);
+                
+                // Add click event to load the book
+                bookElement.addEventListener('click', () => {
+                    try {
+                        // Create a Blob from the base64 data
+                        if (!book.epub) {
+                            console.error('No EPUB data received for book:', book.filename);
+                            return;
+                        }
+
+                        const epubData = book.epub;
+                        const base64Data = epubData.split(',')[1];
+                        if (!base64Data) {
+                            console.error('Invalid EPUB data format for book:', book.filename);
+                            return;
+                        }
+
+                        const byteString = atob(base64Data);
+                        const mimeString = epubData.split(',')[0].split(':')[1].split(';')[0];
+                        const ab = new ArrayBuffer(byteString.length);
+                        const ia = new Uint8Array(ab);
+                        
+                        for (let i = 0; i < byteString.length; i++) {
+                            ia[i] = byteString.charCodeAt(i);
+                        }
+                        
+                        const blob = new Blob([ab], {type: mimeString});
+                        renderEpub(blob);
+                        booksModal.style.display = 'none';
+                        languageSelect.value = language;
+                        
+                    } catch (error) {
+                        console.error('Error loading book:', error);
+                        alert('Error loading book. Please try again.');
+                    }
+                });
+                
+                booksContainer.appendChild(bookElement);
+            });
+            
+            languageSection.appendChild(booksContainer);
+            booksGrid.appendChild(languageSection);
+        });
+    } else if (msg.hasOwnProperty('pred_sentence')) {
+        
+        // Fix: Use a proper async function to handle this
+        handlePredSentence(msg.pred_sentence);
+    } else if (msg.hasOwnProperty('translation') || 
+              (msg.status === 'success' && msg.hasOwnProperty('translated_text'))) {
+        // Handle translation response
+        const translatedText = msg.translation || msg.translated_text;
+        translation.innerHTML = translatedText;
+        console.log("Updated translation with:", translatedText);
+    } else {
+        console.log("got some reply from server ", msg);
+    }
+});
 
 // Add this new function to handle the prediction sentence
 async function handlePredSentence(predSentence) {
@@ -915,8 +953,7 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
     // Separate function for epub rendering
     async function renderEpub(file) {
         try {
-            //await waitForEpub();
-            
+            await waitForEpub();
             currentBook = ePub(file);
             const viewer = document.getElementById("viewer");
             viewer.innerHTML = "";
@@ -931,11 +968,13 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
             });
             
             rendition.display().then(() => {
+                // Initial page setup
                 addClickHandlersToPage();
             });
             
+            // Add event listeners for page changes
             rendition.on("rendered", (section) => {
-                selectedPage = section.href;
+                console.log("Page rendered:", section.href);
                 addClickHandlersToPage();
             });
             
@@ -1118,9 +1157,14 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
                 });
             }
             
+            // Hide the navigation div since we're using side buttons
             fileDiv.style.display = "none";
             
-            
+            // Show the empty viewer message if needed
+            const emptyViewerMessage = document.getElementById('empty-viewer-message');
+            if (emptyViewerMessage) {
+                emptyViewerMessage.style.display = 'none';
+            }
         } catch (error) {
             console.error('Error loading ePub:', error);
             alert('Error loading book. Please ensure you have a stable internet connection and try again.');
