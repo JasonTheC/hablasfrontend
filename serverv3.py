@@ -44,6 +44,17 @@ language_dict = {
     "de": "jonatasgrosman/wav2vec2-large-xlsr-53-german",
 }
 
+# Add this language mapping dictionary at the top level with other dictionaries
+language_name_map = {
+    "francais": "fr",
+    "english": "en",
+    "español": "es",
+    "espagnol": "es",
+    "spanish": "es",
+    "deutsch": "de",
+    "italiano": "it"
+}
+
 def get_or_load_model(lang):
     """Helper function to get or load model and processor"""
     MODEL_ID = language_dict[lang]
@@ -167,15 +178,20 @@ class TextComparator:
         return marked_text, similarity_ratio, original_words, spoken_words
 
 def stt_task(data_object):
-    print(f"language: {data_object['language']}") 
+    # Map language name to code if needed
+    lang = data_object['language'].lower()
+    if lang in language_name_map:
+        lang = language_name_map[lang]
+    
+    print(f"language code: {lang}")
 
-    fpath=f"{data_object['username']}_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.wav" #name of the audio in the server (our computer in this case)
-    with open(fpath, "wb") as audio_file: #received_audio is f.open, initialising this file. audio_file is the variable
-            base64_string = data_object["blob"]
-            actual_base64 = base64_string.split(',')[1]  # Get the Base64 part
-            binary_data = base64.b64decode(actual_base64)
-            audio_file.write(binary_data)
-    the_words = stt(fpath,data_object["language"])
+    fpath = f"{data_object['username']}_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.wav"
+    with open(fpath, "wb") as audio_file:
+        base64_string = data_object["blob"]
+        actual_base64 = base64_string.split(',')[1]
+        binary_data = base64.b64decode(actual_base64)
+        audio_file.write(binary_data)
+    the_words = stt(fpath, lang)
     predicted_sentence, similarity_ratio, original_words, spoken_words = TextComparator.generate_html_report(data_object["sentence"], the_words)
     for i in range(min(len(original_words), len(spoken_words))):
         distance = Levenshtein.distance(original_words[i], spoken_words[i])
@@ -485,12 +501,34 @@ async def login_task(self, data_object):
             "username": username,
             "current_book": user.get("current_book", ""),
             "page": user.get("page", 0),
-            "utterance_fname": user.get("utterrance_fname", ""),
-            "predicted_sentence": user.get("predicted_sentence", ""),
             "book_position": user.get("book_position", 0),
             "preferred_language": user.get("preferred_language", "en"),
             "type": "login"
         }
+
+        # Only add epub and language if there's a current book
+        if user.get("current_book"):
+            print("getting books")
+            epub = None
+            language = None
+            epubs = os.walk(EPUB_DIR)
+            for root, dirs, files in epubs:
+                for file in files:
+                    if file == user["current_book"]:
+                        book_path = Path(root) / file
+                        language = book_path.parent.name
+                        print(f"language: {language}")
+                        with open(book_path, "rb") as f:
+                            book_data = f.read()
+                            book_base64 = base64.b64encode(book_data).decode('utf-8')
+                            epub = f"data:application/epub+zip;base64,{book_base64}"
+                            print(f"Including book data for {user['current_book']}")
+                        break
+            
+            if epub and language:
+                message["epub"] = epub
+                message["language"] = language
+
     else:
         message = {
             "status": "error",
@@ -531,7 +569,8 @@ async def verify_token_task(data_object):
     user = dict(zip(columns, user_row))
     print("User data:", user)
     
-    
+    epub = None
+    language = None
 
     print(f"user.get('current_book'): {user.get('current_book')}")    
     if user.get("current_book"):
@@ -670,7 +709,8 @@ class DatabaseManager:
             conn.commit()
             
             
-
+            epub = None
+            language = None
 
             print(f"user.get('current_book'): {user.get('current_book')}")    
             if user.get("current_book"):
