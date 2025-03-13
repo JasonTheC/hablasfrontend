@@ -243,8 +243,22 @@ img {
     
 }
 #bottom {
-    flex: 0 0 auto; /* Take only needed space */
-    
+    display: flex;
+    flex-direction: column;
+    gap: 10px;  /* space between rows */
+}
+
+.bottom-row {
+    display: flex;
+    justify-content: center;
+    width: 100%;
+}
+
+#points-display {
+    color: black;  
+    font-size: 1.1em;
+    visibility: visible;
+    display: none; /* initially */
 }
     
 .text-container {

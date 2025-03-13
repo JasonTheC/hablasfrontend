@@ -87,18 +87,14 @@
         </div>
    
         <div id="bottom">
-            <div class="bottom-row">
-                <select id="language-select">
-                    <option value="en">English</option>
-                    <option value="es">Spanish</option> 
-                    <option value="fr">Français</option>
-                    <option value="de">Deutch</option>
-                    <option value="it">Italian</option>
-                </select>
-            </div>
-            <div class="bottom-row">
-                <div id="points-display">Points: <span id="points">0</span></div>
-            </div>
+            <select id="language-select">
+                <option value="en">English</option>
+                <option value="es">Spanish</option> 
+                <option value="fr">Français</option>
+                <option value="de">Deutch</option>
+                <option value="it">Italian</option>
+            </select>
+            
         </div>
         
         <!-- Add status indicator -->
@@ -152,7 +148,6 @@
     const returnSentenceDiv = document.getElementById('return_sentence');
     const languageSel =document.getElementById('language-select');
     const fileDiv = document.getElementById("file");
-    const pointsDisplay = document.getElementById("points-display");
 
     const nextPageBtn = document.getElementById('next');
     const prevPageBtn = document.getElementById('prev');
@@ -957,19 +952,19 @@ async function handlePredSentence(predSentence) {
     console.log("predSentence: ", predSentence);
     returnSentenceDiv.innerHTML = predSentence;
     
-    // Show points display when we get a response
-    const pointsDisplay = document.getElementById('points-display');
-    pointsDisplay.style.display = 'block';
-    
-    // Calculate and update points
+    // Wait for the DOM to update
+    await new Promise(resolve => requestAnimationFrame(resolve));
+
+    // Now query for elements with class "wrong"
     const wrongElements = document.getElementsByClassName("wrong");
-    const totalWords = predSentence.split(' ').length;
-    const correctWords = totalWords - wrongElements.length;
     
-    // Award points
-    const pointsEarned = correctWords * 10;
-    userPoints += pointsEarned;
-    updatePointsDisplay(userPoints);
+    // Now you can work with the wrong elements
+    for (const element of wrongElements) {
+        // Your code for handling wrong elements
+        element.addEventListener('click', (event) => {
+            createPopup(element.id, event);
+        });
+    }
 }
 
 // Call loadAvailableBooks when the available books button is clicked
