@@ -1248,6 +1248,10 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
     closeModalBtn.addEventListener('click', () => {
         modalDiv.style.display = "none";
         lineNum = 0;
+        
+        // Hide points display when modal closes
+        const pointsDisplay = document.getElementById('points-display');
+        pointsDisplay.style.display = 'none';
     });
 
     // Close modal when clicking outside
