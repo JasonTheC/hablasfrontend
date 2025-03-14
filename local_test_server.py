@@ -226,8 +226,8 @@ class TextComparator:
                     marked_output.append(spoken)
 
         #calculating points : right words pronounced
-        #max_points = len(marked_output) 
-        max_points = m
+        max_points = len(marked_output) 
+        #max_points = m
         total_points = 0
         subtract_points = 0 #words pronounced incorrectly
         for word in marked_output:
