@@ -241,8 +241,10 @@ class TextComparator:
         # Calculate overall similarity
         similarity_ratio = difflib.SequenceMatcher(None, original_words, spoken_words).ratio()
 
+        #retreiving which user is using the app so we can update his/her points in the database
+        data_object = json.loads(data)
+        result = db.update_user_points(self,data_object,max_points)
 
-        
         return marked_text, similarity_ratio, original_words, spoken_words, max_points, total_points
 
 def stt_task(data_object):
@@ -711,6 +713,7 @@ class DatabaseManager:
             utterrance_fname TEXT DEFAULT '',
             predicted_sentence TEXT DEFAULT '',
             preferred_language TEXT DEFAULT 'en',
+            points INTEGER DEFAULT 0,
             login_token TEXT,
             token_expiry TIMESTAMP
         )
@@ -877,7 +880,7 @@ class DatabaseManager:
     def change_settings_task(self, data_object):
 
         """Handle user settings updates"""
-        conn = sqlite3.connect(self.db_path)
+        conn = sqlite3.connect(self.DB_PATH)
         cursor = conn.cursor()
         
         token = data_object.get("token")
@@ -913,6 +916,38 @@ class DatabaseManager:
         
         return {"status": "success", "message": "Settings updated successfully"}
     
+    def update_user_points(self, data_object, max_points):
+        try:
+            """Update user points"""
+            conn = sqlite3.connect(self.DB_PATH)
+            cursor = conn.cursor()
+            
+            username = data_object.get("username")
+
+            token = data_object.get("token")
+            cursor.execute("SELECT username FROM users WHERE login_token = ? AND token_expiry > ?", 
+                    (token, datetime.now()))
+            user = cursor.fetchone()
+            if not user:
+                conn.close()
+                return {"status": "error", "message": "Invalid or expired token"}
+
+            cursor.execute("SELECT points FROM users WHERE username = ?", (username,))
+            result = cursor.fetchone() #fetchone returns a TUPLE (second element empty)
+            if result is None:
+                previous_points = 0
+            else:
+                previous_points = result[0]
+            #previous_points = result[0] if result else 0 
+            new_points = previous_points + max_points
+            
+            cursor.execute('''UPDATE users SET points = ? WHERE username = ?''', (new_points, username))
+            conn.commit()
+            conn.close()
+            return {"status": "success", "message": "Points updated successfully"}
+
+        except Exception as e:
+            return {"status": "error", "message": str(e)}  # Better to return error status than None
 
 async def main():
 
