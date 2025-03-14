@@ -221,19 +221,26 @@ class TextComparator:
                 ratio = distance / max_len if max_len > 0 else 0
                 
                 if distance > 2 and ratio > 0.3:
+                    print((f"finding the wrong words"))
                     marked_output.append(f'<span id="{orig}" class="wrong" style="color:red;">{spoken}</span>')
                 else:
                     marked_output.append(spoken)
 
-        #calculating points : right words pronounced
+        print("starting the calculation of points")#calculating points : right words pronounced
         max_points = len(marked_output) 
-        #max_points = m
-        total_points = 0
-        subtract_points = 0 #words pronounced incorrectly
+        #max_points = len(spoken_words)
+        print(f"max_points: {max_points}")
+        
+        total_points = max_points  # Start with maximum points
+        subtract_points = 0  # Initialize counter for wrong words
+        
+        # Count wrong words
         for word in marked_output:
             if 'class="wrong"' in word:
                 subtract_points += 1
+        
         total_points = max_points - subtract_points
+        print(f"total_points: {total_points}")  # Add debug print
 
         # Join the marked words back into text
         marked_text = ' '.join(marked_output)
@@ -242,8 +249,8 @@ class TextComparator:
         similarity_ratio = difflib.SequenceMatcher(None, original_words, spoken_words).ratio()
 
         #retreiving which user is using the app so we can update his/her points in the database
-        data_object = json.loads(data)
-        result = db.update_user_points(self,data_object,max_points)
+        #data_object = json.loads(data)
+        #result = db.update_user_points(self,data_object,max_points)
 
         return marked_text, similarity_ratio, original_words, spoken_words, max_points, total_points
 
