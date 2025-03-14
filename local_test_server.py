@@ -127,7 +127,7 @@ class TextComparator:
             return [word for word in text.split() if word]
         
         # Get normalized words
-        original_words = normalize_text(text1)
+        original_words = normalize_text(text1) #its a list!
         spoken_words = normalize_text(text2)
         
         print(f"Original words: {original_words}")
@@ -178,17 +178,20 @@ class TextComparator:
                     traceback[i][j] = "left"
         
         # Traceback to find the alignment
-        aligned_original = []
-        aligned_spoken = []
+        aligned_original = [] 
+        aligned_spoken = [] # gaps are represented by None
         i, j = m, n
+        """aligned_original = ['hello', 'how', 'are',  'you']
+        aligned_spoken   = ['hello', 'how', None,   'you']
+                                          ^ shows missing word"""
         
         while i > 0 or j > 0:
-            if i > 0 and j > 0 and traceback[i][j] == "diag":
+            if i > 0 and j > 0 and traceback[i][j] == "diag": # Words match or are similar enough - add both words
                 aligned_original.append(original_words[i-1])
                 aligned_spoken.append(spoken_words[j-1])
                 i -= 1
                 j -= 1
-            elif i > 0 and traceback[i][j] == "up":
+            elif i > 0 and traceback[i][j] == "up": 
                 aligned_original.append(original_words[i-1])
                 aligned_spoken.append(None)  # Gap in spoken
                 i -= 1
@@ -197,12 +200,12 @@ class TextComparator:
                 aligned_spoken.append(spoken_words[j-1])
                 j -= 1
         
-        # Reverse the alignments
-        aligned_original.reverse()
-        aligned_spoken.reverse()
+        # Reverse the alignments because it was built backwards
+        aligned_original.reverse() #['hello', 'how', None,   'you']. it's original_words with gaps filled
+        aligned_spoken.reverse() # spoken_words with gaps filled
         
         # Generate HTML output
-        marked_output = []
+        marked_output = [] #list with the words that are wrong marked for html
         
         for orig, spoken in zip(aligned_original, aligned_spoken):
             if orig is None:
@@ -221,8 +224,10 @@ class TextComparator:
                     marked_output.append(f'<span id="{orig}" class="wrong" style="color:red;">{spoken}</span>')
                 else:
                     marked_output.append(spoken)
+
         #calculating points : right words pronounced
-        max_points = len(marked_output)
+        #max_points = len(marked_output) 
+        max_points = m
         total_points = 0
         subtract_points = 0 #words pronounced incorrectly
         for word in marked_output:
@@ -907,7 +912,7 @@ class DatabaseManager:
         conn.close()
         
         return {"status": "success", "message": "Settings updated successfully"}
-    def update_
+    
 
 async def main():
 

@@ -641,6 +641,11 @@ function handlePredSentenceResponse(response) {
     
     // Use a proper async function to handle this
     handlePredSentence(response.pred_sentence);
+    
+    // Add this to handle the points
+    if (response.max_points !== undefined && response.total_points !== undefined) {
+        points_calculation(response.max_points, response.total_points);
+    }
 }
 
 function handleTranslationResponse(response) {
@@ -1738,19 +1743,22 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
     }
 
     function points_calculation(max_points, total_points) { 
-        socketInstance.addEventListener('message', (event) => {
-                    try {
-                        const response = JSON.parse(event.data);
-                        console.log("Received WebSocket message:", response);
-                        
-                        const statusIndicator = document.getElementById('recording-status');
-                        if (statusIndicator) {
-                            statusIndicator.style.display = 'none';
-                        }
-                        
-                        if (response.id && messageCallbacks.has(response.id)) {
-                            messageCallbacks.get(response.id)(response);
-                            return;
-                        }
+        try {
+            // Update the points display
+            const pointsElement = document.getElementById('points');
+            if (pointsElement) {
+                pointsElement.textContent = `${total_points}/${max_points}`;
+                console.log("total_points: ", total_points);
+                console.log("max_points: ", max_points);
+            }
+
+            // Make sure the points display is visible
+            const pointsDisplay = document.getElementById('points-display');
+            if (pointsDisplay) {
+                pointsDisplay.style.display = 'block';
+            }
+        } catch (error) {
+            console.error('Error updating points:', error);
+        }
     }
 </script>
