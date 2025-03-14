@@ -221,14 +221,24 @@ class TextComparator:
                     marked_output.append(f'<span id="{orig}" class="wrong" style="color:red;">{spoken}</span>')
                 else:
                     marked_output.append(spoken)
-        
+        #calculating points : right words pronounced
+        max_points = len(marked_output)
+        total_points = 0
+        subtract_points = 0 #words pronounced incorrectly
+        for word in marked_output:
+            if 'class="wrong"' in word:
+                subtract_points += 1
+        total_points = max_points - subtract_points
+
         # Join the marked words back into text
         marked_text = ' '.join(marked_output)
         
         # Calculate overall similarity
         similarity_ratio = difflib.SequenceMatcher(None, original_words, spoken_words).ratio()
+
+
         
-        return marked_text, similarity_ratio, original_words, spoken_words
+        return marked_text, similarity_ratio, original_words, spoken_words, max_points, total_points
 
 def stt_task(data_object):
     print(f"language: {data_object['language']}") 
@@ -860,6 +870,7 @@ class DatabaseManager:
             conn.close()
 
     def change_settings_task(self, data_object):
+
         """Handle user settings updates"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
@@ -896,7 +907,7 @@ class DatabaseManager:
         conn.close()
         
         return {"status": "success", "message": "Settings updated successfully"}
-
+    def update_
 
 async def main():
 

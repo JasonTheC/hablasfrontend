@@ -957,19 +957,21 @@ async function handlePredSentence(predSentence) {
     console.log("predSentence: ", predSentence);
     returnSentenceDiv.innerHTML = predSentence;
     
-    // Show points display when we get a response
+    // Show points display
     const pointsDisplay = document.getElementById('points-display');
     pointsDisplay.style.display = 'block';
     
-    // Calculate and update points
-    const wrongElements = document.getElementsByClassName("wrong");
+    // Count words
     const totalWords = predSentence.split(' ').length;
-    const correctWords = totalWords - wrongElements.length;
+    const wrongWords = document.getElementsByClassName("wrong").length;
+    const correctWords = totalWords - wrongWords;
     
-    // Award points
-    const pointsEarned = correctWords * 10;
-    userPoints += pointsEarned;
-    updatePointsDisplay(userPoints);
+    // Update points display with ratio
+    const pointsElement = document.getElementById('points');
+    pointsElement.textContent = `${correctWords}/${totalWords}`;
+    
+    // Optionally, store the points for later use
+    userPoints = correctWords;
 }
 
 // Call loadAvailableBooks when the available books button is clicked
@@ -1726,7 +1728,6 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
 
             } catch (error) {
                 console.error('Error sending audio data:', error);
-                alert('Error processing audio. Please try again.');
                 
                 // Hide the recording status indicator on error
                 if (statusIndicator) {
@@ -1736,4 +1737,20 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
         };
     }
 
+    function points_calculation(max_points, total_points) { 
+        socketInstance.addEventListener('message', (event) => {
+                    try {
+                        const response = JSON.parse(event.data);
+                        console.log("Received WebSocket message:", response);
+                        
+                        const statusIndicator = document.getElementById('recording-status');
+                        if (statusIndicator) {
+                            statusIndicator.style.display = 'none';
+                        }
+                        
+                        if (response.id && messageCallbacks.has(response.id)) {
+                            messageCallbacks.get(response.id)(response);
+                            return;
+                        }
+    }
 </script>
