@@ -264,7 +264,7 @@ def stt_task(data_object):
             binary_data = base64.b64decode(actual_base64)
             audio_file.write(binary_data)
     the_words = stt(fpath,data_object["language"])
-    predicted_sentence, similarity_ratio, original_words, spoken_words = TextComparator.generate_html_report(data_object["sentence"], the_words)
+    predicted_sentence, similarity_ratio, original_words, spoken_words, max_points, total_points = TextComparator.generate_html_report(data_object["sentence"], the_words)
     for i in range(min(len(original_words), len(spoken_words))):
         distance = Levenshtein.distance(original_words[i], spoken_words[i])
         max_len = max(len(original_words[i]), len(spoken_words[i]))
@@ -274,7 +274,15 @@ def stt_task(data_object):
         print(f"  - Max length: {max_len}")
         print(f"  - Distance ratio: {ratio:.2f}")
         print(f"  - Marked as wrong: {distance > 2 and ratio > 0.3}")
-    message_returned = {"pred_sentence":predicted_sentence}
+    message_returned = {
+        "pred_sentence": predicted_sentence,
+        "similarity_ratio": similarity_ratio,
+        "original_words": original_words,
+        "spoken_words": spoken_words,
+        "max_points": max_points,
+        "total_points": total_points
+    }
+    print("DEBUG - Mensaje que se enviará al frontend:", message_returned)  # Añade esta línea
     db.set_current_book_task(data_object, fpath, predicted_sentence)
 
     if "current_book" in data_object and "username" in data_object:
@@ -493,50 +501,42 @@ async def translate_task(data_object):
     if source_lang in source_lang_map:
         source_lang = source_lang_map[source_lang]
     
-    try:
-        print(f"Attempting to translate from {source_lang} to {target_lang}")
-        
-        # Create a new translator instance for each request
-        translator_instance = Translator()
-        result = await translator_instance.translate(source_text, src=source_lang, dest=target_lang)
-        
-        if hasattr(result, 'text'):
-            translated_text = result.text
-            print(f"Translation successful: {translated_text}")
-            print(f"current_book: {current_book}")
-            print(f"username: {username}")
-            if current_book and username:  
-                print(f"Updating database for user {username} with book {current_book} and page {page}")
-                db.set_current_book_task({
-                    "username": username,
-                    "book": current_book,
-                    "page": page
-                }, "", "")
-            
-            return {
-                "status": "success", 
-                "translated_text": translated_text,
-                "source_lang": source_lang,
-                "target_lang": target_lang,
-                "current_book": current_book,  # Add these fields to the response
+    print(f"Attempting to translate from {source_lang} to {target_lang}")
+    
+    # Create a new translator instance for each request
+    translator_instance = Translator()
+    result = translator_instance.translate(source_text, src=source_lang, dest=target_lang)
+    
+    if hasattr(result, 'text'):
+        translated_text = result.text
+        print(f"Translation successful: {translated_text}")
+        print(f"current_book: {current_book}")
+        print(f"username: {username}")
+        if current_book and username:  
+            print(f"Updating database for user {username} with book {current_book} and page {page}")
+            db.set_current_book_task({
+                "username": username,
+                "book": current_book,
                 "page": page
-            }
-        else:
-            print(f"Translation result has no 'text' attribute: {result}")
-            return {
-                "status": "error",
-                "message": "Translation result format unexpected",
-                "source_lang": source_lang,
-                "target_lang": target_lang
-            }
-    except Exception as e:
-        print(f"Translation error: {e}")
+            }, "", "")
+        
+        return {
+            "status": "success", 
+            "translated_text": translated_text,
+            "source_lang": source_lang,
+            "target_lang": target_lang,
+            "current_book": current_book,  # Add these fields to the response
+            "page": page
+        }
+    else:
+        print(f"Translation result has no 'text' attribute: {result}")
         return {
             "status": "error",
-            "message": str(e),
+            "message": "Translation result format unexpected",
             "source_lang": source_lang,
             "target_lang": target_lang
         }
+  
 
 async def login_task(self, data_object):
     conn = sqlite3.connect(self.DB_PATH)
@@ -964,7 +964,7 @@ async def main():
     preload_all_models()
     print("Preloaded all models")
 
-    async with websockets.serve(handle_connection, "localhost", 8765) as server:
+    async with websockets.serve(handle_connection, "localhost", 8675) as server:
         print("WebSocket server started on local NOT wss://carriertech.uk:8765")
         await asyncio.Future()  # Run forever 
 

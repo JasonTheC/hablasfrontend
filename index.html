@@ -192,7 +192,8 @@
         'Sr.', 'Jr.', 'etc.', 'e.g.', 'i.e.', '."'
     ];
 
-    let socket = new WebSocket('wss://carriertech.uk:8675');; // Declare socket variable. Built-in object of js
+    //let socket = new WebSocket('wss://carriertech.uk:8675');; // Declare socket variable. Built-in object of js
+    let socket = new WebSocket('ws://localhost:8675');
     const booksModal = document.getElementById('books-modal');
 
     // First, get reference to your slider
@@ -349,7 +350,8 @@ function createWebSocketConnection() {
             }
             
             // Create new connection
-            socketInstance = new WebSocket('wss://carriertech.uk:8675');
+            //socketInstance = new WebSocket('wss://carriertech.uk:8675');
+            socketInstance = new WebSocket('ws://localhost:8675'); //local server
             
             return new Promise((resolve, reject) => {
                 // Set up event handlers
@@ -662,12 +664,35 @@ function setLanguage(language){
 }
 function handlePredSentenceResponse(response) {
     
+    console.log("Respuesta completa del servidor:", JSON.stringify(response, null, 2));
     // Use a proper async function to handle this
     handlePredSentence(response.pred_sentence);
-    
+    console.log("Response from handlePredSentenceResponse:", response); //debug
+    const max_points1 = response.max_points;
+    const total_points1 = response.total_points;
+    console.log("Current points before Adding from response:", currentPoints); //debug
+    console.log("Response.max_points:", response.max_points); //debug
+    console.log("Response max points as constant:", max_points1); //debug
+    console.log("Response.total_points:", response.total_points); //debug
+    console.log("Response total points as constant:",total_points1);
+    if (typeof response.max_points === 'number' && typeof response.total_points === 'number') {
+        console.log("Puntos recibidos:", {
+            max_points: response.max_points,
+            total_points: response.total_points
+        });
+    } else {
+        console.error("Error en los puntos recibidos:", {
+            max_points: response.max_points,
+            total_points: response.total_points,
+            typeMax: typeof response.max_points,
+            typeTotal: typeof response.total_points
+        });
+    }
     // Add this to handle the points
     if (response.max_points !== undefined && response.total_points !== undefined) {
+        console.log("Entering if statement to add currentpoints"); //debug
         // Add new points to current total
+        console.log("Current points before Adding from response:", currentPoints); //debug
         currentPoints += response.total_points;
         console.log("Added points:", response.total_points);
         console.log("Current total points:", currentPoints);
