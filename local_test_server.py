@@ -62,7 +62,9 @@ from googletrans import Translator  # Add this import for translation
 end_time = time.time()
 print(f"Time taken to import Translator: {end_time - start_time} seconds")
 import uuid  # Add this import for UUID generation
-
+import soundfile as sf
+import numpy as np
+import wave
 
 LANG_ID = "fr"
 MODEL_ID = "jonatasgrosman/wav2vec2-large-xlsr-53-french"
@@ -98,11 +100,48 @@ def get_or_load_model(lang):
     return loaded_processors[lang], loaded_models[lang]
 
 def stt(AUDIO_DIR, lang):
-    processor, model = get_or_load_model(lang)    
-    audio = librosa.load(AUDIO_DIR, sr=16_000)
-    inputs = processor(audio[0], sampling_rate=audio[1], return_tensors="pt")
+    start_time = time.time()
+    processor, model = get_or_load_model(lang)   
+    end_time = time.time()
+    print(f"Time taken to load model: {end_time - start_time} seconds")
+    
+    start_time = time.time()
+    try:
+        # Convert audio to proper WAV format using ffmpeg if installed
+        temp_wav = f"{AUDIO_DIR}_temp.wav"
+        os.system(f"ffmpeg -y -i {AUDIO_DIR} -acodec pcm_s16le -ar 16000 -ac 1 {temp_wav}")
+        
+        with wave.open(temp_wav, 'rb') as wav_file:
+            # Get audio data
+            frames = wav_file.readframes(wav_file.getnframes())
+            audio = np.frombuffer(frames, dtype=np.int16).astype(np.float32)
+            
+            # Normalize audio
+            audio = audio / 32768.0
+            
+            # Get sample rate
+            sr = wav_file.getframerate()
+            
+        # Clean up temporary file
+        os.remove(temp_wav)
+            
+    except Exception as e:
+        print(f"Error processing audio: {e}")
+        return "Error processing audio file"
+
+    end_time = time.time()
+    print(f"Time taken to load audio: {end_time - start_time} seconds")
+    
+    start_time = time.time()
+    inputs = processor(audio, sampling_rate=sr, return_tensors="pt")
+    end_time = time.time()
+    print(f"Time taken to load inputs: {end_time - start_time} seconds")
+    
+    start_time = time.time()
     with torch.no_grad():
         logits = model(inputs.input_values, attention_mask=inputs.attention_mask).logits
+    end_time = time.time()
+    print(f"Time taken to load logits: {end_time - start_time} seconds")
     
     predicted_ids = torch.argmax(logits, dim=-1)
     predicted_sentences = processor.batch_decode(predicted_ids)
@@ -113,71 +152,89 @@ def stt(AUDIO_DIR, lang):
 class TextComparator:
     @staticmethod
     def generate_html_report(text1, text2, output_file='text_comparison_report.html'):
+        overall_start = time.time()
+        
         # Normalize text for comparison
+        normalize_start = time.time()
         def normalize_text(text):
             text = text.lower()
             # Replace punctuation with spaces
             for char in ',.!?;:«»""()[]{}':
                 text = text.replace(char, ' ')
-            
-            # Handle apostrophes specially
             text = text.replace("'", "'")  # Standardize apostrophes
-            
-            # Split into words and filter empty strings
             return [word for word in text.split() if word]
         
         # Get normalized words
         original_words = normalize_text(text1)
         spoken_words = normalize_text(text2)
+        normalize_end = time.time()
+        print(f"Time for text normalization: {normalize_end - normalize_start:.4f} seconds")
         
-        print(f"Original words: {original_words}")
-        print(f"Spoken words: {spoken_words}")
+        # Create a cache for Levenshtein distances
+        distance_cache = {}
+        def cached_levenshtein(word1, word2):
+            key = (word1, word2)
+            if key not in distance_cache:
+                distance_cache[key] = Levenshtein.distance(word1, word2)
+            return distance_cache[key]
         
-        # Create a dynamic programming matrix for alignment
-        # This is similar to the Needleman-Wunsch algorithm for sequence alignment
+        # Pre-calculate word similarities
+        similarities_start = time.time()
+        word_similarities = {}
+        for i, orig in enumerate(original_words):
+            # Only compare with nearby words
+            start_idx = max(0, i - 3)
+            end_idx = min(len(spoken_words), i + 4)
+            for j in range(start_idx, end_idx):
+                if j < len(spoken_words):
+                    spok = spoken_words[j]
+                    distance = cached_levenshtein(orig, spok)
+                    max_len = max(len(orig), len(spok))
+                    word_similarities[(orig, spok)] = 1 - (distance / max_len if max_len > 0 else 0)
+        similarities_end = time.time()
+        print(f"Time for word similarities calculation: {similarities_end - similarities_start:.4f} seconds")
+        print(f"Number of Levenshtein calculations: {len(distance_cache)}")
+
+        # Create matrices
+        matrix_start = time.time()
         m, n = len(original_words), len(spoken_words)
-        
-        # Initialize the score matrix
         score = [[0 for _ in range(n+1)] for _ in range(m+1)]
-        
-        # Initialize the traceback matrix
         traceback = [[None for _ in range(n+1)] for _ in range(m+1)]
         
-        # Fill the first row and column with gap penalties
+        # Initialize first row and column
         for i in range(m+1):
             score[i][0] = -i
-            if i > 0:
-                traceback[i][0] = "up"
-        
+            if i > 0: traceback[i][0] = "up"
         for j in range(n+1):
             score[0][j] = -j
-            if j > 0:
-                traceback[0][j] = "left"
+            if j > 0: traceback[0][j] = "left"
         
-        # Fill the score and traceback matrices
+        # Fill matrices
         for i in range(1, m+1):
             for j in range(1, n+1):
-                # Calculate similarity score between words
-                word_similarity = 1 - Levenshtein.distance(original_words[i-1], spoken_words[j-1]) / max(len(original_words[i-1]), len(spoken_words[j-1]))
+                word_similarity = word_similarities.get(
+                    (original_words[i-1], spoken_words[j-1]),
+                    0
+                )
                 
-                # Calculate scores for different moves
-                match_score = score[i-1][j-1] + (2 * word_similarity - 1)  # Reward for similar words, penalty for different
-                delete_score = score[i-1][j] - 0.5  # Gap penalty
-                insert_score = score[i][j-1] - 0.5  # Gap penalty
+                match_score = score[i-1][j-1] + (2 * word_similarity - 1)
+                delete_score = score[i-1][j] - 0.5
+                insert_score = score[i][j-1] - 0.5
                 
-                # Choose the best move
                 best_score = max(match_score, delete_score, insert_score)
                 score[i][j] = best_score
                 
-                # Record the move in the traceback matrix
                 if best_score == match_score:
                     traceback[i][j] = "diag"
                 elif best_score == delete_score:
                     traceback[i][j] = "up"
                 else:
                     traceback[i][j] = "left"
-        
-        # Traceback to find the alignment
+        matrix_end = time.time()
+        print(f"Time for matrix operations: {matrix_end - matrix_start:.4f} seconds")
+
+        # Traceback alignment
+        alignment_start = time.time()
         aligned_original = []
         aligned_spoken = []
         i, j = m, n
@@ -190,30 +247,28 @@ class TextComparator:
                 j -= 1
             elif i > 0 and traceback[i][j] == "up":
                 aligned_original.append(original_words[i-1])
-                aligned_spoken.append(None)  # Gap in spoken
+                aligned_spoken.append(None)
                 i -= 1
-            else:  # traceback[i][j] == "left"
-                aligned_original.append(None)  # Gap in original
+            else:
+                aligned_original.append(None)
                 aligned_spoken.append(spoken_words[j-1])
                 j -= 1
         
-        # Reverse the alignments
         aligned_original.reverse()
         aligned_spoken.reverse()
+        alignment_end = time.time()
+        print(f"Time for alignment: {alignment_end - alignment_start:.4f} seconds")
         
         # Generate HTML output
+        html_start = time.time()
         marked_output = []
-        
         for orig, spoken in zip(aligned_original, aligned_spoken):
             if orig is None:
-                # Extra word in spoken text
                 marked_output.append(f'<span id="" class="wrong" style="color:red;">{spoken}</span>')
             elif spoken is None:
-                # Missing word in spoken text (optional to include)
                 continue
             else:
-                # Both words exist - check similarity
-                distance = Levenshtein.distance(orig, spoken)
+                distance = cached_levenshtein(orig, spoken)
                 max_len = max(len(orig), len(spoken))
                 ratio = distance / max_len if max_len > 0 else 0
                 
@@ -222,25 +277,34 @@ class TextComparator:
                 else:
                     marked_output.append(spoken)
         
-        # Join the marked words back into text
         marked_text = ' '.join(marked_output)
-        
-        # Calculate overall similarity
         similarity_ratio = difflib.SequenceMatcher(None, original_words, spoken_words).ratio()
+        html_end = time.time()
+        print(f"Time for HTML generation: {html_end - html_start:.4f} seconds")
+        
+        overall_end = time.time()
+        print(f"Total processing time: {overall_end - overall_start:.4f} seconds")
         
         return marked_text, similarity_ratio, original_words, spoken_words
 
 def stt_task(data_object):
     print(f"language: {data_object['language']}") 
 
-    fpath=f"{data_object['username']}_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.wav" #name of the audio in the server (our computer in this case)
-    with open(fpath, "wb") as audio_file: #received_audio is f.open, initialising this file. audio_file is the variable
+    fpath=f"{data_object['username']}_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.wav"
+    with open(fpath, "wb") as audio_file:
             base64_string = data_object["blob"]
-            actual_base64 = base64_string.split(',')[1]  # Get the Base64 part
+            actual_base64 = base64_string.split(',')[1]
             binary_data = base64.b64decode(actual_base64)
             audio_file.write(binary_data)
     the_words = stt(fpath,data_object["language"])
-    predicted_sentence, similarity_ratio, original_words, spoken_words = TextComparator.generate_html_report(data_object["sentence"], the_words)
+    
+    print("\nStarting text comparison analysis...")
+    predicted_sentence, similarity_ratio, original_words, spoken_words = TextComparator.generate_html_report(
+        data_object["sentence"], 
+        the_words
+    )
+    
+    print("\nDetailed word comparison:")
     for i in range(min(len(original_words), len(spoken_words))):
         distance = Levenshtein.distance(original_words[i], spoken_words[i])
         max_len = max(len(original_words[i]), len(spoken_words[i]))
@@ -250,6 +314,7 @@ def stt_task(data_object):
         print(f"  - Max length: {max_len}")
         print(f"  - Distance ratio: {ratio:.2f}")
         print(f"  - Marked as wrong: {distance > 2 and ratio > 0.3}")
+        
     message_returned = {"pred_sentence":predicted_sentence}
     db.set_current_book_task(data_object, fpath, predicted_sentence)
 
@@ -258,10 +323,9 @@ def stt_task(data_object):
             "username": data_object["username"],
             "book": data_object["current_book"],
             "page": data_object["page"]
-        }, "", "")  # Empty strings for utterance_fname and predicted_sentence
-    
+        }, "", "")
 
-    print("Received audio file and saved as 'received_audio.wav'")
+    print("\nCompleted text comparison analysis")
     return message_returned
 
 def extract_epub_cover(epub_path: Path, cover_dir: Path) -> str:
@@ -474,7 +538,7 @@ async def translate_task(data_object):
         
         # Create a new translator instance for each request
         translator_instance = Translator()
-        result = await translator_instance.translate(source_text, src=source_lang, dest=target_lang)
+        result = translator_instance.translate(source_text, src=source_lang, dest=target_lang)
         
         if hasattr(result, 'text'):
             translated_text = result.text
