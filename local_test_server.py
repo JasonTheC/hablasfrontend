@@ -151,7 +151,7 @@ def stt(AUDIO_DIR, lang):
 
 class TextComparator:
     @staticmethod
-    def generate_html_report(text1, text2, output_file='text_comparison_report.html'):
+    def generate_html_report(text1, text2, output_file,max_points):
         overall_start = time.time()
         
         # Normalize text for comparison
@@ -165,7 +165,7 @@ class TextComparator:
             return [word for word in text.split() if word]
         
         # Get normalized words
-        original_words = normalize_text(text1)
+        original_words = normalize_text(text1) #its a list!
         spoken_words = normalize_text(text2)
         normalize_end = time.time()
         print(f"Time for text normalization: {normalize_end - normalize_start:.4f} seconds")
@@ -238,14 +238,17 @@ class TextComparator:
         aligned_original = []
         aligned_spoken = []
         i, j = m, n
+        """aligned_original = ['hello', 'how', 'are',  'you']
+        aligned_spoken   = ['hello', 'how', None,   'you']
+                                          ^ shows missing word"""
         
         while i > 0 or j > 0:
-            if i > 0 and j > 0 and traceback[i][j] == "diag":
+            if i > 0 and j > 0 and traceback[i][j] == "diag": # Words match or are similar enough - add both words
                 aligned_original.append(original_words[i-1])
                 aligned_spoken.append(spoken_words[j-1])
                 i -= 1
                 j -= 1
-            elif i > 0 and traceback[i][j] == "up":
+            elif i > 0 and traceback[i][j] == "up": 
                 aligned_original.append(original_words[i-1])
                 aligned_spoken.append(None)
                 i -= 1
@@ -273,10 +276,27 @@ class TextComparator:
                 ratio = distance / max_len if max_len > 0 else 0
                 
                 if distance > 2 and ratio > 0.3:
+                    print((f"finding the wrong words"))
                     marked_output.append(f'<span id="{orig}" class="wrong" style="color:red;">{spoken}</span>')
                 else:
                     marked_output.append(spoken)
+
+        print("starting the calculation of points")#calculating points : right words pronounced
+        #max_points comes from stt
+        #max_points = len(spoken_words)
+        print(f"max_points: {max_points}")
         
+        subtract_points = 0  # Initialize counter for wrong words
+        
+        # Count wrong words
+        for word in marked_output:
+            if 'class="wrong"' in word:
+                subtract_points += 1
+        
+        total_points = max_points - subtract_points
+        print(f"total_points: {total_points}")  # Add debug print
+
+        # Join the marked words back into text
         marked_text = ' '.join(marked_output)
         similarity_ratio = difflib.SequenceMatcher(None, original_words, spoken_words).ratio()
         html_end = time.time()
@@ -285,7 +305,7 @@ class TextComparator:
         overall_end = time.time()
         print(f"Total processing time: {overall_end - overall_start:.4f} seconds")
         
-        return marked_text, similarity_ratio, original_words, spoken_words
+        return marked_text, similarity_ratio, original_words, spoken_words, max_points, total_points
 
 def stt_task(data_object):
     print(f"language: {data_object['language']}") 
@@ -297,11 +317,15 @@ def stt_task(data_object):
             binary_data = base64.b64decode(actual_base64)
             audio_file.write(binary_data)
     the_words = stt(fpath,data_object["language"])
-    
+    print(f"the_words: {the_words}")
+    max_points = len(the_words.split(" "))
+    print(f"max_points: {max_points}")
     print("\nStarting text comparison analysis...")
-    predicted_sentence, similarity_ratio, original_words, spoken_words = TextComparator.generate_html_report(
+    predicted_sentence, similarity_ratio, original_words, spoken_words, max_points, total_points = TextComparator.generate_html_report(
         data_object["sentence"], 
-        the_words
+        the_words,
+        "test.html",
+        max_points,
     )
     
     print("\nDetailed word comparison:")
@@ -314,8 +338,15 @@ def stt_task(data_object):
         print(f"  - Max length: {max_len}")
         print(f"  - Distance ratio: {ratio:.2f}")
         print(f"  - Marked as wrong: {distance > 2 and ratio > 0.3}")
-        
-    message_returned = {"pred_sentence":predicted_sentence}
+    message_returned = {
+        "pred_sentence": predicted_sentence,
+        "similarity_ratio": similarity_ratio,
+        "original_words": original_words,
+        "spoken_words": spoken_words,
+        "max_points": max_points,
+        "total_points": total_points
+    }
+    print("DEBUG - Mensaje que se enviará al frontend:", message_returned)  # Añade esta línea
     db.set_current_book_task(data_object, fpath, predicted_sentence)
 
     if "current_book" in data_object and "username" in data_object:
@@ -568,6 +599,41 @@ async def translate_task(data_object):
             "source_lang": source_lang,
             "target_lang": target_lang
         }
+    print(f"Attempting to translate from {source_lang} to {target_lang}")
+    
+    # Create a new translator instance for each request
+    translator_instance = Translator()
+    result = translator_instance.translate(source_text, src=source_lang, dest=target_lang)
+    
+    if hasattr(result, 'text'):
+        translated_text = result.text
+        print(f"Translation successful: {translated_text}")
+        print(f"current_book: {current_book}")
+        print(f"username: {username}")
+        if current_book and username:  
+            print(f"Updating database for user {username} with book {current_book} and page {page}")
+            db.set_current_book_task({
+                "username": username,
+                "book": current_book,
+                "page": page
+            }, "", "")
+        
+        return {
+            "status": "success", 
+            "translated_text": translated_text,
+            "source_lang": source_lang,
+            "target_lang": target_lang,
+            "current_book": current_book,  # Add these fields to the response
+            "page": page
+        }
+    else:
+        print(f"Translation result has no 'text' attribute: {result}")
+        return {
+            "status": "error",
+            "message": "Translation result format unexpected",
+            "source_lang": source_lang,
+            "target_lang": target_lang
+        }
    
 
 async def login_task(self, data_object):
@@ -752,6 +818,7 @@ class DatabaseManager:
             utterrance_fname TEXT DEFAULT '',
             predicted_sentence TEXT DEFAULT '',
             preferred_language TEXT DEFAULT 'en',
+            points INTEGER DEFAULT 0,
             login_token TEXT,
             token_expiry TIMESTAMP
         )
@@ -916,8 +983,9 @@ class DatabaseManager:
             conn.close()
 
     def change_settings_task(self, data_object):
+
         """Handle user settings updates"""
-        conn = sqlite3.connect(self.db_path)
+        conn = sqlite3.connect(self.DB_PATH)
         cursor = conn.cursor()
         
         token = data_object.get("token")
@@ -952,7 +1020,39 @@ class DatabaseManager:
         conn.close()
         
         return {"status": "success", "message": "Settings updated successfully"}
+    
+    def update_user_points(self, data_object, max_points):
+        try:
+            """Update user points"""
+            conn = sqlite3.connect(self.DB_PATH)
+            cursor = conn.cursor()
+            
+            username = data_object.get("username")
 
+            token = data_object.get("token")
+            cursor.execute("SELECT username FROM users WHERE login_token = ? AND token_expiry > ?", 
+                    (token, datetime.now()))
+            user = cursor.fetchone()
+            if not user:
+                conn.close()
+                return {"status": "error", "message": "Invalid or expired token"}
+
+            cursor.execute("SELECT points FROM users WHERE username = ?", (username,))
+            result = cursor.fetchone() #fetchone returns a TUPLE (second element empty)
+            if result is None:
+                previous_points = 0
+            else:
+                previous_points = result[0]
+            #previous_points = result[0] if result else 0 
+            new_points = previous_points + max_points
+            
+            cursor.execute('''UPDATE users SET points = ? WHERE username = ?''', (new_points, username))
+            conn.commit()
+            conn.close()
+            return {"status": "success", "message": "Points updated successfully"}
+
+        except Exception as e:
+            return {"status": "error", "message": str(e)}  # Better to return error status than None
 
 async def main():
 
@@ -962,8 +1062,8 @@ async def main():
     preload_all_models()
     print("Preloaded all models")
 
-    async with websockets.serve(handle_connection, "localhost", 8765) as server:
-        print("WebSocket server started on local NOT wss://carriertech.uk:8765")
+    async with websockets.serve(handle_connection, "localhost", 8675) as server:
+        print("WebSocket server started on local NOT wss://carriertech.uk:8675")
         await asyncio.Future()  # Run forever 
 
 if __name__ == "__main__": #when you use a multi processer load, you use this so it doesnt crash. with asyncio you always have to do it
