@@ -58,7 +58,6 @@
                     <option value="male">Male</option>
                 </select>
                 <div id="points" class="options">Points</div>
-                <div id="suggestions" class="options">Suggestions</div>
 
                 <div id="file">
                     <img src="images/upload-icon-white.png" alt="upload symbol" />
@@ -99,7 +98,7 @@
                 </select>
             </div>
             <div class="bottom-row">
-                <div id="points-display">Points Display</div>
+                <div id="points-display">Points Display: <span id="points">0</span></div>
             </div>
         </div>
         
@@ -132,20 +131,9 @@
             </div>
             <div class="points-row">
                 <h3>Points Left To Next Book</h3>
-                <p id="points-to-next-book">0</p>
+                <p id="current-points">0</p>
             </div>
         </div>
-    </div>
-</div>
-
-<div id="suggestions-modal" class="modal" style="display: block;">
-    <div class="modal-content">
-        <span class="close">&times;</span>
-        <div id="suggestions-container">
-            <h2>Tell us how we can improve!</h2>
-            <textarea id="suggestions-input" placeholder="Write your suggestion here..." rows="4"></textarea>
-            <button id="submit-suggestion" class="submit-btn">Submit</button>
-        </div> 
     </div>
 </div>
 
@@ -239,15 +227,13 @@
     const pointsBtn = document.getElementById('points');
     const pointsModal = document.getElementById('points-modal'); //outer modal !!
     const closePointsModalBtn = document.getElementById('close-points-modal');
-    let accumulatedPoints = 0;
     let pointsToNextBook = 100; //TO DO: get from server
 
     const accumulatedPointsDiv = document.getElementById('accumulated-points');
-    const pointsToNextBookDiv = document.getElementById('points-to-next-book');
-    const suggestionsBtn = document.getElementById('suggestions');
-    const suggestionsModalDiv = document.getElementById('suggestions-modal');
-    const closeSuggestionsModalBtn = document.getElementById('close-suggestions-modal');
+    const pointsToNextBookDiv = document.getElementById('current-points');
     
+    
+    ;
  
 console.log ("starting script");
 
@@ -688,7 +674,7 @@ function handlePredSentenceResponse(response) {
     console.log("Response from handlePredSentenceResponse:", response); //debug
     const max_points1 = response.max_points;
     const total_points1 = response.total_points;
-    //console.log("Current points before Adding from response:", currentPoints); //debug CLEAN OLIVIA
+    console.log("Current points before Adding from response:", currentPoints); //debug
     console.log("Response.max_points:", response.max_points); //debug
     console.log("Response max points as constant:", max_points1); //debug
     console.log("Response.total_points:", response.total_points); //debug
@@ -709,11 +695,11 @@ function handlePredSentenceResponse(response) {
     // Add this to handle the points
     if (response.max_points !== undefined && response.total_points !== undefined) {
         // Add new points to current total
-        accumulatedPoints += response.total_points;
+        currentPoints += response.total_points;
         console.log("Added points:", response.total_points);
-        console.log("Current total points:", accumulatedPoints);
-        document.getElementById('accumulated-points').textContent = accumulatedPoints;
-        document.getElementById('points-to-next-book').textContent = pointsToNextBook;
+        console.log("Current total points:", currentPoints);
+        document.getElementById('accumulated-points').textContent = currentPoints;
+        document.getElementById('current-points').textContent = pointsToNextBook;
         points_calculation(response.max_points, response.total_points);
     }
 }
@@ -1034,6 +1020,15 @@ async function handlePredSentence(predSentence) {
     // Show points display
     pointsDisplay.style.display = 'block';
     
+    // Count words DELETE OLIVIA
+    //const totalWords = predSentence.split(' ').length;
+    //const wrongWords = document.getElementsByClassName("wrong").length;
+    //const correctWords = totalWords - wrongWords;
+    
+
+    
+    // Optionally, store the points for later use
+    userPoints = correctWords;
 }
 
 // Call loadAvailableBooks when the available books button is clicked
@@ -1821,12 +1816,12 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
         console.log("pointsBtn clicked"); //debug
         pointsModal.style.display = 'block';
         
-        pointsToNextBook = 1000; //TO DO: get from server
-        document.getElementById('accumulated-points').textContent = accumulatedPoints;
-        document.getElementById('points-to-next-book').textContent = pointsToNextBook; // Changed from 'point-to-next'
+        pointsToNextBook = 100; //TO DO: get from server
+        document.getElementById('accumulated-points').textContent = currentPoints;
+        document.getElementById('current-points').textContent = pointsToNextBook; // Changed from 'point-to-next'
         
         console.log("Opening points modal:", {
-            accumulatedPoints,
+            currentPoints,
             pointsToNextBook,
             modalDisplay: pointsModal.style.display
         });
@@ -1839,26 +1834,6 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
     window.addEventListener('click', (event) => {
         if (event.target === pointsModal) {
             pointsModal.style.display = 'none';
-        }
-    });
-
-    suggestionsBtn.addEventListener('click', () => {
-        console.log("suggestion display:", { //debug
-            suggestionsBtn,
-            suggestionsModalDiv,
-            closeSuggestionsModalBtn
-        });
-        console.log("suggestion display clicked"); //debug
-        suggestionsModalDiv.style.display = 'block';
-    });
-
-    closeSuggestionsModalBtn.addEventListener('click', () => {
-        suggestionsModalDiv.style.display = 'none';
-    });
-
-    window.addEventListener('click', (event) => {
-        if (event.target === suggestionsModalDiv) {
-            suggestionsModalDiv.style.display = 'none';
         }
     });
 
