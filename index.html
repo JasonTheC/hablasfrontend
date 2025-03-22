@@ -138,7 +138,7 @@
     </div>
 </div>
 
-<div id="suggestions-modal" class="modal" style="display: block;">
+<div id="suggestions-modal" class="modal">
     <div class="modal-content">
         <span class="close">&times;</span>
         <div id="suggestions-container">
@@ -248,7 +248,20 @@
     const suggestionsModalDiv = document.getElementById('suggestions-modal');
     const closeSuggestionsModalBtn = document.getElementById('close-suggestions-modal');
     
- 
+    const submitSuggestionBtn = document.getElementById('submit-suggestion');
+    const suggestionsInput = document.getElementById('suggestions-input');
+
+    // Añade estos logs de debug
+    console.log("Submit button element:", submitSuggestionBtn);
+    console.log("Suggestions input element:", suggestionsInput);
+
+    if (!submitSuggestionBtn) {
+        console.error("Submit button not found!");
+    }
+    if (!suggestionsInput) {
+        console.error("Suggestions input not found!");
+    }
+
 console.log ("starting script");
 
 // Add this function at the start of your script
@@ -559,6 +572,15 @@ function createWebSocketConnection() {
                 task: "get_book_data",
                 filename: filename,
                 language: language
+            });
+        },
+        
+        // sending a suggestion to our server in the same style as Jason
+        submitSuggestion: async function(suggestion, username) {
+            return makeWebSocketRequest({
+                task: "submit_suggestion",
+                suggestion: suggestion,
+                username: username
             });
         }
     };
@@ -1859,6 +1881,31 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
     window.addEventListener('click', (event) => {
         if (event.target === suggestionsModalDiv) {
             suggestionsModalDiv.style.display = 'none';
+        }
+    });
+
+    // Añadir el event listener para el botón de submit
+    submitSuggestionBtn.addEventListener('click', async () => {
+        const suggestion = suggestionsInput.value.trim();
+        console.log("Suggestion button clicked, suggestion:", suggestion); //debug
+        if (!suggestion) {
+            alert('No suggestion written');
+            return;
+        }
+        
+        try {
+            const response = await wsConnection.submitSuggestion(suggestion, username);
+            
+            if (response.status === "success") {
+                alert('Thanks for your suggestion!');
+                suggestionsInput.value = ''; // Limpiar el input
+                suggestionsModalDiv.style.display = 'none'; // Cerrar el modal
+            } else {
+                alert('Error sending the suggestion.Please try again.');
+            }
+        } catch (error) {
+            console.error('Error sending the suggestion:', error);
+            alert('Error sending the suggestion.Please try again.');
         }
     });
 

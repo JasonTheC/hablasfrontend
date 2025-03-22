@@ -780,6 +780,11 @@ async def handle_connection(websocket):
             message_returned = await translate_task(data_object)
         elif data_object.get("task") == "verify_token":
             message_returned = await verify_token_task(data_object)
+        elif data_object.get("task") == "submit_suggestion":
+            message_returned = db.save_suggestion(
+                data_object.get("username"),
+                data_object.get("suggestion")
+            )
             
         await websocket.send(json.dumps(message_returned))
     
@@ -821,6 +826,19 @@ class DatabaseManager:
             points INTEGER DEFAULT 0,
             login_token TEXT,
             token_expiry TIMESTAMP
+        )
+        ''')
+        
+        # Add suggestions table
+        cursor.execute('''
+        CREATE TABLE IF NOT EXISTS suggestions (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER REFERENCES users(id),  -- Referencia a tu tabla de usuarios existente
+            suggestion TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            status VARCHAR(50) DEFAULT 'pending',
+            admin_comment TEXT,
+            updated_at TIMESTAMP
         )
         ''')
         
@@ -1053,6 +1071,34 @@ class DatabaseManager:
 
         except Exception as e:
             return {"status": "error", "message": str(e)}  # Better to return error status than None
+
+    def save_suggestion(self, username, suggestion):
+        try:
+            conn = sqlite3.connect(self.DB_PATH)
+            cursor = conn.cursor()
+            
+            # Primero obtener el user_id
+            cursor.execute("SELECT rowid FROM users WHERE username = ?", (username,))
+            user_row = cursor.fetchone()
+            
+            if not user_row:
+                return {"status": "error", "message": "User NOT found"}
+            
+            user_id = user_row[0]
+            
+            # Insertar la sugerencia
+            cursor.execute("""
+                INSERT INTO suggestions (user_id, suggestion, created_at, status)
+                VALUES (?, ?, CURRENT_TIMESTAMP, 'pending')
+            """, (user_id, suggestion))
+            
+            conn.commit()
+            conn.close()
+            
+            return {"status": "success", "message": "Suggestion successfully saved"}
+        except Exception as e:
+            print(f"Error saving suggestion: {e}")
+            return {"status": "error", "message": str(e)}
 
 async def main():
 
