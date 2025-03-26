@@ -27,7 +27,7 @@ div {
     display: flex;
     margin-left: 4%;
     min-height: 40px; /* Set a minimum height instead of vh */
-    height: max(40px, 5vh); /* Use the larger of 40px or 5vh */
+    height: 5vh; /* Use the larger of 40px or 5vh */
     align-items: center; /* Center content vertically */
 }
 
@@ -39,9 +39,8 @@ div {
     border: 1px solid #ccc; /* Light grey border! */
     border-radius: 10px; /* Rounded corners */
     box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1); /* Subtle shadow for depth */
-    max-width: 800px; /* Maximum width */
     width: 90%; /* Full width */
-    height: 80%; /* Automatic height */
+    height: 55vh; /* Automatic height */
     background-blend-mode: overlay; /* Blend texture with background color */
     padding: 0; /* Remove padding that might cause overflow */
     display: flex; /* Make it a flex container */
@@ -143,10 +142,9 @@ width:90%;
     border : 0.02rem solid #6bd8ff;
 }
 img {
-        max-width: 25%; /* Ensure the image is responsive */
-        height: auto; /* Maintain aspect ratio */
-        display: block; /* Ensure the image is treated as a block element */
-        margin: auto auto; /* Center the image */
+    height: 100%; /* Maintain aspect ratio */
+    max-width: 25%; /* Ensure the image is responsive */    
+    margin: auto auto; /* Center the image */
 }
 
 #settings {
@@ -159,14 +157,13 @@ img {
 
 #myModal {
     display: none;
-    position: fixed !important;
-    bottom: 0 !important;  /* Position at bottom */
-    left: 0 !important;    /* Start from left edge */
-    width: 100% !important; /* Full width */
-    height: 20vh !important; /* 20% of viewport height */
+    position: relative !important; /* Change from fixed to relative */
+    left: 50% !important;
+    transform: translateX(-50%) !important;
+    width: 80% !important;
+    height: 40vh !important;
     background-color: white !important;
     z-index: 999 !important;
-    top: auto !important; /* Override any top positioning */
 }
 #books-modal {
     position: fixed;
@@ -178,6 +175,9 @@ img {
     width: 80% !important;
     height: 80vh !important;
     z-index: 1000;
+}
+#modal-content {
+    height: 100%;
 }
 #books-modal .modal-content {
     background-color: white;
@@ -228,6 +228,7 @@ img {
     display: flex;
     flex-direction: column;
     flex: 10;
+    height: 30%;
 }
 
 
@@ -240,8 +241,8 @@ img {
     flex-direction:row;
     justify-content: space-between;
     align-items: center;
-    flex: 0 0 auto; /* Don't grow, don't shrink, auto base size */
-    padding: 1rem; /* Give it some breathing room */
+    padding: 1rem;
+    height:50%;/* Give it some breathing room */
 
 }
 
@@ -249,8 +250,8 @@ img {
    /* max-height:70%;
     width:auto;
     cursor: pointer;    /* Changes mouse cursor to a hand when hovering */
-    /*padding: 5px 10px; */ /* Adds space inside each arrow (5px top/bottom, 10px left/right) */
-    max-height:60%;
+    padding: 5px 10px; /* Adds space inside each arrow (5px top/bottom, 10px left/right) */
+
     object-fit: contain;
     
 }
@@ -571,11 +572,6 @@ flex-direction: column;
 
 
 
-    .modal-content {
-        margin: 2%;
-        width: 96%;
-        height: 90%;
-    }
 
     .text-container {
         margin-bottom: 20px;
@@ -737,17 +733,7 @@ flex-direction: column;
     }
 }
 
-/* Add this to your style.css file */
-#recording-status {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    margin-top: 15px;
-    padding: 10px;
-    background-color: rgba(0, 0, 0, 0.05);
-    border-radius: 8px;
-}
+
 
 .status-spinner {
     width: 24px;
@@ -823,4 +809,26 @@ flex-direction: column;
 
 #browse-books-btn:hover {
     background-color: #366b7c;
+}
+
+
+.wrong {
+    background-color: #ff6b6b;
+    padding: 2px 6px;
+    border-radius: 4px;
+    cursor: pointer;
+    display: inline-block;
+    margin: 0 2px;
+    transition: filter 0.2s ease;
+    color: white;
+    border: none;
+    font-size: inherit;
+}
+
+.wrong:hover {
+    filter: brightness(0.9);
+}
+
+.wrong.pressed {
+    filter: brightness(0.7);
 }

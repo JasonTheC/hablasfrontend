@@ -14,19 +14,12 @@
     </div>
 
     <div id="div2viewer">
-        <div id="viewer-container">
             <div id="viewer">
                 <div id="empty-viewer-message">
                     <p>No book loaded</p>
                     <button id="browse-books-btn" onclick="loadAvailableBooks()">Browse Available Books</button>
                 </div>
             </div> 
-        </div>
-    </div>
-
-    <div id="div3">
-        
-         
     </div>
 
     <input type="file" id="fileInput" accept=".epub"/>
@@ -55,7 +48,7 @@
                     <option value="female">Female</option>
                     <option value="male">Male</option>
                 </select>
-
+                <div id="points-display">Points: <span id="points">0</span></div>
                 <div id="file">
                     <img src="images/upload-icon-white.png" alt="upload symbol" />
                     <img src="images/epub-icon-white.png" alt="upload symbol" />
@@ -72,33 +65,37 @@
 </div>
 
 <div id="myModal" class="modal"> 
-    <div class="modal-content"> 
+    <div class="modal-content" id="modal-content"> 
         <span class="close-modal">&times;</span>
         <div id="modal-main">
             <div id="translation"></div>
-            <div id="return_sentence"></div>
+            <div id="return_sentence">>></div>
         </div>
 
-        <div id="actionButtons">
+        <div id="actionButtons" style="position: relative;">
             <img id="record" src="images/recordingButton.png" alt="record icon"/>
-            <img id="robot" src="images/robot_talk_white.png" alt="robot"/>
+            <img id="robot" src="images/robot_talk_white.png" alt="robot" data-speaking="false"/>
+            <div id="points-display">Points: <span id="points">0</span></div>
+            
+            <div id="recording-status" style="
+                display: none;
+                position: absolute;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background-color: rgba(0, 0, 0, 0.7);
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                z-index: 1000;">
+                <div class="status-spinner"></div>
+                <div class="status-message">Processing...</div>
+                <div class="timer">0.0s</div>
+            </div>
         </div>
    
-        <div id="bottom">
-            <div class="bottom-row">
-                <select id="language-select">
-                    <option value="en">English</option>
-                    <option value="es">Spanish</option> 
-                    <option value="fr">Français</option>
-                    <option value="de">Deutch</option>
-                    <option value="it">Italian</option>
-                </select>
-            </div>
-            <div class="bottom-row">
-                <div id="points-display">Points: <span id="points">0</span></div>
-            </div>
-        </div>
-        
         <!-- Add status indicator -->
         <div id="recording-status" style="display: none;">
             <div class="status-spinner"></div>
@@ -131,7 +128,7 @@
     let translationText = "";
     let mediaRecorder; 
     let audioChunks = []; //buffer
-
+    let userPoints = 0;
     const lang_conversion = {
         "francais": "fr",
         "english": "en",
@@ -148,7 +145,6 @@
     const prevArrowBtn = document.getElementsByClassName('arrowPrev')[0];
     const nextArrowBtn = document.getElementsByClassName('arrowNext')[0];
     const returnSentenceDiv = document.getElementById('return_sentence');
-    const languageSel =document.getElementById('language-select');
     const fileDiv = document.getElementById("file");
     const pointsDisplay = document.getElementById("points-display");
 
@@ -202,7 +198,12 @@
     let selectedBook = null;
     let selectedPage = null;
     let sourceLang = "";
- 
+    let languageSel ="en";
+
+    // Add these variables at the start of your script
+    let processingStartTime = 0;
+    let timerInterval = null;
+
 console.log ("starting script");
 
 // Add this function at the start of your script
@@ -229,7 +230,7 @@ function waitForEpub() {
 
 // Replace the existing WebSocket implementation with a simpler function-based approach
 function createWebSocketConnection() {
-    const socket = new WebSocket('ws://localhost:8765');
+    const socket = new WebSocket('wss://carriertech.uk:8675');
     
     socket.addEventListener('open', (event) => {
         console.log('WebSocket connection established');
@@ -240,19 +241,26 @@ function createWebSocketConnection() {
     });
 
     socket.addEventListener('message', (event) => {
-        try {
             const response = JSON.parse(event.data);
             console.log("Received WebSocket message:", response);
             
             const statusIndicator = document.getElementById('recording-status');
             if (statusIndicator) {
+                // Stop and clear the timer
+                clearInterval(timerInterval);
+                const finalTime = ((Date.now() - processingStartTime) / 1000).toFixed(1);
+                const timerElement = statusIndicator.querySelector('.timer');
+                if (timerElement) {
+                    timerElement.textContent = `${finalTime}s`;
+                }
+                // Hide the status indicator without a timeout
                 statusIndicator.style.display = 'none';
             }
             
             if (response.books) {
                 handleBooksResponse(response);
             } else if (response.hasOwnProperty('pred_sentence')) {
-                handlePredSentenceResponse(response);
+                handlePredSentence(response);
             } else if (response.hasOwnProperty('translation') || 
                         (response.status === 'success' && response.hasOwnProperty('translated_text'))) {
                 handleTranslationResponse(response);
@@ -283,15 +291,13 @@ function createWebSocketConnection() {
                     renderEpub(blob);
                     booksModal.style.display = 'none';
                     
-                    languageSelect.value = setLanguage(langauge);
+                    languageSel = setLanguage(langauge);
                     selectedBook = book.filename;
                     console.log("selected ", selectedBook);
             }else {
                 console.log("Unhandled response from server:", response);
             }
-        } catch (error) {
-            console.error("Error processing WebSocket message:", error);
-        }
+       
     });
 
     socket.addEventListener('close', (event) => {
@@ -325,33 +331,16 @@ function loadAvailableBooks() {
     booksModal.style.display = 'block';
 }
 
-function updateTranslation(text) {
-    console.log(`Translating text: "${text}" from ${sourceLang}`);
-    
-    translation.textContent = "Translating...";
-    
-    // Get user's native language from settings
-    const targetLang = languageUserOptionsSelect.value;
-    console.log("targetLang: ", targetLang);
-    console.log("sourceLang: ", sourceLang);
-    console.log("username: ", username);
-    
-    sendSocketMessage({ 
-        task: 'translate', 
-        text: text, 
-        source_lang: sourceLang, 
-        target_lang: targetLang, 
-        current_book: selectedBook, 
-        page: selectedPage,
-        username: username 
-    });
-}
+
 
 function createBlobAndConnect() {
-    // Show the recording status indicator
     const statusIndicator = document.getElementById('recording-status');
     if (statusIndicator) {
         statusIndicator.style.display = 'flex';
+        // Start the timer
+        processingStartTime = Date.now();
+        updateTimer();
+        timerInterval = setInterval(updateTimer, 100); // Update every 0.1 seconds
     }
 
     const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
@@ -362,15 +351,11 @@ function createBlobAndConnect() {
     reader.readAsDataURL(audioBlob);
     reader.onloadend = function() {
         const base64data = reader.result;
-        
-        // Log the current language value
-        console.log("Current language value:", languageSel.value);
-        console.log("Current sourceLang:", sourceLang);
-       
+
         sendSocketMessage({ 
             task: 'stt', 
             audio: base64data, 
-            language: languageSel.value, 
+            language: languageSel, 
             sentence: lines[lineNum], 
             username: username, 
             book: selectedBook, 
@@ -539,11 +524,7 @@ function setLanguage(language){
         return language;
     }
 }
-function handlePredSentenceResponse(response) {
-    
-    // Use a proper async function to handle this
-    handlePredSentence(response.pred_sentence);
-}
+
 
 function handleTranslationResponse(response) {
     // Handle translation response
@@ -562,12 +543,10 @@ function handleTokenResponse(response) {
     if (response.language) {
 
         sourceLang = response.language;
-        console.log("Standardized language code:", sourceLang);
         
         // Update language selector if it exists
         if (languageSel) {
-            languageSel.value = setLanguage(sourceLang);
-            console.log("Updated languageSel value to:", languageSel.value);
+            languageSel = setLanguage(sourceLang);
         }
     }
     
@@ -589,8 +568,7 @@ function updateAuthUI(isLoggedIn, username = '', responseData = null) {
         usernameInput.style.display = 'none';
         passwordInput.style.display = 'none';
         sourceLang = responseData.language;
-        languageSel.value = setLanguage(sourceLang);
-        console.log("sourceLang: ", sourceLang);
+        languageSel = setLanguage(sourceLang);
         // Add logged-in user display
         const userInfoDiv = document.createElement('div');
         userInfoDiv.id = 'user-info';
@@ -614,6 +592,7 @@ function updateAuthUI(isLoggedIn, username = '', responseData = null) {
             selectedBook = responseData.current_book;
             selectedPage = responseData.page || 0;
             language = responseData.language;
+            languageSel = setLanguage(language);
             console.log("Loading user's current book:", selectedBook);
             
             // Convert base64 to blob
@@ -679,10 +658,13 @@ async function updateTranslation(text) {
 
 // Update the createBlobAndConnect function
 function createBlobAndConnect() {
-    // Show the recording status indicator
     const statusIndicator = document.getElementById('recording-status');
     if (statusIndicator) {
         statusIndicator.style.display = 'flex';
+        // Start the timer
+        processingStartTime = Date.now();
+        updateTimer();
+        timerInterval = setInterval(updateTimer, 100); // Update every 0.1 seconds
     }
 
     const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
@@ -695,13 +677,13 @@ function createBlobAndConnect() {
         const base64data = reader.result;
         
         // Log the current language value
-        console.log("Current language value:", languageSel.value);
+        console.log("Current language value:", languageSel);
         console.log("Current sourceLang:", sourceLang);
        
         sendSocketMessage({ 
             task: 'stt', 
             blob: base64data, 
-            language: languageSel.value, 
+            language: languageSel, 
             sentence: lines[lineNum], 
             username: username, 
             book: selectedBook, 
@@ -741,9 +723,31 @@ window.addEventListener('DOMContentLoaded', () => {
 });
 
 // Add this new function to handle the prediction sentence
-async function handlePredSentence(predSentence) {
+async function handlePredSentence(response) {
+    console.log("handlePredSentence: ", response);
+    predSentence = response.pred_sentence;
     console.log("predSentence: ", predSentence);
     returnSentenceDiv.innerHTML = predSentence;
+    
+    // Add click handlers to wrong words
+    document.querySelectorAll('.wrong').forEach(wrongWord => {
+        wrongWord.addEventListener('click', (event) => {
+            // Remove 'pressed' class from all wrong words
+            document.querySelectorAll('.wrong').forEach(w => w.classList.remove('pressed'));
+            
+            // Add 'pressed' class to clicked word
+            wrongWord.classList.add('pressed');
+            
+            // Get the correct word from the ID
+            const correctWord = wrongWord.id;
+            console.log("Correct word:", correctWord);
+            
+            // Create popup with the correct word
+            if (!popupflag) {
+                createPopup(correctWord, event);
+            }
+        });
+    });
     
     // Show points display when we get a response
     const pointsDisplay = document.getElementById('points-display');
@@ -752,7 +756,7 @@ async function handlePredSentence(predSentence) {
     // Calculate and update points
     const wrongElements = document.getElementsByClassName("wrong");
     const totalWords = predSentence.split(' ').length;
-    const correctWords = totalWords - wrongElements.length;
+    const correctWords = response.points;
     
     // Award points
     const pointsEarned = correctWords * 10;
@@ -774,7 +778,6 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
 });
     // Separate function for epub rendering
     async function renderEpub(file) {
-        try {
             currentBook = ePub(file);
             const viewer = document.getElementById("viewer");
             viewer.innerHTML = "";
@@ -939,11 +942,63 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
             
             fileDiv.style.display = "none";
             
-            
-        } catch (error) {
-            console.error('Error loading ePub:', error);
-            alert('Error loading book. Please ensure you have a stable internet connection and try again.');
-        }
+            // Create scroll down button if it doesn't exist
+            if (!document.getElementById('scroll-down-btn')) {
+                const scrollBtn = document.createElement('button');
+                scrollBtn.id = 'scroll-down-btn';
+                scrollBtn.textContent = 'Load More';
+                scrollBtn.style.position = 'absolute';
+                scrollBtn.style.bottom = '10px';
+                scrollBtn.style.left = '50%';
+                scrollBtn.style.transform = 'translateX(-50%)';
+                scrollBtn.style.zIndex = '100';
+                scrollBtn.style.padding = '10px 20px';
+                scrollBtn.style.backgroundColor = '#007bff';
+                scrollBtn.style.color = 'white';
+                scrollBtn.style.border = 'none';
+                scrollBtn.style.borderRadius = '5px';
+                scrollBtn.style.cursor = 'pointer';
+                scrollBtn.style.marginBottom = '10px';
+                
+                scrollBtn.onclick = () => {
+                    // Get all iframe contents
+                    const contents = rendition.getContents();
+                    if (contents && contents.length > 0) {
+                        // For each content iframe
+                        contents.forEach(content => {
+                            const iframe = content.document.defaultView;
+                            // Scroll down by 80% of the viewport height
+                            const scrollAmount = iframe.innerHeight * 0.8;
+                            iframe.scrollBy({
+                                top: scrollAmount,
+                                behavior: 'smooth'
+                            });
+                        });
+                        
+                        // After scrolling, try to load more content if needed
+                        setTimeout(() => {
+                            // If we're near the bottom, load more
+                            const lastContent = contents[contents.length - 1];
+                            const iframe = lastContent.document.defaultView;
+                            const scrollPos = iframe.scrollY + iframe.innerHeight;
+                            const scrollHeight = lastContent.document.body.scrollHeight;
+                            
+                            if (scrollHeight - scrollPos < iframe.innerHeight * 0.2) {
+                                console.log("Near bottom, attempting to load more content");
+                                rendition.next();
+                            }
+                        }, 300);
+                        scrollBtn.style.display = 'none';
+                    }
+                };
+                
+                // Append to div2viewer instead of body
+                const div2viewer = document.getElementById('div2viewer');
+                div2viewer.appendChild(scrollBtn);
+                
+                // Make sure div2viewer has a position for absolute positioning to work properly
+                div2viewer.style.position = div2viewer.style.position || 'relative';
+            }
     }
 
     recordBtn.addEventListener('click', async () => { //standarised procedure 
@@ -1040,11 +1095,23 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
 
     textToSpeechBtn.addEventListener('click', () => {
         if ('speechSynthesis' in window) {
-            textToSpeech(lines[lineNum]);
+            const isCurrentlySpeaking = textToSpeechBtn.getAttribute('data-speaking') === 'true';
+            
+            if (isCurrentlySpeaking) {
+                // Stop speaking and reset the button
+                window.speechSynthesis.cancel();
+                textToSpeechBtn.setAttribute('data-speaking', 'false');
+                textToSpeechBtn.style.filter = 'brightness(1)';
+            } else {
+                // Start speaking and darken the button
+                textToSpeechBtn.setAttribute('data-speaking', 'true');
+                textToSpeechBtn.style.filter = 'brightness(0.7)';
+                textToSpeech(lines[lineNum]);
+            }
         } else {
             console.log("Sorry, your browser doesn't support text to speech!");
         }
-    })
+    });
     
     
     function randomLanguage(){
@@ -1060,7 +1127,7 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
             msg.text = textToSpeak;
             
             // Make sure we're using the correct language
-            const currentLang = languageSel.value.substring(0,2);
+            const currentLang = languageSel.substring(0,2);
             console.log('Using language:', currentLang);
             msg.lang = currentLang;
             
@@ -1114,8 +1181,16 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
             
             // Add event listeners to debug TTS issues
             msg.onstart = () => console.log('Speech started');
-            msg.onend = () => console.log('Speech ended');
-            msg.onerror = (e) => console.error('Speech error:', e);
+            msg.onend = () => {
+                console.log('Speech ended');
+                textToSpeechBtn.setAttribute('data-speaking', 'false');
+                textToSpeechBtn.style.filter = 'brightness(1)';
+            };
+            msg.onerror = (e) => {
+                console.error('Speech error:', e);
+                textToSpeechBtn.setAttribute('data-speaking', 'false');
+                textToSpeechBtn.style.filter = 'brightness(1)';
+            };
             
             window.speechSynthesis.speak(msg);
         } else {
@@ -1151,6 +1226,11 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
             popupflag = false;
             e.stopPropagation();
         });
+        popup.addEventListener('click', (e) => {
+            popup.remove();
+            popupflag = false;
+            e.stopPropagation();
+        });
         
         // Get click/touch position
         const x = event.clientX || (event.touches && event.touches[0].clientX) || 0;
@@ -1164,9 +1244,9 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
         document.body.appendChild(popup);
         popup.style.zIndex = 1000;
         
-        // Fix: Call textToSpeech with the correct language
+        // Use the correct word for TTS
         if (content) {
-            console.log("Speaking content:", content);
+            console.log("Speaking correct word:", content);
             textToSpeech(content);
         } else {
             console.error("No content to speak");
@@ -1235,14 +1315,7 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
         viewerElement.addEventListener('touchend', handleTextSelection);
     }
     
-    // Make sure language selection changes trigger retranslation
-    languageSel.addEventListener('change', function() {
-        if (translationText) {
-            sourceLang = this.value;
-            languageSel.value = setLanguage(sourceLang);
-            updateTranslation(translationText);
-        }
-    });
+
 
     function handleTextSelection() {
         const selection = window.getSelection();
@@ -1252,8 +1325,8 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
             console.log("Selected text:", text);
             selectedText = text;
             modalDiv.style.display = "block";
-            sourceLang = languageSel.value;
-            languageSel.value = setLanguage(sourceLang);
+            sourceLang = languageSel;
+            languageSel = setLanguage(sourceLang);
             translationText = text;
             updateTranslation(text);
         }
@@ -1354,16 +1427,10 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
 
     // Add this function to handle book data responses
     function handleBookDataResponse(response) {
-        if (response.error) {
-            console.error('Error loading book:', response.error);
-            alert('Error loading book: ' + response.error);
-            return;
-        }
+            console.log("response:", response);
 
-        try {
-            if (!response.epub) {
-                throw new Error('No EPUB data received');
-            }
+        
+          
 
             // Set selectedBook from the response filename
             selectedBook = response.filename;
@@ -1371,8 +1438,10 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
 
             // Set language from response
             sourceLang = response.language;
-            languageSel.value = setLanguage(sourceLang);
+            languageSel = setLanguage(sourceLang);
+            console.log("epub:", response.epub);
             const base64Data = response.epub.split(',')[1];
+            console.log("Base64 data:", base64Data);
             if (!base64Data) {
                 throw new Error('Invalid EPUB data format');
             }
@@ -1401,10 +1470,7 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
                 alert('Error rendering book: ' + error.message);
             });
 
-        } catch (error) {
-            console.error('Error processing book data:', error);
-            alert('Error loading book: ' + error.message);
-        }
+    
     }
 
     // Select all elements with the 'close' class
@@ -1420,5 +1486,31 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
             }
         });
     });
+
+    function updatePointsDisplay(points) {
+        // Update all points displays
+        const pointsDisplays = document.querySelectorAll('#points');
+        pointsDisplays.forEach(element => {
+            element.textContent = points;
+        });
+
+        // Make sure points display is visible
+        const pointsDisplayDivs = document.querySelectorAll('#points-display');
+        pointsDisplayDivs.forEach(div => {
+            div.style.display = 'block';
+            div.style.textAlign = 'center';
+            div.style.fontSize = '1em';
+            div.style.fontWeight = 'bold';
+        });
+    }
+
+    // Add this new function
+    function updateTimer() {
+        const timerElement = document.querySelector('.timer');
+        if (timerElement && processingStartTime) {
+            const elapsedTime = (Date.now() - processingStartTime) / 1000; // Convert to seconds
+            timerElement.textContent = `${elapsedTime.toFixed(1)}s`;
+        }
+    }
 
 </script>

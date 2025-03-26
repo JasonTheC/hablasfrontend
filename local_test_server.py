@@ -303,19 +303,28 @@ def stt_task(data_object):
         data_object["sentence"], 
         the_words
     )
+    wrong_words = predicted_sentence.count('class="wrong"')
+    # Simplified points system (temporarily bypassing Levenshtein)
+    total_words = len(spoken_words)
+    points = total_words  # Start with maximum points
     
-    print("\nDetailed word comparison:")
-    for i in range(min(len(original_words), len(spoken_words))):
-        distance = Levenshtein.distance(original_words[i], spoken_words[i])
-        max_len = max(len(original_words[i]), len(spoken_words[i]))
-        ratio = distance / max_len if max_len > 0 else 0
-        print(f"Word {i+1}: Original '{original_words[i]}' vs Spoken '{spoken_words[i]}'")
-        print(f"  - Levenshtein distance: {distance}")
-        print(f"  - Max length: {max_len}")
-        print(f"  - Distance ratio: {ratio:.2f}")
-        print(f"  - Marked as wrong: {distance > 2 and ratio > 0.3}")
+  
+    percentage_score = (points / total_words * 100) if total_words > 0 else 0
+    
+    print(f"\nPoints Summary:")
+    print(f"Total words: {total_words}")
+    print(f"Wrong words: {wrong_words}")
+    print(f"Points earned: {points}/{total_words}")
+    print(f"Percentage score: {percentage_score:.1f}%")
         
-    message_returned = {"pred_sentence":predicted_sentence}
+    message_returned = {
+        "pred_sentence": predicted_sentence,
+        "points": points,
+        "total_words": total_words,
+        "wrong_words": wrong_words,
+        "percentage_score": round(percentage_score, 1)
+    }
+    
     db.set_current_book_task(data_object, fpath, predicted_sentence)
 
     if "current_book" in data_object and "username" in data_object:
@@ -537,7 +546,7 @@ async def translate_task(data_object):
     
     # Create a new translator instance for each request
     translator_instance = Translator()
-    result = translator_instance.translate(source_text, src=source_lang, dest=target_lang)
+    result = await translator_instance.translate(source_text, src=source_lang, dest=target_lang) #await on linux
     
     if hasattr(result, 'text'):
         translated_text = result.text

@@ -20,6 +20,8 @@ from googletrans import Translator  # Add this import for translation
 import Levenshtein  # Add this import for Levenshtein distance
 from googletrans import Translator  # Add this import for translation
 import uuid  # Add this import for UUID generation
+import numpy as np
+import soundfile as sf
 
 
 LANG_ID = "fr"
@@ -193,16 +195,16 @@ def stt_task(data_object):
         audio_file.write(binary_data)
     the_words = stt(fpath, lang)
     predicted_sentence, similarity_ratio, original_words, spoken_words = TextComparator.generate_html_report(data_object["sentence"], the_words)
-    for i in range(min(len(original_words), len(spoken_words))):
-        distance = Levenshtein.distance(original_words[i], spoken_words[i])
-        max_len = max(len(original_words[i]), len(spoken_words[i]))
-        ratio = distance / max_len if max_len > 0 else 0
-        print(f"Word {i+1}: Original '{original_words[i]}' vs Spoken '{spoken_words[i]}'")
-        print(f"  - Levenshtein distance: {distance}")
-        print(f"  - Max length: {max_len}")
-        print(f"  - Distance ratio: {ratio:.2f}")
-        print(f"  - Marked as wrong: {distance > 2 and ratio > 0.3}")
-    message_returned = {"pred_sentence":predicted_sentence}
+    
+    total_words = len(spoken_words)
+    wrong_words = predicted_sentence.count('class="wrong"')
+    points = total_words - wrong_words
+    message_returned = {
+        "pred_sentence": predicted_sentence,
+        "points": points,
+        "total_words": total_words,
+        "wrong_words": wrong_words,
+    }
     db.set_current_book_task(data_object, fpath, predicted_sentence)
 
     if "current_book" in data_object and "username" in data_object:
