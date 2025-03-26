@@ -19,14 +19,16 @@ div {
 }
 
 #title {
-    font-size: 1.9em;
     font-family: 'Quicksand', sans-serif;
     font-weight: 600;
-    color:white; 
+    color: white; 
     padding: 1%;
     text-align: left;
     display: flex;
     margin-left: 4%;
+    min-height: 40px; /* Set a minimum height instead of vh */
+    height: max(40px, 5vh); /* Use the larger of 40px or 5vh */
+    align-items: center; /* Center content vertically */
 }
 
 #div2viewer {
@@ -39,7 +41,7 @@ div {
     box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1); /* Subtle shadow for depth */
     max-width: 800px; /* Maximum width */
     width: 90%; /* Full width */
-    height: 90%; /* Automatic height */
+    height: 80%; /* Automatic height */
     background-blend-mode: overlay; /* Blend texture with background color */
     padding: 0; /* Remove padding that might cause overflow */
     display: flex; /* Make it a flex container */
@@ -149,7 +151,7 @@ img {
 
 #settings {
     float:right;
-    height:10vh;
+    height:100%;
     margin-right: 0; 
     padding: 1%;
     cursor: pointer;
@@ -157,46 +159,56 @@ img {
 
 #myModal {
     display: none;
-    position: fixed; /* Change to fixed positioning */
-    background-color: transparent;
-    z-index: 999;
+    position: fixed !important;
+    bottom: 0 !important;  /* Position at bottom */
+    left: 0 !important;    /* Start from left edge */
+    width: 100% !important; /* Full width */
+    height: 20vh !important; /* 20% of viewport height */
+    background-color: white !important;
+    z-index: 999 !important;
+    top: auto !important; /* Override any top positioning */
 }
-
-#myModal .modal-content {
-    background-color: white;
-    padding: 10px;
-    border-radius: 8px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-    position: relative;
-    margin: 0;
-    height: auto;
-}
-
-/* Keep the original .modal class for other modals */
-.modal {
+#books-modal {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
     display: none;
+    margin: auto;
+    width: 80% !important;
+    height: 80vh !important;
+    z-index: 1000;
+}
+#books-modal .modal-content {
+    background-color: white;
+    border-radius: 10px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+    width: 100%;
+    height: 100%;
+    padding: 20px;
+    position: relative;
+    overflow-y: auto;
+}
+
+.modal-overlay {
     position: fixed;
     top: 0;
     left: 0;
-    background-color: rgba(0,0,0,0.4);
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
     z-index: 999;
+    display: none;
 }
 
-.modal-content {
-    position: relative; /* Makes this element a positioning context for its children
-    Any child with position: absolute will be positioned relative to this element
-    Like creating a coordinate system inside this element */
-    height: 80%;
-    display: flex;
-    flex-direction: column;
-    /* Makes flex items stack vertically instead of horizontally*/
-    background-color: #fefefe;
-    margin: 5%;
-    padding: 20px;
-    border: 1px solid #888;
-    width: 80%;
-    
-    font-family: 'Roboto', sans-serif;
+/* Remove or modify the general .modal class */
+.modal {
+    display: none;
+    position: fixed;
+    background-color: rgba(0,0,0,0.4);
+    z-index: 999;
+    width: 100%;
+    height: 100%;
 }
 
 .close {
@@ -602,6 +614,23 @@ flex-direction: column;
 
     .vertical-slider {
         width: 5%;
+    }
+
+    #title {
+        padding: 8px 1%; /* Adjust padding for mobile */
+        margin-left: 2%; /* Reduce left margin on mobile */
+        height: 40px; /* Fixed height on mobile */
+    }
+    
+    #title p {
+        font-size: 1.2rem; /* Control text size on mobile */
+        margin: 0; /* Remove any default paragraph margins */
+    }
+    
+    #title img {
+        height: 24px; /* Control settings icon size */
+        width: auto;
+        max-width: none; /* Override the general img max-width */
     }
 }
 

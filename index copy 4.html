@@ -15,12 +15,14 @@
 
     <div id="div2viewer">
         <div id="viewer-container">
+            <button id="prev" class="side-nav-btn"><span>&laquo;</span></button>
             <div id="viewer">
                 <div id="empty-viewer-message">
                     <p>No book loaded</p>
                     <button id="browse-books-btn" onclick="loadAvailableBooks()">Browse Available Books</button>
                 </div>
             </div> 
+            <button id="next" class="side-nav-btn"><span>&raquo;</span></button>
         </div>
     </div>
 
@@ -64,7 +66,7 @@
     </div>
 
 
-<div id="books-modal" >
+<div id="books-modal" class="modal">
     <div class="modal-content">
         <span class="close">&times;</span>
         <div id="books-grid"></div>
@@ -322,6 +324,7 @@ function sendSocketMessage(message) {
 // Update functions to use the sendSocketMessage function
 function loadAvailableBooks() {
     sendSocketMessage({ task: 'get_books' });
+    const booksModal = document.getElementById('books-modal');
     booksModal.style.display = 'block';
 }
 
@@ -700,7 +703,7 @@ function createBlobAndConnect() {
        
         sendSocketMessage({ 
             task: 'stt', 
-            blob: base64data, 
+            audio: base64data, 
             language: languageSel.value, 
             sentence: lines[lineNum], 
             username: username, 
@@ -775,6 +778,8 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
     // Separate function for epub rendering
     async function renderEpub(file) {
         try {
+            //await waitForEpub();
+            
             currentBook = ePub(file);
             const viewer = document.getElementById("viewer");
             viewer.innerHTML = "";
@@ -783,8 +788,9 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
                 width: "100%",
                 allowScriptedContent: true,
                 script: true,
-                flow: "scrolled-doc",
-                manager: "continuous"
+                spread: "none",
+                flow: "paginated",
+                manager: "default"
             });
             
             rendition.display().then(() => {
@@ -801,115 +807,148 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
                 const contents = rendition.getContents();
                 
                 contents.forEach(content => {
-                    // Add CSS for pulsing animation to the document head
-                    const style = content.document.createElement('style');
-                    style.textContent = `
-                        @keyframes pulse {
-                            0% { background-color: transparent; }
-                            50% { background-color: rgba(169, 209, 215, 0.3); }
-                            100% { background-color: transparent; }
-                        }
-                        .pulse-animation {
-                            animation: pulse 2s infinite;
-                        }
-                        .sentence-icon {
-                            font-size: 16px;
-                            margin-right: 4px;
-                            vertical-align: middle;
-                            display: inline-block;
-                        }
-                        .pulse-animation .sentence-icon {
-                            opacity: 1 !important;
-                        }
-                    `;
-                    content.document.head.appendChild(style);
-                    
-                    // Remove any existing pulse animations first
-                    content.document.querySelectorAll('.pulse-animation').forEach(el => {
-                        el.classList.remove('pulse-animation');
-                        const icon = el.querySelector('.sentence-icon');
-                        if (icon) {
-                            icon.remove();
-                        }
-                    });
-                    
-                    let isFirstSentence = true;
-                    
-                    content.document.querySelectorAll('p, span').forEach((element, elementIndex) => {
+                    // Add click handlers to paragraphs and spans
+                    content.document.querySelectorAll('p, span').forEach(element => {
+                        // Skip if already processed
                         if (element.dataset.processed === "true") return;
                         
-                        // Skip if this is a title (text in all caps)
-                        if (element.textContent.trim() === element.textContent.trim().toUpperCase()) {
-                            element.dataset.processed = "true";
-                            return;
-                        }
+                        // Check if element has at least 2 words
+                        const words = element.textContent.trim().split(/\s+/);
+                        if (words.length < 2) return; // Skip elements with fewer than 2 words
                         
-                        const sentences = element.textContent.split(/(?<=[.!?])\s+/);
-                        if (sentences.length === 0) return;
-                        
-                        element.textContent = '';
+                        // Mark as processed to avoid duplicate handlers
                         element.dataset.processed = "true";
                         
-                        sentences.forEach((sentence, index) => {
-                            if (sentence.trim().length < 2) return;
-                            
-                            const sentenceSpan = content.document.createElement('span');
-                            sentenceSpan.textContent = sentence + ' ';
-                            sentenceSpan.style.cursor = 'pointer';
-                            sentenceSpan.style.borderRadius = '3px';
-                            sentenceSpan.style.transition = 'background-color 0.2s ease';
-                            
-                            // Only add the finger emoji to the first actual sentence
-                            if (isFirstSentence && 
-                                sentence.trim() !== sentence.trim().toUpperCase() && 
-                                sentence.trim().length > 10) { // Basic check for actual sentence
-                                const selectIcon = content.document.createElement('span');
-                                selectIcon.textContent = '👉';
-                                selectIcon.className = 'sentence-icon';
-                                selectIcon.style.opacity = '1';
-                                sentenceSpan.insertBefore(selectIcon, sentenceSpan.firstChild);
-                                sentenceSpan.classList.add('pulse-animation');
-                                isFirstSentence = false;
+                        // Create and add the select icon
+                        const selectIcon = content.document.createElement('div');
+                        selectIcon.innerHTML = `
+                            <svg width="16" height="16" viewBox="0 0 24 24">
+                                <circle cx="12" cy="12" r="10" fill="#4588a0" fill-opacity="0.7"/>
+                                <path d="M7 12h10" stroke="white" stroke-width="2"/>
+                                <path d="M12 7v10" stroke="white" stroke-width="2"/>
+                            </svg>`;
+                        selectIcon.style.position = 'absolute';
+                        selectIcon.style.left = '-3em';
+                        selectIcon.style.top = '50%';
+                        selectIcon.style.transform = 'translateY(-50%)';
+                        selectIcon.style.zIndex = '5';
+                        selectIcon.style.pointerEvents = 'none'; // Make sure icon doesn't interfere with clicks
+                        
+                        // Make the parent element relative for absolute positioning
+                        element.style.position = 'relative';
+                        element.style.paddingLeft = '8px';
+                        element.style.marginLeft = '24px';
+                        
+                        // Insert the icon
+                        element.insertBefore(selectIcon, element.firstChild);
+                        
+                        // Rest of the styles
+                        element.style.cursor = 'pointer';
+                        element.style.borderRadius = '3px';
+                        element.style.transition = 'background-color 0.2s ease';
+                        element.style.display = 'block';
+                        
+                        // Add hover effect
+                        element.addEventListener('mouseover', () => {
+                            element.style.backgroundColor = 'rgba(169, 209, 215, 0.3)';
+                            const circleElement = selectIcon.querySelector('circle');
+                            if (circleElement) {
+                                circleElement.setAttribute('fill-opacity', '1');
                             }
+                        });
+                        
+                        element.addEventListener('mouseout', () => {
+                            if (!element.classList.contains('selected-line')) {
+                                element.style.backgroundColor = 'transparent';
+                                const circleElement = selectIcon.querySelector('circle');
+                                if (circleElement) {
+                                    circleElement.setAttribute('fill-opacity', '0.7');
+                                }
+                            }
+                        });
+                        
+                        // Add click handler
+                        element.addEventListener('click', (event) => {
+                            console.log("Element clicked:", element.textContent.substring(0, 30) + "...");
                             
-                            // Add hover effects
-                            sentenceSpan.addEventListener('mouseover', () => {
-                                sentenceSpan.style.backgroundColor = 'rgba(169, 209, 215, 0.3)';
-                            });
+                            // Check if device is mobile
+                            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+                            console.log("Is mobile device:", isMobile);
                             
-                            sentenceSpan.addEventListener('mouseout', () => {
-                                if (!sentenceSpan.classList.contains('selected-line')) {
-                                    sentenceSpan.style.backgroundColor = 'transparent';
+                            // Remove previous selection
+                            content.document.querySelectorAll('.selected-line').forEach(el => {
+                                el.classList.remove('selected-line');
+                                el.style.backgroundColor = 'transparent';
+                                const circleEl = el.querySelector('circle');
+                                if (circleEl) {
+                                    circleEl.setAttribute('fill-opacity', '0.7');
                                 }
                             });
                             
-                            // Add click handler
-                            sentenceSpan.addEventListener('click', (event) => {
-                                // Remove pulsing animation and icon from any sentence
-                                content.document.querySelectorAll('.pulse-animation').forEach(el => {
-                                    el.classList.remove('pulse-animation');
-                                    const icon = el.querySelector('.sentence-icon');
-                                    if (icon) {
-                                        icon.remove();
+                            // Add selection to clicked element
+                            element.classList.add('selected-line');
+                            element.style.backgroundColor = 'rgba(169, 209, 215, 0.5)';
+                            const circleElement = selectIcon.querySelector('circle');
+                            if (circleElement) {
+                                circleElement.setAttribute('fill-opacity', '1');
+                            }
+                            
+                            // Get element's bounding box relative to the window
+                            const elementRect = element.getBoundingClientRect();
+                            console.log("Element bounds:", {
+                                top: elementRect.top,
+                                bottom: elementRect.bottom,
+                                height: elementRect.height
+                            });
+                            
+                            // Position and show modal
+                            const modal = document.getElementById('myModal');
+                            const modalContent = modal.querySelector('.modal-content');
+                            
+                            if (modal) {
+                                // Calculate position relative to viewport
+                                const padding = isMobile ? 10 : 20; // Less padding on mobile
+                                
+                                // Get element's position relative to iframe
+                                const elementRect = element.getBoundingClientRect();
+                                console.log("Element position within iframe:", elementRect);
+                                
+                                // Get the iframe/viewer position relative to main window
+                                const viewerContainer = document.getElementById('viewer-container');
+                                const viewerRect = viewerContainer.getBoundingClientRect();
+                                console.log("Viewer container position:", viewerRect);
+                                
+                                // Calculate absolute position by combining both
+                                let absoluteTop = viewerRect.top + elementRect.top;
+                                let absoluteBottom = viewerRect.top + elementRect.bottom;
+                                
+                                console.log("Calculated absolute position:", {
+                                    top: absoluteTop,
+                                    bottom: absoluteBottom
+                                });
+                                console.log("window.innerHeight: ", window.innerHeight);
+                                console.log("window.innerWidth: ", window.innerWidth);
+                                if ((absoluteBottom + modalContent.offsetHeight) > window.innerHeight) {
+                                    absoluteBottom = absoluteTop - modalContent.offsetHeight - padding;
+                                    if (absoluteBottom < 0) {
+                                        absoluteBottom = absoluteTop;
                                     }
-                                });
+                                } else {
+                                    absoluteBottom = absoluteBottom + padding;
+                                }
+                                // Reset all positioning to prevent any inherited styles
+                                modal.style.cssText = `
+                                    position: fixed !important;
+                                    top: ${absoluteBottom}px !important;
+                                    left: ${isMobile ? '10px' : ((window.innerWidth - (Math.min(window.innerWidth - 40, 800))) / 2) + 'px'} !important;
+                                    display: block !important;
+                                    z-index: 9999 !important;
+                                    bottom: auto !important;
+                                    transform: none !important;
+                                    margin: 0 !important;
+                                `;
                                 
-                                // Remove previous selection
-                                content.document.querySelectorAll('.selected-line').forEach(el => {
-                                    el.classList.remove('selected-line');
-                                    el.style.backgroundColor = 'transparent';
-                                });
-                                
-                                // Add selection to clicked sentence
-                                sentenceSpan.classList.add('selected-line');
-                                sentenceSpan.style.backgroundColor = 'rgba(169, 209, 215, 0.5)';
-                                
-                                // Show modal with translation
-                                const modal = document.getElementById('myModal');
-                                const modalContent = modal.querySelector('.modal-content');
-                                
-                                // Calculate width for modal content
-                                const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+                                console.log("Modal style set to:", modal.style.cssText);
                                 
                                 // Set modal content width
                                 if (isMobile) {
@@ -920,18 +959,38 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
                                     modalContent.style.width = `${modalWidth}px`;
                                 }
                                 
-                                modal.style.display = 'block';
+                                // Ensure modal is visible by scrolling if necessary
+                                setTimeout(() => {
+                                    const modalHeight = modalContent.offsetHeight || 300;
+                                    console.log("Modal actual dimensions:", {
+                                        height: modalContent.offsetHeight,
+                                        top: modal.getBoundingClientRect().top,
+                                        bottom: modal.getBoundingClientRect().bottom
+                                    });
+                                    
+                                    const modalBottom = absoluteBottom + padding + modalHeight;
+                                    if (modalBottom  > window.innerHeight) {
+                                        absoluteBottom = absoluteTop - modalContent.offsetHeight - padding;
+                                        if (absoluteBottom < 0) {
+                                            absoluteBottom = absoluteTop;
+                                        }
+                                        modal.style.top = `${absoluteBottom}px`;
+                                    }
+                                }, 50); // Short delay to ensure the modal has rendered
                                 
-                                // Update translation
-                                selectedText = sentence.trim();
+                                // Get the text and update translation
+                                selectedText = element.textContent.trim();
                                 lines = [selectedText];
                                 lineNum = 0;
-                                updateTranslation(selectedText);
                                 
+                                const translationDiv = document.getElementById('translation');
+                                if (translationDiv) {
+                                    updateTranslation(selectedText);
+                                }
+                                
+                                // Prevent the click from propagating
                                 event.stopPropagation();
-                            });
-                            
-                            element.appendChild(sentenceSpan);
+                            }
                         });
                     });
                 });
@@ -1007,36 +1066,35 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
         fileInput.click();
     })
 
-    settingsBtn.addEventListener('click', (event) => {
+    settingsBtn.addEventListener('click',()=> {
         console.log("settings button clicked");
-        console.log("Drawer classList before:", drawer.classList);
-        drawer.style.display = 'block';  // First set display to block
-        setTimeout(() => {
-            drawer.classList.add('open'); // Then add the open class
-        }, 10);
-        event.stopPropagation();
+        drawer.classList.add('open'); //adding a class named 'open'
     });
 
     closeDrawerBtn.addEventListener('click', () => {
-        console.log("close button clicked");
-        drawer.classList.remove('open');
-        setTimeout(() => {
-            drawer.style.display = 'none';
-        }, 300); // Wait for transition to complete
+        drawer.classList.remove('open'); //removing a class named 'open'
     });
 
     window.addEventListener('click', (event) => {
-        // Check if the click was on the settings button or its children (like the image)
-        if (!drawer.contains(event.target) && !settingsBtn.contains(event.target)) {
+        if (!drawer.contains(event.target) && event.target !== settingsBtn) {
             drawer.classList.remove('open');
-            setTimeout(() => {
-                drawer.style.display = 'none';
-            }, 300); // Wait for transition to complete
         }
     });
 
-    // Make sure the drawer starts hidden
-    drawer.style.display = 'none';
+    
+    nextPageBtn.addEventListener('click', () => {
+        console.log("nextPageBtn clicked");
+        if (rendition) { //if an epub is loaded
+            rendition.next().then(extractVisibleText); //next is a method from epub.js to go to the next page
+        }
+    })
+
+    prevPageBtn.addEventListener('click',() =>{
+        console.log("prevPageBtn clicked");
+        if (rendition){
+            rendition.prev().then(extractVisibleText);
+        }
+    } )
 
     textToSpeechBtn.addEventListener('click', () => {
         if ('speechSynthesis' in window) {
@@ -1393,6 +1451,8 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
                 if (response.page) {
                     rendition.display(response.page);
                 }
+                // Close the books modal if it's open
+                const booksModal = document.getElementById('books-modal');
                 if (booksModal) {
                     booksModal.style.display = 'none';
                 }
@@ -1406,19 +1466,5 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
             alert('Error loading book: ' + error.message);
         }
     }
-
-    // Select all elements with the 'close' class
-    const closeButtons = document.getElementsByClassName('close');
-
-    // Add click event listener to each close button
-    Array.from(closeButtons).forEach(closeBtn => {
-        closeBtn.addEventListener('click', () => {
-            // Find the closest parent modal/drawer
-            const container = closeBtn.closest('.modal, .drawer, #books-modal');
-            if (container) {
-                container.style.display = 'none';
-            }
-        });
-    });
 
 </script>
