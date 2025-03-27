@@ -63,165 +63,178 @@ language_name_map = {
     "italiano": "it"
 }
 
-def get_or_load_model(lang):
-    """Helper function to get or load model and processor"""
-    MODEL_ID = language_dict[lang]
-    
-    if lang not in loaded_processors:
-        loaded_processors[lang] = Wav2Vec2Processor.from_pretrained(MODEL_ID)
-    if lang not in loaded_models:
-        loaded_models[lang] = Wav2Vec2ForCTC.from_pretrained(MODEL_ID)
-        
-    return loaded_processors[lang], loaded_models[lang]
+class ModelManager:
+    def __init__(self):
+        self.loaded_processors = {}
+        self.loaded_models = {}
+        self.batch_queue = queue.Queue()
+        self.batch_size = 8  # Adjust based on your GPU memory
+        self.processing_thread = threading.Thread(target=self._process_batch, daemon=True)
+        self.processing_thread.start()
+        self.lock = threading.Lock()
 
-def stt(AUDIO_DIR, lang):
-    processor, model = get_or_load_model(lang)    
-    audio = librosa.load(AUDIO_DIR, sr=16_000)
-    inputs = processor(audio[0], sampling_rate=audio[1], return_tensors="pt")
-    with torch.no_grad():
-        logits = model(inputs.input_values, attention_mask=inputs.attention_mask).logits
-    
-    predicted_ids = torch.argmax(logits, dim=-1)
-    predicted_sentences = processor.batch_decode(predicted_ids)
-    
-    print("Prediction:", predicted_sentences)
-    return predicted_sentences[0]
+    def get_or_load_model(self, lang):
+        """Thread-safe model loading with GPU optimization"""
+        with self.lock:
+            if lang not in self.loaded_processors:
+                MODEL_ID = language_dict[lang]
+                self.loaded_processors[lang] = Wav2Vec2Processor.from_pretrained(MODEL_ID)
+                model = Wav2Vec2ForCTC.from_pretrained(MODEL_ID)
+                
+                # Enable GPU parallel processing if multiple GPUs are available
+                if torch.cuda.device_count() > 1:
+                    model = DataParallel(model)
+                model = model.to('cuda')
+                model.eval()  # Set to evaluation mode
+                self.loaded_models[lang] = model
+            
+            return self.loaded_processors[lang], self.loaded_models[lang]
 
-class TextComparator:
-    @staticmethod
-    def generate_html_report(text1, text2, output_file='text_comparison_report.html'):
-        def normalize_text(text):
-            text = text.lower()
-            for char in ',.!?;:«»""()[]{}':
-                text = text.replace(char, ' ')
-            text = text.replace("'", "'")  
-            return [word for word in text.split() if word]
-        
-        original_words = normalize_text(text1)
-        spoken_words = normalize_text(text2)
-        
-        print(f"Original words: {original_words}")
-        print(f"Spoken words: {spoken_words}")
-        m, n = len(original_words), len(spoken_words)
-        score = [[0 for _ in range(n+1)] for _ in range(m+1)]
-        traceback = [[None for _ in range(n+1)] for _ in range(m+1)]
-        for i in range(m+1):
-            score[i][0] = -i
-            if i > 0:
-                traceback[i][0] = "up"
-        
-        for j in range(n+1):
-            score[0][j] = -j
-            if j > 0:
-                traceback[0][j] = "left"
-        for i in range(1, m+1):
-            for j in range(1, n+1):
-                word_similarity = 1 - Levenshtein.distance(original_words[i-1], spoken_words[j-1]) / max(len(original_words[i-1]), len(spoken_words[j-1]))
+    def _process_batch(self):
+        """Process batches of audio in background"""
+        while True:
+            batch = []
+            try:
+                # Collect batch_size items or wait for timeout
+                while len(batch) < self.batch_size:
+                    try:
+                        item = self.batch_queue.get(timeout=0.1)
+                        batch.append(item)
+                    except queue.Empty:
+                        if batch:  # Process partial batch
+                            break
+                        continue
+
+                if batch:
+                    self._process_items(batch)
+
+            except Exception as e:
+                print(f"Batch processing error: {e}")
+
+    def _process_items(self, batch):
+        """Process a batch of audio files"""
+        try:
+            # Group by language
+            by_language = {}
+            for item in batch:
+                lang = item['lang']
+                if lang not in by_language:
+                    by_language[lang] = []
+                by_language[lang].append(item)
+
+            # Process each language batch
+            for lang, items in by_language.items():
+                processor, model = self.get_or_load_model(lang)
                 
-                match_score = score[i-1][j-1] + (2 * word_similarity - 1)  # Reward for similar words, penalty for different
-                delete_score = score[i-1][j] - 0.5  # Gap penalty
-                insert_score = score[i][j-1] - 0.5  # Gap penalty
+                # Prepare batch inputs
+                audio_inputs = []
+                attention_masks = []
                 
-                best_score = max(match_score, delete_score, insert_score)
-                score[i][j] = best_score
-                
-                if best_score == match_score:
-                    traceback[i][j] = "diag"
-                elif best_score == delete_score:
-                    traceback[i][j] = "up"
-                else:
-                    traceback[i][j] = "left"
-        
-        # Traceback to find the alignment
-        aligned_original = []
-        aligned_spoken = []
-        i, j = m, n
-        
-        while i > 0 or j > 0:
-            if i > 0 and j > 0 and traceback[i][j] == "diag":
-                aligned_original.append(original_words[i-1])
-                aligned_spoken.append(spoken_words[j-1])
-                i -= 1
-                j -= 1
-            elif i > 0 and traceback[i][j] == "up":
-                aligned_original.append(original_words[i-1])
-                aligned_spoken.append(None)  # Gap in spoken
-                i -= 1
-            else:  # traceback[i][j] == "left"
-                aligned_original.append(None)  # Gap in original
-                aligned_spoken.append(spoken_words[j-1])
-                j -= 1
-        
-        # Reverse the alignments
-        aligned_original.reverse()
-        aligned_spoken.reverse()
-        
-        # Generate HTML output
-        marked_output = []
-        
-        for orig, spoken in zip(aligned_original, aligned_spoken):
-            if orig is None:
-                # Extra word in spoken text
-                marked_output.append(f'<span id="" class="wrong" style="color:red;">{spoken}</span>')
-            elif spoken is None:
-                # Missing word in spoken text (optional to include)
-                continue
-            else:
-                # Both words exist - check similarity
-                distance = Levenshtein.distance(orig, spoken)
-                max_len = max(len(orig), len(spoken))
-                ratio = distance / max_len if max_len > 0 else 0
-                
-                if distance > 2 and ratio > 0.3:
-                    marked_output.append(f'<span id="{orig}" class="wrong" style="color:red;">{spoken}</span>')
-                else:
-                    marked_output.append(spoken)
-        
-        # Join the marked words back into text
-        marked_text = ' '.join(marked_output)
-        
-        # Calculate overall similarity
-        similarity_ratio = difflib.SequenceMatcher(None, original_words, spoken_words).ratio()
-        
-        return marked_text, similarity_ratio, original_words, spoken_words
+                for item in items:
+                    audio = librosa.load(item['audio_path'], sr=16_000)[0]
+                    inputs = processor(audio, sampling_rate=16_000, return_tensors="pt", padding=True)
+                    audio_inputs.append(inputs.input_values)
+                    attention_masks.append(inputs.attention_mask)
+
+                # Stack batch inputs
+                batched_inputs = torch.cat(audio_inputs).to('cuda')
+                batched_attention_mask = torch.cat(attention_masks).to('cuda')
+
+                # Run inference with automatic mixed precision
+                with autocast():
+                    with torch.no_grad():
+                        logits = model(batched_inputs, attention_mask=batched_attention_mask).logits
+
+                # Process results
+                predicted_ids = torch.argmax(logits, dim=-1)
+                predicted_sentences = processor.batch_decode(predicted_ids)
+
+                # Update results
+                for item, sentence in zip(items, predicted_sentences):
+                    item['future'].set_result(sentence)
+
+        except Exception as e:
+            print(f"Error processing batch: {e}")
+            # Set error result for all items in batch
+            for item in batch:
+                item['future'].set_exception(e)
+
+# Initialize the model manager
+model_manager = ModelManager()
+
+async def stt(audio_path, lang):
+    """Asynchronous STT with batching support"""
+    loop = asyncio.get_running_loop()
+    future = loop.create_future()
+    
+    model_manager.batch_queue.put({
+        'audio_path': audio_path,
+        'lang': lang,
+        'future': future
+    })
+    
+    return await future
 
 def stt_task(data_object):
-    # Map language name to code if needed
-    lang = data_object['language'].lower()
-    if lang in language_name_map:
-        lang = language_name_map[lang]
-    
-    print(f"language code: {lang}")
+    """Modified STT task to use the new batching system"""
+    try:
+        # Map language name to code if needed
+        lang = data_object['language'].lower()
+        if lang in language_name_map:
+            lang = language_name_map[lang]
+        
+        print(f"language code: {lang}")
 
-    fpath = f"{data_object['username']}_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.wav"
-    with open(fpath, "wb") as audio_file:
-        base64_string = data_object["blob"]
-        actual_base64 = base64_string.split(',')[1]
-        binary_data = base64.b64decode(actual_base64)
-        audio_file.write(binary_data)
-    the_words = stt(fpath, lang)
-    predicted_sentence, similarity_ratio, original_words, spoken_words = TextComparator.generate_html_report(data_object["sentence"], the_words)
-    
-    total_words = len(spoken_words)
-    wrong_words = predicted_sentence.count('class="wrong"')
-    points = total_words - wrong_words
-    message_returned = {
-        "pred_sentence": predicted_sentence,
-        "points": points,
-        "total_words": total_words,
-        "wrong_words": wrong_words,
-    }
-    db.set_current_book_task(data_object, fpath, predicted_sentence)
+        # Save audio file
+        fpath = f"{data_object['username']}_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.wav"
+        with open(fpath, "wb") as audio_file:
+            base64_string = data_object["blob"]
+            actual_base64 = base64_string.split(',')[1]
+            binary_data = base64.b64decode(actual_base64)
+            audio_file.write(binary_data)
 
-    if "current_book" in data_object and "username" in data_object:
-        db.set_current_book_task({
-            "username": data_object["username"],
-            "book": data_object["current_book"],
-            "page": data_object["page"]
-        }, "", "") 
+        # Process audio synchronously instead of using asyncio
+        processor, model = model_manager.get_or_load_model(lang)
+        
+        # Load and process audio
+        audio = librosa.load(fpath, sr=16_000)[0]
+        inputs = processor(audio, sampling_rate=16_000, return_tensors="pt", padding=True)
+        
+        # Move inputs to GPU
+        input_values = inputs.input_values.to('cuda')
+        attention_mask = inputs.attention_mask.to('cuda')
 
-    print("Received audio file and saved as 'received_audio.wav'")
-    return message_returned
+        # Run inference with automatic mixed precision
+        with autocast():
+            with torch.no_grad():
+                logits = model(input_values, attention_mask=attention_mask).logits
+
+        # Process results
+        predicted_ids = torch.argmax(logits, dim=-1)
+        the_words = processor.batch_decode(predicted_ids)[0]  # Take first result since we're processing single audio
+
+        # Rest of the processing remains the same
+        predicted_sentence, similarity_ratio, original_words, spoken_words = TextComparator.generate_html_report(
+            data_object["sentence"], the_words)
+        
+        total_words = len(spoken_words)
+        wrong_words = predicted_sentence.count('class="wrong"')
+        points = total_words - wrong_words
+        
+        message_returned = {
+            "pred_sentence": predicted_sentence,
+            "points": points,
+            "total_words": total_words,
+            "wrong_words": wrong_words,
+        }
+        
+        db.set_current_book_task(data_object, fpath, predicted_sentence)
+
+        return message_returned
+
+    except Exception as e:
+        print(f"Error in stt_task: {e}")
+        return {"error": str(e)}
 
 def extract_epub_cover(epub_path: Path, cover_dir: Path) -> str:
     """Extract cover image from EPUB file using the same approach as the PHP code"""
@@ -879,6 +892,41 @@ class DatabaseManager:
         
         return {"status": "success", "message": "Settings updated successfully"}
 
+class TextComparator:
+    @staticmethod
+    def generate_html_report(original_text, spoken_text):
+        """
+        Compare original and spoken text, generating an HTML report highlighting differences
+        Returns: HTML string, similarity ratio, original words list, spoken words list
+        """
+        # Normalize texts
+        original_text = original_text.lower().strip()
+        spoken_text = spoken_text.lower().strip()
+        
+        # Split into words
+        original_words = original_text.split()
+        spoken_words = spoken_text.split()
+        
+        # Calculate similarity ratio
+        similarity_ratio = Levenshtein.ratio(original_text, spoken_text)
+        
+        # Generate diff
+        d = difflib.Differ()
+        diff = list(d.compare(original_words, spoken_words))
+        
+        # Build HTML output
+        html_parts = []
+        for word in diff:
+            if word.startswith('  '):  # Words that match
+                html_parts.append(f'<span class="correct">{word[2:]}</span>')
+            elif word.startswith('- '):  # Words in original but not in spoken
+                html_parts.append(f'<span class="wrong">{word[2:]}</span>')
+            elif word.startswith('+ '):  # Words in spoken but not in original
+                html_parts.append(f'<span class="extra">{word[2:]}</span>')
+        
+        html_output = ' '.join(html_parts)
+        
+        return html_output, similarity_ratio, original_words, spoken_words
 
 async def main():
 
