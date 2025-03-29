@@ -10,7 +10,10 @@
     
     <div id="title">
         <p>Hablas</p>
-        <img src="images/settings.png" id="settings"/> 
+        <div id="title-right">
+            <div id="user-section">Login</div>
+            <img src="images/settings.png" id="settings"/> 
+        </div>
     </div>
 
     <div id="div2viewer">
@@ -153,6 +156,7 @@
     const selectBtn = document.getElementById('select');
 
     const settingsBtn = document.getElementById ("settings");
+    const userSection = document.getElementById ("user-section");
     const drawer = document.getElementById('settings-drawer');
     const closeDrawerBtn = document.getElementById('close-drawer');
     const availableBooksBtn = document.getElementById('available-books');
@@ -573,6 +577,7 @@ function updateAuthUI(isLoggedIn, username = '', responseData = null) {
         const userInfoDiv = document.createElement('div');
         userInfoDiv.id = 'user-info';
         userInfoDiv.className = 'options';
+        userSection.textContent = username;
         userInfoDiv.innerHTML = `
             <div style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
                 <span>Logged in as: ${username}</span>
@@ -742,8 +747,8 @@ async function handlePredSentence(response) {
             const correctWord = wrongWord.id;
             console.log("Correct word:", correctWord);
             
-            // Create popup with the correct word
-            if (!popupflag) {
+            // Create popup with the correct word only if we have one
+            if (correctWord && !popupflag) {
                 createPopup(correctWord, event);
             }
         });
@@ -1060,6 +1065,17 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
     fileDiv.addEventListener('click',()=> {
         fileInput.click();
     })
+    userSection.addEventListener('click', (event) => {
+        if (userSection.textContent == "Login") {
+            console.log("user section clicked");
+            console.log("Drawer classList before:", drawer.classList);
+            drawer.style.display = 'block';  // First set display to block
+            setTimeout(() => {
+                drawer.classList.add('open'); // Then add the open class
+            }, 10);
+            event.stopPropagation();
+        }
+    });
 
     settingsBtn.addEventListener('click', (event) => {
         console.log("settings button clicked");

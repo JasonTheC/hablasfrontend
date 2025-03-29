@@ -23,12 +23,37 @@ div {
     font-weight: 600;
     color: white; 
     padding: 1%;
-    text-align: left;
-    display: flex;
+    display: block;
     margin-left: 4%;
     min-height: 40px; 
     height: 5%;
-    align-items: center; /* Center content vertically */
+}
+
+/* The webapp name */
+#title p {
+    float: left;
+    margin: 0;
+}
+
+/* Wrapper for both user-section and settings */
+#title-right {
+    float: right;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+#user-section {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+#settings {
+    height: 100%;
+    padding: 1%;
+    cursor: pointer;
 }
 
 #div2viewer {
@@ -63,7 +88,7 @@ width:90%;
     display: none;
 }
 #wrong {
-    color: red;
+    color: rgb(255, 255, 255);
     cursor: pointer;
 }
 #viewer {
@@ -144,6 +169,14 @@ img {
     margin: auto auto; /* Center the image */
 }
 
+
+#title-right {
+    float:right;
+
+    height:100%;
+    display: inline-flex;
+    margin-right: 0; 
+}
 #settings {
     float:right;
     height:100%;
@@ -614,9 +647,8 @@ flex-direction: column;
     }
 
     #title {
-        padding: 8px 1%; /* Adjust padding for mobile */
+        padding: 1%; /* Adjust padding for mobile */
         margin-left: 2%; /* Reduce left margin on mobile */
-        height: 40px; /* Fixed height on mobile */
     }
     
     #title p {

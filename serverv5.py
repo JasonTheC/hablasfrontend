@@ -185,8 +185,23 @@ def stt_task(data_object):
         
         print(f"language code: {lang}")
 
-        # Save audio file
-        fpath = f"{data_object['username']}_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.wav"
+        # Determine user identifier (username or IP)
+        user_id = data_object.get('username', None)
+        if not user_id:
+            # Get IP from websocket connection info stored in data_object
+            user_id = f"ip_{data_object.get('ip', 'unknown')}"
+        
+        book_name = data_object.get('book', '').replace('.epub', '')  # Remove .epub extension
+        
+        # Create user and book specific directory
+        user_dir = RECORDINGS_DIR / user_id
+        book_dir = user_dir / book_name if book_name else user_dir / "general"
+        book_dir.mkdir(parents=True, exist_ok=True)
+
+        # Save audio file with timestamp in the appropriate directory
+        timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+        fpath = book_dir / f"recording_{timestamp}.wav"
+        
         with open(fpath, "wb") as audio_file:
             base64_string = data_object["blob"]
             actual_base64 = base64_string.split(',')[1]
@@ -630,7 +645,11 @@ async def handle_connection(websocket):
     try:
         data = await websocket.recv()
         data_object = json.loads(data)
-        print(f"Received data: {data_object}")
+        
+        # Add IP address to data_object
+        client_ip = websocket.remote_address[0]
+        data_object['ip'] = client_ip
+        
         message_returned = {"error": "Invalid task"}  # Default message
         
         if data_object.get("task") == "get_books":
