@@ -433,8 +433,8 @@ async def translate_task(data_object):
     source_lang = data_object.get("source_lang", "en")
     target_lang = data_object.get("target_lang", "fr")
     current_book = data_object.get("current_book", "")
-    page = data_object.get("page", 0)
-    username = data_object.get("username", "")  # Add username from data_object
+    cfi = data_object.get("cfi", "")  # Get CFI instead of page
+    username = data_object.get("username", "")
 
     if not source_text:
         return {"status": "error", "message": "No text provided for translation"}
@@ -453,14 +453,11 @@ async def translate_task(data_object):
         "italiano": "it"
     }
 
-    # Convert language names to standard codes
     if source_lang in source_lang_map:
         source_lang = source_lang_map[source_lang]
 
     try:
         print(f"Attempting to translate from {source_lang} to {target_lang}")
-
-        # Create a new translator instance for each request
         translator_instance = Translator()
         result = await translator_instance.translate(source_text, src=source_lang, dest=target_lang)
 
@@ -470,11 +467,11 @@ async def translate_task(data_object):
             print(f"current_book: {current_book}")
             print(f"username: {username}")
             if current_book and username:
-                print(f"Updating database for user {username} with book {current_book} and page {page}")
+                print(f"Updating database for user {username} with book {current_book} and CFI {cfi}")
                 db.set_current_book_task({
                     "username": username,
                     "book": current_book,
-                    "page": page
+                    "cfi": cfi,  # Update to use CFI instead of page
                 }, "", "")
 
             return {
@@ -482,8 +479,8 @@ async def translate_task(data_object):
                 "translated_text": translated_text,
                 "source_lang": source_lang,
                 "target_lang": target_lang,
-                "current_book": current_book,  # Add these fields to the response
-                "page": page
+                "current_book": current_book,
+                "cfi": cfi  # Return CFI instead of page
             }
         else:
             print(f"Translation result has no 'text' attribute: {result}")
@@ -538,8 +535,7 @@ async def login_task(self, data_object):
             "token": token,
             "username": username,
             "current_book": user.get("current_book", ""),
-            "page": user.get("page", 0),
-            "book_position": user.get("book_position", 0),
+            "cfi": user.get("cfi", ""),  # Use CFI instead of page
             "preferred_language": user.get("preferred_language", "en"),
             "type": "login"
         }
@@ -633,7 +629,7 @@ async def verify_token_task(data_object):
         "status": "success",
         "username": user.get("username", ""),
         "current_book": user.get("current_book", ""),
-        "page": user.get("page", 0),
+        "cfi": user.get("cfi", ""),
         "preferred_language": user.get("preferred_language", "en"),
         "token": token,
         "epub": epub,
@@ -703,14 +699,13 @@ class DatabaseManager:
         conn = sqlite3.connect(self.DB_PATH)
         cursor = conn.cursor()
 
-        # Create users table with additional columns for page and utterance tracking
+        # Create users table with CFI instead of page
         cursor.execute('''
         CREATE TABLE IF NOT EXISTS users (
             username TEXT PRIMARY KEY,
             password TEXT NOT NULL,
             current_book TEXT DEFAULT '',
-            book_position INTEGER DEFAULT 0,
-            page TEXT DEFAULT '',
+            cfi TEXT DEFAULT '',  -- Changed from page to cfi
             utterrance_fname TEXT DEFAULT '',
             predicted_sentence TEXT DEFAULT '',
             preferred_language TEXT DEFAULT 'en',
@@ -753,13 +748,21 @@ class DatabaseManager:
                 (token, expiry, username))
             conn.commit()
 
+            message = {
+                "status": "success",
+                "token": token,
+                "username": username,
+                "current_book": user.get("current_book", ""),
+                "cfi": user.get("cfi", ""),  # Use CFI instead of page
+                "preferred_language": user.get("preferred_language", "en"),
+                "type": "login"
+            }
 
-            epub = None
-            language = None
-
-            print(f"user.get('current_book'): {user.get('current_book')}")
+            # Only add epub and language if there's a current book
             if user.get("current_book"):
                 print("getting books")
+                epub = None
+                language = None
                 epubs = os.walk(EPUB_DIR)
                 for root, dirs, files in epubs:
                     for file in files:
@@ -776,20 +779,10 @@ class DatabaseManager:
                         epub = f"data:application/epub+zip;base64,{book_base64}"
                         print(f"Including book data for {user['current_book']}")
 
+            if epub and language:
+                message["epub"] = epub
+                message["language"] = language
 
-
-            message = {
-                "status": "success",
-                "token": token,
-                "username": username,
-                "current_book": user.get("current_book", ""),
-                "page": user.get("page", 0),
-                "book_position": user.get("book_position", 0),
-                "preferred_language": user.get("preferred_language", "en"),
-                "type": "login",
-                "epub": epub,
-                "language": language
-            }
         else:
             message = {
                 "status": "error",
@@ -798,7 +791,6 @@ class DatabaseManager:
 
         conn.close()
         return message
-
 
     def signup_task(self, data_object):
         conn = sqlite3.connect(self.DB_PATH)
@@ -839,9 +831,9 @@ class DatabaseManager:
 
             username = data_object.get("username")
             current_book = data_object.get("book", data_object.get("current_book", ""))  # Try both book and current_book
-            page = data_object.get("page", 0)
+            cfi = data_object.get("cfi", "")  # Use CFI instead of page
 
-            print(f"Updating database for {username} with book: {current_book}, page: {page}")
+            print(f"Updating database for {username} with book: {current_book}, cfi: {cfi}")
 
             # First verify the user exists
             cursor.execute("SELECT username FROM users WHERE username = ?", (username,))
@@ -849,15 +841,15 @@ class DatabaseManager:
                 print(f"User {username} not found in database")
                 return False
 
-            # Update the user's current book and page
+            # Update the user's current book and cfi
             cursor.execute("""
                 UPDATE users
                 SET current_book = ?,
-                    page = ?,
+                    cfi = ?,
                     utterrance_fname = ?,
                     predicted_sentence = ?
                 WHERE username = ?
-            """, (current_book, page, utterrance_fname, predicted_sentence, username))
+            """, (current_book, cfi, utterrance_fname, predicted_sentence, username))
 
             if cursor.rowcount == 0:
                 print(f"No rows were updated for user {username}")
@@ -867,9 +859,9 @@ class DatabaseManager:
             conn.commit()
 
             # Verify the update
-            cursor.execute("SELECT current_book, page FROM users WHERE username = ?", (username,))
+            cursor.execute("SELECT current_book, cfi FROM users WHERE username = ?", (username,))
             result = cursor.fetchone()
-            print(f"After update - Book: {result[0]}, Page: {result[1]}")
+            print(f"After update - Book: {result[0]}, CFI: {result[1]}")
 
             return True
         except Exception as e:
@@ -888,8 +880,8 @@ class DatabaseManager:
 
         if "current_book" in data_object:
             updates["current_book"] = data_object["current_book"]
-        if "book_position" in data_object:
-            updates["book_position"] = data_object["book_position"]
+        if "cfi" in data_object:
+            updates["cfi"] = data_object["cfi"]
         if "preferred_language" in data_object:
             updates["preferred_language"] = data_object["preferred_language"]
 

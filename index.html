@@ -371,7 +371,7 @@ function createBlobAndConnect() {
 // Update login button click handler
 loginButton.addEventListener('click', () => {
     loginButton.style.backgroundColor = '#FFB6C1';
-    username = usernameInput.value;
+    username = usernameInput.value.toLowerCase();
     password = passwordInput.value;
 
     if (!isValidEmail(username)) {
@@ -394,7 +394,7 @@ loginButton.addEventListener('click', () => {
 // Update signup button click handler
 signupButton.addEventListener('click', () => {
     signupButton.style.backgroundColor = '#FFB6C1';
-    username = usernameInput.value;
+    username = usernameInput.value.toLowerCase();
     password = passwordInput.value;
 
     if (!isValidEmail(username)) {
@@ -425,7 +425,7 @@ function handleLogout() {
     // Clear stored token
     localStorage.removeItem('token');
     localStorage.removeItem('username');
-    
+    userSection.innerHTML = "Login";
     // Update UI
     updateAuthUI(false);
     
@@ -614,7 +614,7 @@ function updateAuthUI(isLoggedIn, username = '', responseData = null) {
             const blob = new Blob([ab], {type: mimeString});
             
             // Render the book
-            renderEpub(blob).then(() => {
+            renderEpub(blob, responseData.cfi).then(() => {
                 if (selectedPage && rendition) {
                     rendition.display(selectedPage);
                 }
@@ -649,14 +649,16 @@ async function updateTranslation(text) {
     console.log("targetLang: ", targetLang);
     console.log("sourceLang: ", sourceLang);
     console.log("username: ", username);
-    
+    const contents = rendition.getContents();
+    const cfi = rendition.currentLocation().start.cfi;
+    console.log("cfi: ", cfi);
     sendSocketMessage({ 
         task: 'translate', 
         text: text, 
         source_lang: sourceLang, 
         target_lang: targetLang, 
         current_book: selectedBook, 
-        page: selectedPage,
+        cfi: cfi,
         username: username 
     });
 }
@@ -782,7 +784,7 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
     });
 });
     // Separate function for epub rendering
-    async function renderEpub(file) {
+    async function renderEpub(file, cfi=null) {
             currentBook = ePub(file);
             const viewer = document.getElementById("viewer");
             viewer.innerHTML = "";
@@ -794,14 +796,20 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
                 flow: "scrolled-doc",
                 manager: "continuous"
             });
-            
-            rendition.display().then(() => {
-                addClickHandlersToPage();
-            });
+            console.log("cfi: ", cfi);
+            if (cfi) {
+                rendition.display(cfi, { offsetTop: 1000 });
+            } else {
+                rendition.display().then(() => {
+                    addClickHandlersToPage();
+                });
+            }
             
             rendition.on("rendered", (section) => {
                 selectedPage = section.href;
                 addClickHandlersToPage();
+                const contents = rendition.getContents();
+                console.log("contents: ", contents);
             });
             
             // Function to add click handlers to the current page
@@ -809,6 +817,7 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
                 const contents = rendition.getContents();
                 
                 contents.forEach(content => {
+                    console.log("content it: ", content.document.querySelector('p'));
                     // Add CSS for pulsing animation to the document head
                     const style = content.document.createElement('style');
                     style.textContent = `
@@ -840,7 +849,10 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
                             icon.remove();
                         }
                     });
-                    
+                    // Scroll up half a page
+                   
+                                
+
                     let isFirstSentence = true;
                     
                     content.document.querySelectorAll('p, span').forEach((element, elementIndex) => {
@@ -1003,7 +1015,10 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
                 // Make sure div2viewer has a position for absolute positioning to work properly
                 div2viewer.style.position = div2viewer.style.position || 'relative';
             }
-    }
+            if (cfi) {
+                rendition.display(cfi, { offsetTop: 1000 });
+            }
+        }
 
     recordBtn.addEventListener('click', async () => { //standarised procedure 
         if (!isRecording) {
