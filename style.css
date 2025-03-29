@@ -3,7 +3,7 @@ body {
     margin: 1%;
     overflow: hidden;
     width: 99vw; 
-    height: 90vh;
+    height: 90svh;
     justify-content:center;
     align-items: center; 
 
@@ -26,8 +26,8 @@ div {
     text-align: left;
     display: flex;
     margin-left: 4%;
-    min-height: 40px; /* Set a minimum height instead of vh */
-    height: 5vh; /* Use the larger of 40px or 5vh */
+    min-height: 40px; 
+    height: 5%;
     align-items: center; /* Center content vertically */
 }
 
@@ -40,7 +40,7 @@ div {
     border-radius: 10px; /* Rounded corners */
     box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1); /* Subtle shadow for depth */
     width: 90%; /* Full width */
-    height: 55vh; /* Automatic height */
+    height: 55svh; /* Automatic height */
     background-blend-mode: overlay; /* Blend texture with background color */
     padding: 0; /* Remove padding that might cause overflow */
     display: flex; /* Make it a flex container */
@@ -48,9 +48,6 @@ div {
     overflow: hidden; /* Prevent overflow */
 }
 
-#div2viewer:hover {
-    box-shadow: 0 6px 15px rgba(0, 0, 0, 0.2); /* Darker shadow on hover */
-}
 
 #div3 {
     
@@ -157,13 +154,17 @@ img {
 
 #myModal {
     display: none;
-    position: relative !important; /* Change from fixed to relative */
-    left: 50% !important;
-    transform: translateX(-50%) !important;
-    width: 80% !important;
-    height: 40vh !important;
-    background-color: white !important;
-    z-index: 999 !important;
+    position: relative; /* Change from fixed to relative */
+    left: 50%; 
+    transform: translateX(-50%);
+    width: 80%;
+    height:40svh;
+    background-color: white;
+    z-index: 100;
+    background-color: #f9f9f9; /* Light background color */
+    border: 1px solid #ccc; /* Light grey border! */
+    border-radius: 10px; /* Rounded corners */
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1); /* Subtle shadow for depth */
 }
 #books-modal {
     position: fixed;
@@ -173,7 +174,7 @@ img {
     display: none;
     margin: auto;
     width: 80% !important;
-    height: 80vh !important;
+    height: 80% !important;
     z-index: 1000;
 }
 #modal-content {
@@ -361,7 +362,7 @@ img {
     display: flex;
     flex-direction: column; /* Stack items vertically */
     padding: 20px;
-    max-height: 70vh; /* Limits height to enable scrolling */
+    max-height: 70%; /* Limits height to enable scrolling */
     overflow-y: auto; /* Adds vertical scrollbar */
     overflow-x: hidden; /* Prevents horizontal scrolling */
 }

@@ -16,8 +16,8 @@
     <div id="div2viewer">
             <div id="viewer">
                 <div id="empty-viewer-message">
-                    <p>No book loaded</p>
-                    <button id="browse-books-btn" onclick="loadAvailableBooks()">Browse Available Books</button>
+                    <p></p>
+                    <button id="browse-books-btn" onclick="loadAvailableBooks()">Tap here to begin!s</button>
                 </div>
             </div> 
     </div>
@@ -867,7 +867,6 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
                                 sentence.trim() !== sentence.trim().toUpperCase() && 
                                 sentence.trim().length > 10) { // Basic check for actual sentence
                                 const selectIcon = content.document.createElement('span');
-                                selectIcon.textContent = '👉';
                                 selectIcon.className = 'sentence-icon';
                                 selectIcon.style.opacity = '1';
                                 sentenceSpan.insertBefore(selectIcon, sentenceSpan.firstChild);
@@ -1123,75 +1122,55 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
         if ('speechSynthesis' in window) {
             console.log('Starting text-to-speech for:', textToSpeak);
             
+            // Cancel any ongoing speech
+            window.speechSynthesis.cancel();
+            
             let msg = new SpeechSynthesisUtterance();
             msg.text = textToSpeak;
             
-            // Make sure we're using the correct language
+            // Get the current language (first 2 chars)
             const currentLang = languageSel.substring(0,2);
             console.log('Using language:', currentLang);
             msg.lang = currentLang;
             
-            // Match the settings from the robot button
-            msg.rate = 1;
+            // Set standard speech parameters
+            msg.rate = 0.8;
             msg.volume = 1;
             msg.pitch = 1;
             
-            // Select a voice based on gender preference
+            // Get available voices
             const voices = window.speechSynthesis.getVoices();
             
-            // Filter voices by language and gender
-            const matchingVoices = voices.filter(voice => {
-                // Check if voice language matches or contains our target language
-                const voiceLang = voice.lang.toLowerCase();
-                const targetLang = currentLang.toLowerCase();
-                const langMatch = voiceLang.startsWith(targetLang) || voiceLang.includes(targetLang);
-                
-                // Determine gender based on voice name (common pattern in voice APIs)
-                // This is a heuristic and may not be 100% accurate
-                const isFemaleName = voice.name.toLowerCase().includes('female') || 
-                                   voice.name.toLowerCase().includes('woman') ||
-                                   voice.name.toLowerCase().includes('girl') ||
-                                   voice.name.toLowerCase().includes('fiona') ||
-                                   voice.name.toLowerCase().includes('samantha') ||
-                                   voice.name.toLowerCase().includes('victoria');
-                                   
-                const isMaleName = voice.name.toLowerCase().includes('male') || 
-                                 voice.name.toLowerCase().includes('man') ||
-                                 voice.name.toLowerCase().includes('guy') ||
-                                 voice.name.toLowerCase().includes('david') ||
-                                 voice.name.toLowerCase().includes('thomas') ||
-                                 voice.name.toLowerCase().includes('daniel');
-                
-                // Match based on selected gender
-                const genderMatch = (selectedVoiceGender === 'female' && isFemaleName) || 
-                                  (selectedVoiceGender === 'male' && isMaleName);
-                
-                return langMatch && genderMatch;
-            });
+            // Find a voice that matches our language
+            const matchingVoice = voices.find(voice => 
+                voice.lang.toLowerCase().startsWith(currentLang.toLowerCase())
+            );
             
-            console.log(`Found ${matchingVoices.length} matching voices for ${currentLang} and gender ${selectedVoiceGender}`);
-            
-            // Use the first matching voice, or fall back to default
-            if (matchingVoices.length > 0) {
-                msg.voice = matchingVoices[0];
-                console.log("Selected voice:", msg.voice.name);
-            } else {
-                console.log("No matching voice found, using default");
+            if (matchingVoice) {
+                msg.voice = matchingVoice;
+                console.log("Selected voice:", matchingVoice.name);
             }
             
-            // Add event listeners to debug TTS issues
-            msg.onstart = () => console.log('Speech started');
+            // Add event listeners for state management
+            msg.onstart = () => {
+                console.log('Speech started');
+                textToSpeechBtn.setAttribute('data-speaking', 'true');
+                textToSpeechBtn.style.filter = 'brightness(0.7)';
+            };
+            
             msg.onend = () => {
                 console.log('Speech ended');
                 textToSpeechBtn.setAttribute('data-speaking', 'false');
                 textToSpeechBtn.style.filter = 'brightness(1)';
             };
+            
             msg.onerror = (e) => {
                 console.error('Speech error:', e);
                 textToSpeechBtn.setAttribute('data-speaking', 'false');
                 textToSpeechBtn.style.filter = 'brightness(1)';
             };
             
+            // For iOS compatibility, we need to speak immediately after user interaction
             window.speechSynthesis.speak(msg);
         } else {
             console.error("Speech synthesis not supported in this browser");
