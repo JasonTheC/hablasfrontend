@@ -14,12 +14,21 @@
     </div>
 
     <div id="div2viewer">
+        <div id="viewer-container">
+            <button id="prev" class="side-nav-btn"><span>&laquo;</span></button>
             <div id="viewer">
                 <div id="empty-viewer-message">
                     <p>No book loaded</p>
                     <button id="browse-books-btn" onclick="loadAvailableBooks()">Browse Available Books</button>
                 </div>
             </div> 
+            <button id="next" class="side-nav-btn"><span>&raquo;</span></button>
+        </div>
+    </div>
+
+    <div id="div3">
+        
+         
     </div>
 
     <input type="file" id="fileInput" accept=".epub"/>
@@ -48,17 +57,16 @@
                     <option value="female">Female</option>
                     <option value="male">Male</option>
                 </select>
-                <div id="points-display">Points: <span id="points">0</span></div>
+
                 <div id="file">
                     <img src="images/upload-icon-white.png" alt="upload symbol" />
                     <img src="images/epub-icon-white.png" alt="upload symbol" />
                 </div>
-                <div id="feedback-button" class="options">Feedback</div>
             </div>
     </div>
 
 
-<div id="books-modal" >
+<div id="books-modal" class="modal">
     <div class="modal-content">
         <span class="close">&times;</span>
         <div id="books-grid"></div>
@@ -66,37 +74,33 @@
 </div>
 
 <div id="myModal" class="modal"> 
-    <div class="modal-content" id="modal-content"> 
+    <div class="modal-content"> 
         <span class="close-modal">&times;</span>
         <div id="modal-main">
             <div id="translation"></div>
-            <div id="return_sentence">>></div>
+            <div id="return_sentence"></div>
         </div>
 
-        <div id="actionButtons" style="position: relative;">
+        <div id="actionButtons">
             <img id="record" src="images/recordingButton.png" alt="record icon"/>
-            <img id="robot" src="images/robot_talk_white.png" alt="robot" data-speaking="false"/>
-            <div id="points-display">Points: <span id="points">0</span></div>
-            
-            <div id="recording-status" style="
-                display: none;
-                position: absolute;
-                top: 0;
-                left: 0;
-                right: 0;
-                bottom: 0;
-                background-color: rgba(0, 0, 0, 0.7);
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-                justify-content: center;
-                z-index: 1000;">
-                <div class="status-spinner"></div>
-                <div class="status-message">Processing...</div>
-                <div class="timer">0.0s</div>
-            </div>
+            <img id="robot" src="images/robot_talk_white.png" alt="robot"/>
         </div>
    
+        <div id="bottom">
+            <div class="bottom-row">
+                <select id="language-select">
+                    <option value="en">English</option>
+                    <option value="es">Spanish</option> 
+                    <option value="fr">Français</option>
+                    <option value="de">Deutch</option>
+                    <option value="it">Italian</option>
+                </select>
+            </div>
+            <div class="bottom-row">
+                <div id="points-display">Points: <span id="points">0</span></div>
+            </div>
+        </div>
+        
         <!-- Add status indicator -->
         <div id="recording-status" style="display: none;">
             <div class="status-spinner"></div>
@@ -106,6 +110,7 @@
 </div>
 
 
+
 <div id="user-account-options-modal" class="modal user-account-options-modal">
     <div class="modal-content user-account-options-modal-content">
         <span class="close options-close">&times;</span>
@@ -113,16 +118,6 @@
         <button id="change-info-button">Change info</button>
         <button id="delete-account-button">Delete account</button>
     </div>
-</div>
-
-<div id="feedback-modal">
-    <div class="modal-content">
-        <span class="close">&times;</span>
-        <p>Feedback modal</p>
-        <div id="send-feedback-button" class="options">Send feedback!</div>
-    </div>
-       
-    
 </div>
 
 <script>
@@ -138,7 +133,7 @@
     let translationText = "";
     let mediaRecorder; 
     let audioChunks = []; //buffer
-    let userPoints = 0;
+
     const lang_conversion = {
         "francais": "fr",
         "english": "en",
@@ -155,6 +150,7 @@
     const prevArrowBtn = document.getElementsByClassName('arrowPrev')[0];
     const nextArrowBtn = document.getElementsByClassName('arrowNext')[0];
     const returnSentenceDiv = document.getElementById('return_sentence');
+    const languageSel =document.getElementById('language-select');
     const fileDiv = document.getElementById("file");
     const pointsDisplay = document.getElementById("points-display");
 
@@ -202,21 +198,13 @@
 
     const voiceGenderDisplay = document.getElementById('voice-gender');
     const voiceGenderSelect = document.getElementById('voice-gender-select');
-    const feedbackBtn = document.getElementById('feedback-button');
-    const feedbackModal = document.getElementById('feedback-modal');
-    const sendFeedbackBtn = document.getElementById('send-feedback-button');
     let voiceGenderOptionsOpen = false;
     let availableVoices = [];
     let selectedVoiceGender = 'female'; // Default to female
     let selectedBook = null;
     let selectedPage = null;
     let sourceLang = "";
-    let languageSel ="en";
-
-    // Add these variables at the start of your script
-    let processingStartTime = 0;
-    let timerInterval = null;
-
+ 
 console.log ("starting script");
 
 // Add this function at the start of your script
@@ -243,7 +231,7 @@ function waitForEpub() {
 
 // Replace the existing WebSocket implementation with a simpler function-based approach
 function createWebSocketConnection() {
-    const socket = new WebSocket('wss://carriertech.uk:8675');
+    const socket = new WebSocket('ws://localhost:8765');
     
     socket.addEventListener('open', (event) => {
         console.log('WebSocket connection established');
@@ -254,26 +242,19 @@ function createWebSocketConnection() {
     });
 
     socket.addEventListener('message', (event) => {
+        try {
             const response = JSON.parse(event.data);
             console.log("Received WebSocket message:", response);
             
             const statusIndicator = document.getElementById('recording-status');
             if (statusIndicator) {
-                // Stop and clear the timer
-                clearInterval(timerInterval);
-                const finalTime = ((Date.now() - processingStartTime) / 1000).toFixed(1);
-                const timerElement = statusIndicator.querySelector('.timer');
-                if (timerElement) {
-                    timerElement.textContent = `${finalTime}s`;
-                }
-                // Hide the status indicator without a timeout
                 statusIndicator.style.display = 'none';
             }
             
             if (response.books) {
                 handleBooksResponse(response);
             } else if (response.hasOwnProperty('pred_sentence')) {
-                handlePredSentence(response);
+                handlePredSentenceResponse(response);
             } else if (response.hasOwnProperty('translation') || 
                         (response.status === 'success' && response.hasOwnProperty('translated_text'))) {
                 handleTranslationResponse(response);
@@ -304,13 +285,15 @@ function createWebSocketConnection() {
                     renderEpub(blob);
                     booksModal.style.display = 'none';
                     
-                    languageSel = setLanguage(langauge);
+                    languageSelect.value = setLanguage(langauge);
                     selectedBook = book.filename;
                     console.log("selected ", selectedBook);
             }else {
                 console.log("Unhandled response from server:", response);
             }
-       
+        } catch (error) {
+            console.error("Error processing WebSocket message:", error);
+        }
     });
 
     socket.addEventListener('close', (event) => {
@@ -341,19 +324,37 @@ function sendSocketMessage(message) {
 // Update functions to use the sendSocketMessage function
 function loadAvailableBooks() {
     sendSocketMessage({ task: 'get_books' });
+    const booksModal = document.getElementById('books-modal');
     booksModal.style.display = 'block';
 }
 
-
+function updateTranslation(text) {
+    console.log(`Translating text: "${text}" from ${sourceLang}`);
+    
+    translation.textContent = "Translating...";
+    
+    // Get user's native language from settings
+    const targetLang = languageUserOptionsSelect.value;
+    console.log("targetLang: ", targetLang);
+    console.log("sourceLang: ", sourceLang);
+    console.log("username: ", username);
+    
+    sendSocketMessage({ 
+        task: 'translate', 
+        text: text, 
+        source_lang: sourceLang, 
+        target_lang: targetLang, 
+        current_book: selectedBook, 
+        page: selectedPage,
+        username: username 
+    });
+}
 
 function createBlobAndConnect() {
+    // Show the recording status indicator
     const statusIndicator = document.getElementById('recording-status');
     if (statusIndicator) {
         statusIndicator.style.display = 'flex';
-        // Start the timer
-        processingStartTime = Date.now();
-        updateTimer();
-        timerInterval = setInterval(updateTimer, 100); // Update every 0.1 seconds
     }
 
     const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
@@ -364,11 +365,15 @@ function createBlobAndConnect() {
     reader.readAsDataURL(audioBlob);
     reader.onloadend = function() {
         const base64data = reader.result;
-
+        
+        // Log the current language value
+        console.log("Current language value:", languageSel.value);
+        console.log("Current sourceLang:", sourceLang);
+       
         sendSocketMessage({ 
             task: 'stt', 
             audio: base64data, 
-            language: languageSel, 
+            language: languageSel.value, 
             sentence: lines[lineNum], 
             username: username, 
             book: selectedBook, 
@@ -537,7 +542,11 @@ function setLanguage(language){
         return language;
     }
 }
-
+function handlePredSentenceResponse(response) {
+    
+    // Use a proper async function to handle this
+    handlePredSentence(response.pred_sentence);
+}
 
 function handleTranslationResponse(response) {
     // Handle translation response
@@ -556,10 +565,12 @@ function handleTokenResponse(response) {
     if (response.language) {
 
         sourceLang = response.language;
+        console.log("Standardized language code:", sourceLang);
         
         // Update language selector if it exists
         if (languageSel) {
-            languageSel = setLanguage(sourceLang);
+            languageSel.value = setLanguage(sourceLang);
+            console.log("Updated languageSel value to:", languageSel.value);
         }
     }
     
@@ -581,7 +592,8 @@ function updateAuthUI(isLoggedIn, username = '', responseData = null) {
         usernameInput.style.display = 'none';
         passwordInput.style.display = 'none';
         sourceLang = responseData.language;
-        languageSel = setLanguage(sourceLang);
+        languageSel.value = setLanguage(sourceLang);
+        console.log("sourceLang: ", sourceLang);
         // Add logged-in user display
         const userInfoDiv = document.createElement('div');
         userInfoDiv.id = 'user-info';
@@ -605,7 +617,6 @@ function updateAuthUI(isLoggedIn, username = '', responseData = null) {
             selectedBook = responseData.current_book;
             selectedPage = responseData.page || 0;
             language = responseData.language;
-            languageSel = setLanguage(language);
             console.log("Loading user's current book:", selectedBook);
             
             // Convert base64 to blob
@@ -671,13 +682,10 @@ async function updateTranslation(text) {
 
 // Update the createBlobAndConnect function
 function createBlobAndConnect() {
+    // Show the recording status indicator
     const statusIndicator = document.getElementById('recording-status');
     if (statusIndicator) {
         statusIndicator.style.display = 'flex';
-        // Start the timer
-        processingStartTime = Date.now();
-        updateTimer();
-        timerInterval = setInterval(updateTimer, 100); // Update every 0.1 seconds
     }
 
     const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
@@ -690,13 +698,13 @@ function createBlobAndConnect() {
         const base64data = reader.result;
         
         // Log the current language value
-        console.log("Current language value:", languageSel);
+        console.log("Current language value:", languageSel.value);
         console.log("Current sourceLang:", sourceLang);
        
         sendSocketMessage({ 
             task: 'stt', 
-            blob: base64data, 
-            language: languageSel, 
+            audio: base64data, 
+            language: languageSel.value, 
             sentence: lines[lineNum], 
             username: username, 
             book: selectedBook, 
@@ -736,31 +744,9 @@ window.addEventListener('DOMContentLoaded', () => {
 });
 
 // Add this new function to handle the prediction sentence
-async function handlePredSentence(response) {
-    console.log("handlePredSentence: ", response);
-    predSentence = response.pred_sentence;
+async function handlePredSentence(predSentence) {
     console.log("predSentence: ", predSentence);
     returnSentenceDiv.innerHTML = predSentence;
-    
-    // Add click handlers to wrong words
-    document.querySelectorAll('.wrong').forEach(wrongWord => {
-        wrongWord.addEventListener('click', (event) => {
-            // Remove 'pressed' class from all wrong words
-            document.querySelectorAll('.wrong').forEach(w => w.classList.remove('pressed'));
-            
-            // Add 'pressed' class to clicked word
-            wrongWord.classList.add('pressed');
-            
-            // Get the correct word from the ID
-            const correctWord = wrongWord.id;
-            console.log("Correct word:", correctWord);
-            
-            // Create popup with the correct word
-            if (!popupflag) {
-                createPopup(correctWord, event);
-            }
-        });
-    });
     
     // Show points display when we get a response
     const pointsDisplay = document.getElementById('points-display');
@@ -769,7 +755,7 @@ async function handlePredSentence(response) {
     // Calculate and update points
     const wrongElements = document.getElementsByClassName("wrong");
     const totalWords = predSentence.split(' ').length;
-    const correctWords = response.points;
+    const correctWords = totalWords - wrongElements.length;
     
     // Award points
     const pointsEarned = correctWords * 10;
@@ -791,6 +777,9 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
 });
     // Separate function for epub rendering
     async function renderEpub(file) {
+        try {
+            //await waitForEpub();
+            
             currentBook = ePub(file);
             const viewer = document.getElementById("viewer");
             viewer.innerHTML = "";
@@ -799,8 +788,9 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
                 width: "100%",
                 allowScriptedContent: true,
                 script: true,
-                flow: "scrolled-doc",
-                manager: "continuous"
+                spread: "none",
+                flow: "paginated",
+                manager: "default"
             });
             
             rendition.display().then(() => {
@@ -817,115 +807,148 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
                 const contents = rendition.getContents();
                 
                 contents.forEach(content => {
-                    // Add CSS for pulsing animation to the document head
-                    const style = content.document.createElement('style');
-                    style.textContent = `
-                        @keyframes pulse {
-                            0% { background-color: transparent; }
-                            50% { background-color: rgba(169, 209, 215, 0.3); }
-                            100% { background-color: transparent; }
-                        }
-                        .pulse-animation {
-                            animation: pulse 2s infinite;
-                        }
-                        .sentence-icon {
-                            font-size: 16px;
-                            margin-right: 4px;
-                            vertical-align: middle;
-                            display: inline-block;
-                        }
-                        .pulse-animation .sentence-icon {
-                            opacity: 1 !important;
-                        }
-                    `;
-                    content.document.head.appendChild(style);
-                    
-                    // Remove any existing pulse animations first
-                    content.document.querySelectorAll('.pulse-animation').forEach(el => {
-                        el.classList.remove('pulse-animation');
-                        const icon = el.querySelector('.sentence-icon');
-                        if (icon) {
-                            icon.remove();
-                        }
-                    });
-                    
-                    let isFirstSentence = true;
-                    
-                    content.document.querySelectorAll('p, span').forEach((element, elementIndex) => {
+                    // Add click handlers to paragraphs and spans
+                    content.document.querySelectorAll('p, span').forEach(element => {
+                        // Skip if already processed
                         if (element.dataset.processed === "true") return;
                         
-                        // Skip if this is a title (text in all caps)
-                        if (element.textContent.trim() === element.textContent.trim().toUpperCase()) {
-                            element.dataset.processed = "true";
-                            return;
-                        }
+                        // Check if element has at least 2 words
+                        const words = element.textContent.trim().split(/\s+/);
+                        if (words.length < 2) return; // Skip elements with fewer than 2 words
                         
-                        const sentences = element.textContent.split(/(?<=[.!?])\s+/);
-                        if (sentences.length === 0) return;
-                        
-                        element.textContent = '';
+                        // Mark as processed to avoid duplicate handlers
                         element.dataset.processed = "true";
                         
-                        sentences.forEach((sentence, index) => {
-                            if (sentence.trim().length < 2) return;
-                            
-                            const sentenceSpan = content.document.createElement('span');
-                            sentenceSpan.textContent = sentence + ' ';
-                            sentenceSpan.style.cursor = 'pointer';
-                            sentenceSpan.style.borderRadius = '3px';
-                            sentenceSpan.style.transition = 'background-color 0.2s ease';
-                            
-                            // Only add the finger emoji to the first actual sentence
-                            if (isFirstSentence && 
-                                sentence.trim() !== sentence.trim().toUpperCase() && 
-                                sentence.trim().length > 10) { // Basic check for actual sentence
-                                const selectIcon = content.document.createElement('span');
-                                selectIcon.textContent = '👉';
-                                selectIcon.className = 'sentence-icon';
-                                selectIcon.style.opacity = '1';
-                                sentenceSpan.insertBefore(selectIcon, sentenceSpan.firstChild);
-                                sentenceSpan.classList.add('pulse-animation');
-                                isFirstSentence = false;
+                        // Create and add the select icon
+                        const selectIcon = content.document.createElement('div');
+                        selectIcon.innerHTML = `
+                            <svg width="16" height="16" viewBox="0 0 24 24">
+                                <circle cx="12" cy="12" r="10" fill="#4588a0" fill-opacity="0.7"/>
+                                <path d="M7 12h10" stroke="white" stroke-width="2"/>
+                                <path d="M12 7v10" stroke="white" stroke-width="2"/>
+                            </svg>`;
+                        selectIcon.style.position = 'absolute';
+                        selectIcon.style.left = '-3em';
+                        selectIcon.style.top = '50%';
+                        selectIcon.style.transform = 'translateY(-50%)';
+                        selectIcon.style.zIndex = '5';
+                        selectIcon.style.pointerEvents = 'none'; // Make sure icon doesn't interfere with clicks
+                        
+                        // Make the parent element relative for absolute positioning
+                        element.style.position = 'relative';
+                        element.style.paddingLeft = '8px';
+                        element.style.marginLeft = '24px';
+                        
+                        // Insert the icon
+                        element.insertBefore(selectIcon, element.firstChild);
+                        
+                        // Rest of the styles
+                        element.style.cursor = 'pointer';
+                        element.style.borderRadius = '3px';
+                        element.style.transition = 'background-color 0.2s ease';
+                        element.style.display = 'block';
+                        
+                        // Add hover effect
+                        element.addEventListener('mouseover', () => {
+                            element.style.backgroundColor = 'rgba(169, 209, 215, 0.3)';
+                            const circleElement = selectIcon.querySelector('circle');
+                            if (circleElement) {
+                                circleElement.setAttribute('fill-opacity', '1');
                             }
+                        });
+                        
+                        element.addEventListener('mouseout', () => {
+                            if (!element.classList.contains('selected-line')) {
+                                element.style.backgroundColor = 'transparent';
+                                const circleElement = selectIcon.querySelector('circle');
+                                if (circleElement) {
+                                    circleElement.setAttribute('fill-opacity', '0.7');
+                                }
+                            }
+                        });
+                        
+                        // Add click handler
+                        element.addEventListener('click', (event) => {
+                            console.log("Element clicked:", element.textContent.substring(0, 30) + "...");
                             
-                            // Add hover effects
-                            sentenceSpan.addEventListener('mouseover', () => {
-                                sentenceSpan.style.backgroundColor = 'rgba(169, 209, 215, 0.3)';
-                            });
+                            // Check if device is mobile
+                            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+                            console.log("Is mobile device:", isMobile);
                             
-                            sentenceSpan.addEventListener('mouseout', () => {
-                                if (!sentenceSpan.classList.contains('selected-line')) {
-                                    sentenceSpan.style.backgroundColor = 'transparent';
+                            // Remove previous selection
+                            content.document.querySelectorAll('.selected-line').forEach(el => {
+                                el.classList.remove('selected-line');
+                                el.style.backgroundColor = 'transparent';
+                                const circleEl = el.querySelector('circle');
+                                if (circleEl) {
+                                    circleEl.setAttribute('fill-opacity', '0.7');
                                 }
                             });
                             
-                            // Add click handler
-                            sentenceSpan.addEventListener('click', (event) => {
-                                // Remove pulsing animation and icon from any sentence
-                                content.document.querySelectorAll('.pulse-animation').forEach(el => {
-                                    el.classList.remove('pulse-animation');
-                                    const icon = el.querySelector('.sentence-icon');
-                                    if (icon) {
-                                        icon.remove();
+                            // Add selection to clicked element
+                            element.classList.add('selected-line');
+                            element.style.backgroundColor = 'rgba(169, 209, 215, 0.5)';
+                            const circleElement = selectIcon.querySelector('circle');
+                            if (circleElement) {
+                                circleElement.setAttribute('fill-opacity', '1');
+                            }
+                            
+                            // Get element's bounding box relative to the window
+                            const elementRect = element.getBoundingClientRect();
+                            console.log("Element bounds:", {
+                                top: elementRect.top,
+                                bottom: elementRect.bottom,
+                                height: elementRect.height
+                            });
+                            
+                            // Position and show modal
+                            const modal = document.getElementById('myModal');
+                            const modalContent = modal.querySelector('.modal-content');
+                            
+                            if (modal) {
+                                // Calculate position relative to viewport
+                                const padding = isMobile ? 10 : 20; // Less padding on mobile
+                                
+                                // Get element's position relative to iframe
+                                const elementRect = element.getBoundingClientRect();
+                                console.log("Element position within iframe:", elementRect);
+                                
+                                // Get the iframe/viewer position relative to main window
+                                const viewerContainer = document.getElementById('viewer-container');
+                                const viewerRect = viewerContainer.getBoundingClientRect();
+                                console.log("Viewer container position:", viewerRect);
+                                
+                                // Calculate absolute position by combining both
+                                let absoluteTop = viewerRect.top + elementRect.top;
+                                let absoluteBottom = viewerRect.top + elementRect.bottom;
+                                
+                                console.log("Calculated absolute position:", {
+                                    top: absoluteTop,
+                                    bottom: absoluteBottom
+                                });
+                                console.log("window.innerHeight: ", window.innerHeight);
+                                console.log("window.innerWidth: ", window.innerWidth);
+                                if ((absoluteBottom + modalContent.offsetHeight) > window.innerHeight) {
+                                    absoluteBottom = absoluteTop - modalContent.offsetHeight - padding;
+                                    if (absoluteBottom < 0) {
+                                        absoluteBottom = absoluteTop;
                                     }
-                                });
+                                } else {
+                                    absoluteBottom = absoluteBottom + padding;
+                                }
+                                // Reset all positioning to prevent any inherited styles
+                                modal.style.cssText = `
+                                    position: fixed !important;
+                                    top: ${absoluteBottom}px !important;
+                                    left: ${isMobile ? '10px' : ((window.innerWidth - (Math.min(window.innerWidth - 40, 800))) / 2) + 'px'} !important;
+                                    display: block !important;
+                                    z-index: 9999 !important;
+                                    bottom: auto !important;
+                                    transform: none !important;
+                                    margin: 0 !important;
+                                `;
                                 
-                                // Remove previous selection
-                                content.document.querySelectorAll('.selected-line').forEach(el => {
-                                    el.classList.remove('selected-line');
-                                    el.style.backgroundColor = 'transparent';
-                                });
-                                
-                                // Add selection to clicked sentence
-                                sentenceSpan.classList.add('selected-line');
-                                sentenceSpan.style.backgroundColor = 'rgba(169, 209, 215, 0.5)';
-                                
-                                // Show modal with translation
-                                const modal = document.getElementById('myModal');
-                                const modalContent = modal.querySelector('.modal-content');
-                                
-                                // Calculate width for modal content
-                                const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+                                console.log("Modal style set to:", modal.style.cssText);
                                 
                                 // Set modal content width
                                 if (isMobile) {
@@ -936,18 +959,38 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
                                     modalContent.style.width = `${modalWidth}px`;
                                 }
                                 
-                                modal.style.display = 'block';
+                                // Ensure modal is visible by scrolling if necessary
+                                setTimeout(() => {
+                                    const modalHeight = modalContent.offsetHeight || 300;
+                                    console.log("Modal actual dimensions:", {
+                                        height: modalContent.offsetHeight,
+                                        top: modal.getBoundingClientRect().top,
+                                        bottom: modal.getBoundingClientRect().bottom
+                                    });
+                                    
+                                    const modalBottom = absoluteBottom + padding + modalHeight;
+                                    if (modalBottom  > window.innerHeight) {
+                                        absoluteBottom = absoluteTop - modalContent.offsetHeight - padding;
+                                        if (absoluteBottom < 0) {
+                                            absoluteBottom = absoluteTop;
+                                        }
+                                        modal.style.top = `${absoluteBottom}px`;
+                                    }
+                                }, 50); // Short delay to ensure the modal has rendered
                                 
-                                // Update translation
-                                selectedText = sentence.trim();
+                                // Get the text and update translation
+                                selectedText = element.textContent.trim();
                                 lines = [selectedText];
                                 lineNum = 0;
-                                updateTranslation(selectedText);
                                 
+                                const translationDiv = document.getElementById('translation');
+                                if (translationDiv) {
+                                    updateTranslation(selectedText);
+                                }
+                                
+                                // Prevent the click from propagating
                                 event.stopPropagation();
-                            });
-                            
-                            element.appendChild(sentenceSpan);
+                            }
                         });
                     });
                 });
@@ -955,63 +998,11 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
             
             fileDiv.style.display = "none";
             
-            // Create scroll down button if it doesn't exist
-            if (!document.getElementById('scroll-down-btn')) {
-                const scrollBtn = document.createElement('button');
-                scrollBtn.id = 'scroll-down-btn';
-                scrollBtn.textContent = 'Load More';
-                scrollBtn.style.position = 'absolute';
-                scrollBtn.style.bottom = '10px';
-                scrollBtn.style.left = '50%';
-                scrollBtn.style.transform = 'translateX(-50%)';
-                scrollBtn.style.zIndex = '100';
-                scrollBtn.style.padding = '10px 20px';
-                scrollBtn.style.backgroundColor = '#007bff';
-                scrollBtn.style.color = 'white';
-                scrollBtn.style.border = 'none';
-                scrollBtn.style.borderRadius = '5px';
-                scrollBtn.style.cursor = 'pointer';
-                scrollBtn.style.marginBottom = '10px';
-                
-                scrollBtn.onclick = () => {
-                    // Get all iframe contents
-                    const contents = rendition.getContents();
-                    if (contents && contents.length > 0) {
-                        // For each content iframe
-                        contents.forEach(content => {
-                            const iframe = content.document.defaultView;
-                            // Scroll down by 80% of the viewport height
-                            const scrollAmount = iframe.innerHeight * 0.8;
-                            iframe.scrollBy({
-                                top: scrollAmount,
-                                behavior: 'smooth'
-                            });
-                        });
-                        
-                        // After scrolling, try to load more content if needed
-                        setTimeout(() => {
-                            // If we're near the bottom, load more
-                            const lastContent = contents[contents.length - 1];
-                            const iframe = lastContent.document.defaultView;
-                            const scrollPos = iframe.scrollY + iframe.innerHeight;
-                            const scrollHeight = lastContent.document.body.scrollHeight;
-                            
-                            if (scrollHeight - scrollPos < iframe.innerHeight * 0.2) {
-                                console.log("Near bottom, attempting to load more content");
-                                rendition.next();
-                            }
-                        }, 300);
-                        scrollBtn.style.display = 'none';
-                    }
-                };
-                
-                // Append to div2viewer instead of body
-                const div2viewer = document.getElementById('div2viewer');
-                div2viewer.appendChild(scrollBtn);
-                
-                // Make sure div2viewer has a position for absolute positioning to work properly
-                div2viewer.style.position = div2viewer.style.position || 'relative';
-            }
+            
+        } catch (error) {
+            console.error('Error loading ePub:', error);
+            alert('Error loading book. Please ensure you have a stable internet connection and try again.');
+        }
     }
 
     recordBtn.addEventListener('click', async () => { //standarised procedure 
@@ -1075,56 +1066,43 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
         fileInput.click();
     })
 
-    settingsBtn.addEventListener('click', (event) => {
+    settingsBtn.addEventListener('click',()=> {
         console.log("settings button clicked");
-        console.log("Drawer classList before:", drawer.classList);
-        drawer.style.display = 'block';  // First set display to block
-        setTimeout(() => {
-            drawer.classList.add('open'); // Then add the open class
-        }, 10);
-        event.stopPropagation();
+        drawer.classList.add('open'); //adding a class named 'open'
     });
 
     closeDrawerBtn.addEventListener('click', () => {
-        console.log("close button clicked");
-        drawer.classList.remove('open');
-        setTimeout(() => {
-            drawer.style.display = 'none';
-        }, 300); // Wait for transition to complete
+        drawer.classList.remove('open'); //removing a class named 'open'
     });
 
     window.addEventListener('click', (event) => {
-        // Check if the click was on the settings button or its children (like the image)
-        if (!drawer.contains(event.target) && !settingsBtn.contains(event.target)) {
+        if (!drawer.contains(event.target) && event.target !== settingsBtn) {
             drawer.classList.remove('open');
-            setTimeout(() => {
-                drawer.style.display = 'none';
-            }, 300); // Wait for transition to complete
         }
     });
 
-    // Make sure the drawer starts hidden
-    drawer.style.display = 'none';
+    
+    nextPageBtn.addEventListener('click', () => {
+        console.log("nextPageBtn clicked");
+        if (rendition) { //if an epub is loaded
+            rendition.next().then(extractVisibleText); //next is a method from epub.js to go to the next page
+        }
+    })
+
+    prevPageBtn.addEventListener('click',() =>{
+        console.log("prevPageBtn clicked");
+        if (rendition){
+            rendition.prev().then(extractVisibleText);
+        }
+    } )
 
     textToSpeechBtn.addEventListener('click', () => {
         if ('speechSynthesis' in window) {
-            const isCurrentlySpeaking = textToSpeechBtn.getAttribute('data-speaking') === 'true';
-            
-            if (isCurrentlySpeaking) {
-                // Stop speaking and reset the button
-                window.speechSynthesis.cancel();
-                textToSpeechBtn.setAttribute('data-speaking', 'false');
-                textToSpeechBtn.style.filter = 'brightness(1)';
-            } else {
-                // Start speaking and darken the button
-                textToSpeechBtn.setAttribute('data-speaking', 'true');
-                textToSpeechBtn.style.filter = 'brightness(0.7)';
-                textToSpeech(lines[lineNum]);
-            }
+            textToSpeech(lines[lineNum]);
         } else {
             console.log("Sorry, your browser doesn't support text to speech!");
         }
-    });
+    })
     
     
     function randomLanguage(){
@@ -1140,7 +1118,7 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
             msg.text = textToSpeak;
             
             // Make sure we're using the correct language
-            const currentLang = languageSel.substring(0,2);
+            const currentLang = languageSel.value.substring(0,2);
             console.log('Using language:', currentLang);
             msg.lang = currentLang;
             
@@ -1194,16 +1172,8 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
             
             // Add event listeners to debug TTS issues
             msg.onstart = () => console.log('Speech started');
-            msg.onend = () => {
-                console.log('Speech ended');
-                textToSpeechBtn.setAttribute('data-speaking', 'false');
-                textToSpeechBtn.style.filter = 'brightness(1)';
-            };
-            msg.onerror = (e) => {
-                console.error('Speech error:', e);
-                textToSpeechBtn.setAttribute('data-speaking', 'false');
-                textToSpeechBtn.style.filter = 'brightness(1)';
-            };
+            msg.onend = () => console.log('Speech ended');
+            msg.onerror = (e) => console.error('Speech error:', e);
             
             window.speechSynthesis.speak(msg);
         } else {
@@ -1239,11 +1209,6 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
             popupflag = false;
             e.stopPropagation();
         });
-        popup.addEventListener('click', (e) => {
-            popup.remove();
-            popupflag = false;
-            e.stopPropagation();
-        });
         
         // Get click/touch position
         const x = event.clientX || (event.touches && event.touches[0].clientX) || 0;
@@ -1257,9 +1222,9 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
         document.body.appendChild(popup);
         popup.style.zIndex = 1000;
         
-        // Use the correct word for TTS
+        // Fix: Call textToSpeech with the correct language
         if (content) {
-            console.log("Speaking correct word:", content);
+            console.log("Speaking content:", content);
             textToSpeech(content);
         } else {
             console.error("No content to speak");
@@ -1328,7 +1293,14 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
         viewerElement.addEventListener('touchend', handleTextSelection);
     }
     
-
+    // Make sure language selection changes trigger retranslation
+    languageSel.addEventListener('change', function() {
+        if (translationText) {
+            sourceLang = this.value;
+            languageSel.value = setLanguage(sourceLang);
+            updateTranslation(translationText);
+        }
+    });
 
     function handleTextSelection() {
         const selection = window.getSelection();
@@ -1338,8 +1310,8 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
             console.log("Selected text:", text);
             selectedText = text;
             modalDiv.style.display = "block";
-            sourceLang = languageSel;
-            languageSel = setLanguage(sourceLang);
+            sourceLang = languageSel.value;
+            languageSel.value = setLanguage(sourceLang);
             translationText = text;
             updateTranslation(text);
         }
@@ -1440,10 +1412,16 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
 
     // Add this function to handle book data responses
     function handleBookDataResponse(response) {
-            console.log("response:", response);
+        if (response.error) {
+            console.error('Error loading book:', response.error);
+            alert('Error loading book: ' + response.error);
+            return;
+        }
 
-        
-          
+        try {
+            if (!response.epub) {
+                throw new Error('No EPUB data received');
+            }
 
             // Set selectedBook from the response filename
             selectedBook = response.filename;
@@ -1451,10 +1429,8 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
 
             // Set language from response
             sourceLang = response.language;
-            languageSel = setLanguage(sourceLang);
-            console.log("epub:", response.epub);
+            languageSel.value = setLanguage(sourceLang);
             const base64Data = response.epub.split(',')[1];
-            console.log("Base64 data:", base64Data);
             if (!base64Data) {
                 throw new Error('Invalid EPUB data format');
             }
@@ -1475,6 +1451,8 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
                 if (response.page) {
                     rendition.display(response.page);
                 }
+                // Close the books modal if it's open
+                const booksModal = document.getElementById('books-modal');
                 if (booksModal) {
                     booksModal.style.display = 'none';
                 }
@@ -1483,65 +1461,10 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
                 alert('Error rendering book: ' + error.message);
             });
 
-    
-    }
-
-    // Select all elements with the 'close' class
-    const closeButtons = document.getElementsByClassName('close');
-
-    // Add click event listener to each close button
-    Array.from(closeButtons).forEach(closeBtn => {
-        closeBtn.addEventListener('click', () => {
-            // Find the closest parent modal/drawer
-            const container = closeBtn.closest('.modal, .drawer, #books-modal');
-            if (container) {
-                container.style.display = 'none';
-            }
-        });
-    });
-
-    function updatePointsDisplay(points) {
-        // Update all points displays
-        const pointsDisplays = document.querySelectorAll('#points');
-        pointsDisplays.forEach(element => {
-            element.textContent = points;
-        });
-
-        // Make sure points display is visible
-        const pointsDisplayDivs = document.querySelectorAll('#points-display');
-        pointsDisplayDivs.forEach(div => {
-            div.style.display = 'block';
-            div.style.textAlign = 'center';
-            div.style.fontSize = '1em';
-            div.style.fontWeight = 'bold';
-        });
-    }
-
-    // Add this new function
-    function updateTimer() {
-        const timerElement = document.querySelector('.timer');
-        if (timerElement && processingStartTime) {
-            const elapsedTime = (Date.now() - processingStartTime) / 1000; // Convert to seconds
-            timerElement.textContent = `${elapsedTime.toFixed(1)}s`;
+        } catch (error) {
+            console.error('Error processing book data:', error);
+            alert('Error loading book: ' + error.message);
         }
     }
-
-    feedbackBtn.addEventListener('click', async () => {
-        const response = await fetch('surveycopy.html');
-        const surveyHtml = await response.text();
-        
-        feedbackModal.style.display = 'block';
-        feedbackModal.innerHTML = surveyHtml; 
-    });
-
-    sendFeedbackBtn.addEventListener('click', () => {
-        feedbackModal.style.display = 'none';
-        //console.log("sendFeedbackBtn clicked");
-        //const message = {
-        //    task: "get_survey"
-        //};
-        //sendSocketMessage(JSON.stringify(message));
-    });
-
 
 </script>

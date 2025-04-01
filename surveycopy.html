@@ -1,0 +1,122 @@
+<!-- In your modal HTML -->
+<div id="feedbackModal" >
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 id="feedbackModalLabel">Hablas - Trial MPV N1</h5>   
+            </div>
+            <div class="modal-body"> 
+                <form id="feedbackForm">
+                    <!-- Name -->
+                    <div class="mb-3">
+                        <label for="name" class="form-label">Name *</label>
+                        <input type="text" class="form-control" id="name" required>
+                    </div>
+
+                    <!-- Country -->
+                    <div class="mb-3">
+                        <label for="country" class="form-label">Country *</label>
+                        <input type="text" class="form-control" id="country" required>
+                    </div>
+
+                    <!-- Age Range -->
+                    <div class="mb-3">
+                        <label class="form-label">Age range</label>
+                        <select class="form-select" id="ageRange">
+                            <option value="<18">&lt;18-years-old</option>
+                            <option value="18-24">18-24</option>
+                            <option value="24-29">24-29</option>
+                            <option value="30-40">30-40</option>
+                            <option value="40-50">40-50</option>
+                            <option value="50-60">50-60</option>
+                            <option value=">60">&gt;60</option>
+                        </select>
+                    </div>
+
+                    <!-- Intuitive Rating -->
+                    <div class="mb-3">
+                        <label class="form-label">Did you find it easy to understand how it works? (1 = not intuitive at all, 5 = very intuitive)</label>
+                        <div class="rating-buttons">
+                            <div class="btn-group" role="group">
+                                <input type="radio" class="btn-check" name="intuitive" id="rating1" value="1">
+                                <label class="btn btn-outline-primary" for="rating1">1</label>
+
+                                <input type="radio" class="btn-check" name="intuitive" id="rating2" value="2">
+                                <label class="btn btn-outline-primary" for="rating2">2</label>
+
+                                <input type="radio" class="btn-check" name="intuitive" id="rating3" value="3">
+                                <label class="btn btn-outline-primary" for="rating3">3</label>
+
+                                <input type="radio" class="btn-check" name="intuitive" id="rating4" value="4">
+                                <label class="btn btn-outline-primary" for="rating4">4</label>
+
+                                <input type="radio" class="btn-check" name="intuitive" id="rating5" value="5">
+                                <label class="btn btn-outline-primary" for="rating5">5</label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Need Guidance -->
+                    <div class="mb-3">
+                        <label class="form-label">Would you have needed guidance?</label>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="guidance" id="guidanceYes" value="yes">
+                            <label class="form-check-label" for="guidanceYes">Yes</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="guidance" id="guidanceNo" value="no">
+                            <label class="form-check-label" for="guidanceNo">No</label>
+                        </div>
+                    </div>
+
+                    <!-- App Issues -->
+                    <div class="mb-3">
+                        <label class="form-label">Did the app stop working at any point?</label>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="appIssues" id="issuesYes" value="yes">
+                            <label class="form-check-label" for="issuesYes">Yes</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="appIssues" id="issuesNo" value="no">
+                            <label class="form-check-label" for="issuesNo">No</label>
+                        </div>
+                    </div>
+
+                    <!-- Usage Time -->
+                    <div class="mb-3">
+                        <label for="usageTime" class="form-label">How long would you use it daily?</label>
+                        <input type="text" class="form-control" id="usageTime">
+                    </div>
+
+                    <!-- Engaging Features -->
+                    <div class="mb-3">
+                        <label for="engagingFeatures" class="form-label">What features of the app do you find the most engaging? What would make the app engaging for you?</label>
+                        <textarea class="form-control" id="engagingFeatures" rows="3"></textarea>
+                    </div>
+
+                    <!-- Learning -->
+                    <div class="mb-3">
+                        <label for="learning" class="form-label">Do you think you learned something new?</label>
+                        <textarea class="form-control" id="learning" rows="2"></textarea>
+                    </div>
+
+                    <!-- Feelings -->
+                    <div class="mb-3">
+                        <label for="feelings" class="form-label">How do you feel after using the app? (motivated, happy, accomplished...?)</label>
+                        <textarea class="form-control" id="feelings" rows="2"></textarea>
+                    </div>
+
+                    <!-- Suggestions -->
+                    <div class="mb-3">
+                        <label for="suggestions" class="form-label">Any suggestions, improvements, thoughts? Let us know!</label>
+                        <textarea class="form-control" id="suggestions" rows="3"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" id="send-feedback-button">Send Feedback</button>
+            </div>
+        </div>
+    </div>
+</div>
+

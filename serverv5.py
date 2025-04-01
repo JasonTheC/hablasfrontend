@@ -1,70 +1,34 @@
 import asyncio, difflib, time #multiprocessser good for sockets
-start_time = time.time()
-print("importing libraries")
 
 import websockets , json # the json is bc we're sending a json object from the website
 import wave , base64
 import os #library for anything that has to do with your hard-drive
-end_time = time.time()
-print(f"Time taken to import libraries: {end_time - start_time} seconds")
-print("importing torch")
-start_time = time.time()
 import torch, sqlite3
-end_time = time.time()
-print(f"Time taken to import torch and sqlite3: {end_time - start_time} seconds")
-print("importing librosa")
-start_time = time.time()
+
 import librosa #library to analyse and process audio . soundfile is similar 
-end_time = time.time()
-print(f"Time taken to import librosa: {end_time - start_time} seconds")
-print("importing transformers")
-start_time = time.time()
 from transformers import Wav2Vec2ForCTC, Wav2Vec2Processor
-end_time = time.time()
-print(f"Time taken to import transformers: {end_time - start_time} seconds")
-print("importing ssl")
-start_time = time.time()
 import ssl  # Add this import at the top
-end_time = time.time()
-print(f"Time taken to import ssl: {end_time - start_time} seconds")
-print("importing secrets")
-start_time = time.time()
 import secrets  # Add secrets to generate tokens
-end_time = time.time()
-print(f"Time taken to import secrets: {end_time - start_time} seconds")
-print("importing datetime")
 from datetime import datetime, timedelta
-print("importing zipfile")
 import zipfile
-print("importing xml.etree.ElementTree")
 import xml.etree.ElementTree as ET
-print("importing pathlib")
 from pathlib import Path
 import shutil
-end_time = time.time()
-print(f"Time taken to import shutil: {end_time - start_time} seconds")
-start_time = time.time()
 import mimetypes
-end_time = time.time()
-print(f"Time taken to import mimetypes: {end_time - start_time} seconds")
-start_time = time.time()
 from PIL import Image, ImageDraw, ImageFont
-end_time = time.time()
-print(f"Time taken to import PIL: {end_time - start_time} seconds")
-start_time = time.time()
-print("importing Levenshtein")
-import Levenshtein  # Add this import for Levenshtein distance
-end_time = time.time()
-print(f"Time taken to import Levenshtein: {end_time - start_time} seconds")
-start_time = time.time()
-print("importing Translator")
 from googletrans import Translator  # Add this import for translation
-end_time = time.time()
-print(f"Time taken to import Translator: {end_time - start_time} seconds")
+import Levenshtein  # Add this import for Levenshtein distance
+from googletrans import Translator  # Add this import for translation
 import uuid  # Add this import for UUID generation
-import soundfile as sf
 import numpy as np
-import wave
+import soundfile as sf
+import torch.cuda
+from torch.cuda.amp import autocast
+from torch.nn.parallel import DataParallel
+import queue
+from concurrent.futures import ThreadPoolExecutor
+import threading
+
 
 LANG_ID = "fr"
 MODEL_ID = "jonatasgrosman/wav2vec2-large-xlsr-53-french"
@@ -81,267 +45,201 @@ DEFAULT_COVER = "default-cover.png"
 db = None
 
 language_dict = {
-    #"en": "jonatasgrosman/wav2vec2-large-xlsr-53-english",
+    "en": "jonatasgrosman/wav2vec2-large-xlsr-53-english",
     "fr": "jonatasgrosman/wav2vec2-large-xlsr-53-french",
-    #"es": "jonatasgrosman/wav2vec2-large-xlsr-53-spanish",
-    #"it": "jonatasgrosman/wav2vec2-large-xlsr-53-french",
-    #"de": "jonatasgrosman/wav2vec2-large-xlsr-53-german",
+    "es": "jonatasgrosman/wav2vec2-large-xlsr-53-spanish",
+    "it": "jonatasgrosman/wav2vec2-large-xlsr-53-french",
+    "de": "jonatasgrosman/wav2vec2-large-xlsr-53-german",
 }
 
-def get_or_load_model(lang):
-    """Helper function to get or load model and processor"""
-    MODEL_ID = language_dict[lang]
-    
-    if lang not in loaded_processors:
-        loaded_processors[lang] = Wav2Vec2Processor.from_pretrained(MODEL_ID)
-    if lang not in loaded_models:
-        loaded_models[lang] = Wav2Vec2ForCTC.from_pretrained(MODEL_ID)
-        
-    return loaded_processors[lang], loaded_models[lang]
+# Add this language mapping dictionary at the top level with other dictionaries
+language_name_map = {
+    "francais": "fr",
+    "english": "en",
+    "español": "es",
+    "espagnol": "es",
+    "spanish": "es",
+    "deutsch": "de",
+    "italiano": "it"
+}
 
-def stt(AUDIO_DIR, lang):
-    start_time = time.time()
-    processor, model = get_or_load_model(lang)   
-    end_time = time.time()
-    print(f"Time taken to load model: {end_time - start_time} seconds")
-    
-    start_time = time.time()
-    try:
-        # Convert audio to proper WAV format using ffmpeg if installed
-        temp_wav = f"{AUDIO_DIR}_temp.wav"
-        os.system(f"ffmpeg -y -i {AUDIO_DIR} -acodec pcm_s16le -ar 16000 -ac 1 {temp_wav}")
-        
-        with wave.open(temp_wav, 'rb') as wav_file:
-            # Get audio data
-            frames = wav_file.readframes(wav_file.getnframes())
-            audio = np.frombuffer(frames, dtype=np.int16).astype(np.float32)
-            
-            # Normalize audio
-            audio = audio / 32768.0
-            
-            # Get sample rate
-            sr = wav_file.getframerate()
-            
-        # Clean up temporary file
-        os.remove(temp_wav)
-            
-    except Exception as e:
-        print(f"Error processing audio: {e}")
-        return "Error processing audio file"
+class ModelManager:
+    def __init__(self):
+        self.loaded_processors = {}
+        self.loaded_models = {}
+        self.batch_queue = queue.Queue()
+        self.batch_size = 8  # Adjust based on your GPU memory
+        self.processing_thread = threading.Thread(target=self._process_batch, daemon=True)
+        self.processing_thread.start()
+        self.lock = threading.Lock()
 
-    end_time = time.time()
-    print(f"Time taken to load audio: {end_time - start_time} seconds")
-    
-    start_time = time.time()
-    inputs = processor(audio, sampling_rate=sr, return_tensors="pt")
-    end_time = time.time()
-    print(f"Time taken to load inputs: {end_time - start_time} seconds")
-    
-    start_time = time.time()
-    with torch.no_grad():
-        logits = model(inputs.input_values, attention_mask=inputs.attention_mask).logits
-    end_time = time.time()
-    print(f"Time taken to load logits: {end_time - start_time} seconds")
-    
-    predicted_ids = torch.argmax(logits, dim=-1)
-    predicted_sentences = processor.batch_decode(predicted_ids)
-    
-    print("Prediction:", predicted_sentences)
-    return predicted_sentences[0]
-
-class TextComparator:
-    @staticmethod
-    def generate_html_report(text1, text2, output_file='text_comparison_report.html'):
-        overall_start = time.time()
-        
-        # Normalize text for comparison
-        normalize_start = time.time()
-        def normalize_text(text):
-            text = text.lower()
-            # Replace punctuation with spaces
-            for char in ',.!?;:«»""()[]{}':
-                text = text.replace(char, ' ')
-            text = text.replace("'", "'")  # Standardize apostrophes
-            return [word for word in text.split() if word]
-        
-        # Get normalized words
-        original_words = normalize_text(text1)
-        spoken_words = normalize_text(text2)
-        normalize_end = time.time()
-        print(f"Time for text normalization: {normalize_end - normalize_start:.4f} seconds")
-        
-        # Create a cache for Levenshtein distances
-        distance_cache = {}
-        def cached_levenshtein(word1, word2):
-            key = (word1, word2)
-            if key not in distance_cache:
-                distance_cache[key] = Levenshtein.distance(word1, word2)
-            return distance_cache[key]
-        
-        # Pre-calculate word similarities
-        similarities_start = time.time()
-        word_similarities = {}
-        for i, orig in enumerate(original_words):
-            # Only compare with nearby words
-            start_idx = max(0, i - 3)
-            end_idx = min(len(spoken_words), i + 4)
-            for j in range(start_idx, end_idx):
-                if j < len(spoken_words):
-                    spok = spoken_words[j]
-                    distance = cached_levenshtein(orig, spok)
-                    max_len = max(len(orig), len(spok))
-                    word_similarities[(orig, spok)] = 1 - (distance / max_len if max_len > 0 else 0)
-        similarities_end = time.time()
-        print(f"Time for word similarities calculation: {similarities_end - similarities_start:.4f} seconds")
-        print(f"Number of Levenshtein calculations: {len(distance_cache)}")
-
-        # Create matrices
-        matrix_start = time.time()
-        m, n = len(original_words), len(spoken_words)
-        score = [[0 for _ in range(n+1)] for _ in range(m+1)]
-        traceback = [[None for _ in range(n+1)] for _ in range(m+1)]
-        
-        # Initialize first row and column
-        for i in range(m+1):
-            score[i][0] = -i
-            if i > 0: traceback[i][0] = "up"
-        for j in range(n+1):
-            score[0][j] = -j
-            if j > 0: traceback[0][j] = "left"
-        
-        # Fill matrices
-        for i in range(1, m+1):
-            for j in range(1, n+1):
-                word_similarity = word_similarities.get(
-                    (original_words[i-1], spoken_words[j-1]),
-                    0
-                )
+    def get_or_load_model(self, lang):
+        """Thread-safe model loading with GPU optimization"""
+        with self.lock:
+            if lang not in self.loaded_processors:
+                MODEL_ID = language_dict[lang]
+                self.loaded_processors[lang] = Wav2Vec2Processor.from_pretrained(MODEL_ID)
+                model = Wav2Vec2ForCTC.from_pretrained(MODEL_ID)
                 
-                match_score = score[i-1][j-1] + (2 * word_similarity - 1)
-                delete_score = score[i-1][j] - 0.5
-                insert_score = score[i][j-1] - 0.5
-                
-                best_score = max(match_score, delete_score, insert_score)
-                score[i][j] = best_score
-                
-                if best_score == match_score:
-                    traceback[i][j] = "diag"
-                elif best_score == delete_score:
-                    traceback[i][j] = "up"
-                else:
-                    traceback[i][j] = "left"
-        matrix_end = time.time()
-        print(f"Time for matrix operations: {matrix_end - matrix_start:.4f} seconds")
+                # Enable GPU parallel processing if multiple GPUs are available
+                if torch.cuda.device_count() > 1:
+                    model = DataParallel(model)
+                model = model.to('cuda')
+                model.eval()  # Set to evaluation mode
+                self.loaded_models[lang] = model
+            
+            return self.loaded_processors[lang], self.loaded_models[lang]
 
-        # Traceback alignment
-        alignment_start = time.time()
-        aligned_original = []
-        aligned_spoken = []
-        i, j = m, n
-        
-        while i > 0 or j > 0:
-            if i > 0 and j > 0 and traceback[i][j] == "diag":
-                aligned_original.append(original_words[i-1])
-                aligned_spoken.append(spoken_words[j-1])
-                i -= 1
-                j -= 1
-            elif i > 0 and traceback[i][j] == "up":
-                aligned_original.append(original_words[i-1])
-                aligned_spoken.append(None)
-                i -= 1
-            else:
-                aligned_original.append(None)
-                aligned_spoken.append(spoken_words[j-1])
-                j -= 1
-        
-        aligned_original.reverse()
-        aligned_spoken.reverse()
-        alignment_end = time.time()
-        print(f"Time for alignment: {alignment_end - alignment_start:.4f} seconds")
-        
-        # Generate HTML output
-        html_start = time.time()
-        marked_output = []
-        for orig, spoken in zip(aligned_original, aligned_spoken):
-            if orig is None:
-                marked_output.append(f'<span id="" class="wrong" style="color:red;">{spoken}</span>')
-            elif spoken is None:
-                continue
-            else:
-                distance = cached_levenshtein(orig, spoken)
-                max_len = max(len(orig), len(spoken))
-                ratio = distance / max_len if max_len > 0 else 0
+    def _process_batch(self):
+        """Process batches of audio in background"""
+        while True:
+            batch = []
+            try:
+                # Collect batch_size items or wait for timeout
+                while len(batch) < self.batch_size:
+                    try:
+                        item = self.batch_queue.get(timeout=0.1)
+                        batch.append(item)
+                    except queue.Empty:
+                        if batch:  # Process partial batch
+                            break
+                        continue
+
+                if batch:
+                    self._process_items(batch)
+
+            except Exception as e:
+                print(f"Batch processing error: {e}")
+
+    def _process_items(self, batch):
+        """Process a batch of audio files"""
+        try:
+            # Group by language
+            by_language = {}
+            for item in batch:
+                lang = item['lang']
+                if lang not in by_language:
+                    by_language[lang] = []
+                by_language[lang].append(item)
+
+            # Process each language batch
+            for lang, items in by_language.items():
+                processor, model = self.get_or_load_model(lang)
                 
-                if distance > 2 and ratio > 0.3:
-                    marked_output.append(f'<span id="{orig}" class="wrong" style="color:red;">{spoken}</span>')
-                else:
-                    marked_output.append(spoken)
-        
-        marked_text = ' '.join(marked_output)
-        similarity_ratio = difflib.SequenceMatcher(None, original_words, spoken_words).ratio()
-        html_end = time.time()
-        print(f"Time for HTML generation: {html_end - html_start:.4f} seconds")
-        
-        overall_end = time.time()
-        print(f"Total processing time: {overall_end - overall_start:.4f} seconds")
-        
-        return marked_text, similarity_ratio, original_words, spoken_words
+                # Prepare batch inputs
+                audio_inputs = []
+                attention_masks = []
+                
+                for item in items:
+                    audio = librosa.load(item['audio_path'], sr=16_000)[0]
+                    inputs = processor(audio, sampling_rate=16_000, return_tensors="pt", padding=True)
+                    audio_inputs.append(inputs.input_values)
+                    attention_masks.append(inputs.attention_mask)
+
+                # Stack batch inputs
+                batched_inputs = torch.cat(audio_inputs).to('cuda')
+                batched_attention_mask = torch.cat(attention_masks).to('cuda')
+
+                # Run inference with automatic mixed precision
+                with autocast():
+                    with torch.no_grad():
+                        logits = model(batched_inputs, attention_mask=batched_attention_mask).logits
+
+                # Process results
+                predicted_ids = torch.argmax(logits, dim=-1)
+                predicted_sentences = processor.batch_decode(predicted_ids)
+
+                # Update results
+                for item, sentence in zip(items, predicted_sentences):
+                    item['future'].set_result(sentence)
+
+        except Exception as e:
+            print(f"Error processing batch: {e}")
+            # Set error result for all items in batch
+            for item in batch:
+                item['future'].set_exception(e)
+
+# Initialize the model manager
+model_manager = ModelManager()
+
+async def stt(audio_path, lang):
+    """Asynchronous STT with batching support"""
+    loop = asyncio.get_running_loop()
+    future = loop.create_future()
+    
+    model_manager.batch_queue.put({
+        'audio_path': audio_path,
+        'lang': lang,
+        'future': future
+    })
+    
+    return await future
 
 def stt_task(data_object):
-    print(f"language: {data_object['language']}") 
+    """Modified STT task to use the new batching system"""
+    try:
+        # Map language name to code if needed
+        lang = data_object['language'].lower()
+        if lang in language_name_map:
+            lang = language_name_map[lang]
+        
+        print(f"language code: {lang}")
 
-    fpath=f"{data_object['username']}_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.wav"
-    with open(fpath, "wb") as audio_file:
+        # Save audio file
+        fpath = f"{data_object['username']}_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.wav"
+        with open(fpath, "wb") as audio_file:
             base64_string = data_object["blob"]
             actual_base64 = base64_string.split(',')[1]
             binary_data = base64.b64decode(actual_base64)
             audio_file.write(binary_data)
-    the_words = stt(fpath,data_object["language"])
-    
-    print("\nStarting text comparison analysis...")
-    predicted_sentence, similarity_ratio, original_words, spoken_words = TextComparator.generate_html_report(
-        data_object["sentence"], 
-        the_words
-    )
-    wrong_words = predicted_sentence.count('class="wrong"')
-    # Simplified points system (temporarily bypassing Levenshtein)
-    total_words = len(spoken_words)
-    points = total_words  # Start with maximum points
-    
-  
-    percentage_score = (points / total_words * 100) if total_words > 0 else 0
-    
-    print(f"\nPoints Summary:")
-    print(f"Total words: {total_words}")
-    print(f"Wrong words: {wrong_words}")
-    print(f"Points earned: {points}/{total_words}")
-    print(f"Percentage score: {percentage_score:.1f}%")
+
+        # Process audio synchronously instead of using asyncio
+        processor, model = model_manager.get_or_load_model(lang)
         
-    message_returned = {
-        "pred_sentence": predicted_sentence,
-        "points": points,
-        "total_words": total_words,
-        "wrong_words": wrong_words,
-        "percentage_score": round(percentage_score, 1)
-    }
-    
-    db.set_current_book_task(data_object, fpath, predicted_sentence)
+        # Load and process audio
+        audio = librosa.load(fpath, sr=16_000)[0]
+        inputs = processor(audio, sampling_rate=16_000, return_tensors="pt", padding=True)
+        
+        # Move inputs to GPU
+        input_values = inputs.input_values.to('cuda')
+        attention_mask = inputs.attention_mask.to('cuda')
 
-    if "current_book" in data_object and "username" in data_object:
-        db.set_current_book_task({
-            "username": data_object["username"],
-            "book": data_object["current_book"],
-            "page": data_object["page"]
-        }, "", "")
+        # Run inference with automatic mixed precision
+        with autocast():
+            with torch.no_grad():
+                logits = model(input_values, attention_mask=attention_mask).logits
 
-    print("\nCompleted text comparison analysis")
-    return message_returned
+        # Process results
+        predicted_ids = torch.argmax(logits, dim=-1)
+        the_words = processor.batch_decode(predicted_ids)[0]  # Take first result since we're processing single audio
+
+        # Rest of the processing remains the same
+        predicted_sentence, similarity_ratio, original_words, spoken_words = TextComparator.generate_html_report(
+            data_object["sentence"], the_words)
+        
+        total_words = len(spoken_words)
+        wrong_words = predicted_sentence.count('class="wrong"')
+        points = total_words - wrong_words
+        
+        message_returned = {
+            "pred_sentence": predicted_sentence,
+            "points": points,
+            "total_words": total_words,
+            "wrong_words": wrong_words,
+        }
+        
+        db.set_current_book_task(data_object, fpath, predicted_sentence)
+
+        return message_returned
+
+    except Exception as e:
+        print(f"Error in stt_task: {e}")
+        return {"error": str(e)}
 
 def extract_epub_cover(epub_path: Path, cover_dir: Path) -> str:
     """Extract cover image from EPUB file using the same approach as the PHP code"""
     try:
         with zipfile.ZipFile(epub_path) as zip_file:
-            # First try META-INF/container.xml
             try:
                 container = ET.fromstring(zip_file.read('META-INF/container.xml'))
                 rootfile_path = container.find('.//{urn:oasis:names:tc:opendocol:xmlns:container}rootfile').get('full-path')
@@ -542,42 +440,50 @@ async def translate_task(data_object):
     if source_lang in source_lang_map:
         source_lang = source_lang_map[source_lang]
     
-    print(f"Attempting to translate from {source_lang} to {target_lang}")
-    
-    # Create a new translator instance for each request
-    translator_instance = Translator()
-    result = await translator_instance.translate(source_text, src=source_lang, dest=target_lang) #await on linux
-    
-    if hasattr(result, 'text'):
-        translated_text = result.text
-        print(f"Translation successful: {translated_text}")
-        print(f"current_book: {current_book}")
-        print(f"username: {username}")
-        if current_book and username:  
-            print(f"Updating database for user {username} with book {current_book} and page {page}")
-            db.set_current_book_task({
-                "username": username,
-                "book": current_book,
-                "page": page
-            }, "", "")
+    try:
+        print(f"Attempting to translate from {source_lang} to {target_lang}")
         
-        return {
-            "status": "success", 
-            "translated_text": translated_text,
-            "source_lang": source_lang,
-            "target_lang": target_lang,
-            "current_book": current_book,  # Add these fields to the response
-            "page": page
-        }
-    else:
-        print(f"Translation result has no 'text' attribute: {result}")
+        # Create a new translator instance for each request
+        translator_instance = Translator()
+        result = await translator_instance.translate(source_text, src=source_lang, dest=target_lang)
+        
+        if hasattr(result, 'text'):
+            translated_text = result.text
+            print(f"Translation successful: {translated_text}")
+            print(f"current_book: {current_book}")
+            print(f"username: {username}")
+            if current_book and username:  
+                print(f"Updating database for user {username} with book {current_book} and page {page}")
+                db.set_current_book_task({
+                    "username": username,
+                    "book": current_book,
+                    "page": page
+                }, "", "")
+            
+            return {
+                "status": "success", 
+                "translated_text": translated_text,
+                "source_lang": source_lang,
+                "target_lang": target_lang,
+                "current_book": current_book,  # Add these fields to the response
+                "page": page
+            }
+        else:
+            print(f"Translation result has no 'text' attribute: {result}")
+            return {
+                "status": "error",
+                "message": "Translation result format unexpected",
+                "source_lang": source_lang,
+                "target_lang": target_lang
+            }
+    except Exception as e:
+        print(f"Translation error: {e}")
         return {
             "status": "error",
-            "message": "Translation result format unexpected",
+            "message": str(e),
             "source_lang": source_lang,
             "target_lang": target_lang
         }
-   
 
 async def login_task(self, data_object):
     conn = sqlite3.connect(self.DB_PATH)
@@ -616,12 +522,34 @@ async def login_task(self, data_object):
             "username": username,
             "current_book": user.get("current_book", ""),
             "page": user.get("page", 0),
-            "utterance_fname": user.get("utterrance_fname", ""),
-            "predicted_sentence": user.get("predicted_sentence", ""),
             "book_position": user.get("book_position", 0),
             "preferred_language": user.get("preferred_language", "en"),
             "type": "login"
         }
+
+        # Only add epub and language if there's a current book
+        if user.get("current_book"):
+            print("getting books")
+            epub = None
+            language = None
+            epubs = os.walk(EPUB_DIR)
+            for root, dirs, files in epubs:
+                for file in files:
+                    if file == user["current_book"]:
+                        book_path = Path(root) / file
+                        language = book_path.parent.name
+                        print(f"language: {language}")
+                        with open(book_path, "rb") as f:
+                            book_data = f.read()
+                            book_base64 = base64.b64encode(book_data).decode('utf-8')
+                            epub = f"data:application/epub+zip;base64,{book_base64}"
+                            print(f"Including book data for {user['current_book']}")
+                        break
+            
+            if epub and language:
+                message["epub"] = epub
+                message["language"] = language
+
     else:
         message = {
             "status": "error",
@@ -662,7 +590,8 @@ async def verify_token_task(data_object):
     user = dict(zip(columns, user_row))
     print("User data:", user)
     
-    
+    epub = None
+    language = None
 
     print(f"user.get('current_book'): {user.get('current_book')}")    
     if user.get("current_book"):
@@ -723,8 +652,6 @@ async def handle_connection(websocket):
             message_returned = await translate_task(data_object)
         elif data_object.get("task") == "verify_token":
             message_returned = await verify_token_task(data_object)
-        elif data_object.get("task") == "get_survey":
-            message_returned = await handle_survey(data_object)
             
         await websocket.send(json.dumps(message_returned))
     
@@ -740,7 +667,7 @@ def preload_all_models():
     print("Preloading all language models...")
     for lang in language_dict:
         print(f"Loading {lang} model...")
-        get_or_load_model(lang)
+        model_manager.get_or_load_model(lang)
     print("All models loaded!")
 
 class DatabaseManager:
@@ -803,7 +730,8 @@ class DatabaseManager:
             conn.commit()
             
             
-
+            epub = None
+            language = None
 
             print(f"user.get('current_book'): {user.get('current_book')}")    
             if user.get("current_book"):
@@ -964,6 +892,41 @@ class DatabaseManager:
         
         return {"status": "success", "message": "Settings updated successfully"}
 
+class TextComparator:
+    @staticmethod
+    def generate_html_report(original_text, spoken_text):
+        """
+        Compare original and spoken text, generating an HTML report highlighting differences
+        Returns: HTML string, similarity ratio, original words list, spoken words list
+        """
+        # Normalize texts
+        original_text = original_text.lower().strip()
+        spoken_text = spoken_text.lower().strip()
+        
+        # Split into words
+        original_words = original_text.split()
+        spoken_words = spoken_text.split()
+        
+        # Calculate similarity ratio
+        similarity_ratio = Levenshtein.ratio(original_text, spoken_text)
+        
+        # Generate diff
+        d = difflib.Differ()
+        diff = list(d.compare(original_words, spoken_words))
+        
+        # Build HTML output
+        html_parts = []
+        for word in diff:
+            if word.startswith('  '):  # Words that match
+                html_parts.append(f'<span class="correct">{word[2:]}</span>')
+            elif word.startswith('- '):  # Words in original but not in spoken
+                html_parts.append(f'<span class="wrong">{word[2:]}</span>')
+            elif word.startswith('+ '):  # Words in spoken but not in original
+                html_parts.append(f'<span class="extra">{word[2:]}</span>')
+        
+        html_output = ' '.join(html_parts)
+        
+        return html_output, similarity_ratio, original_words, spoken_words
 
 async def main():
 
@@ -971,27 +934,25 @@ async def main():
     db = DatabaseManager("usersHablas.db")
     db.init_database();
     preload_all_models()
-    print("Preloaded all models")
+    
+    # Create SSL context
+    ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    ssl_context.load_cert_chain(
+        '/media/nas/SSLCerts/carriertech.uk/fullchain.pem',
+        '/media/nas/SSLCerts/carriertech.uk/privkey.pem'
+    )
 
-    async with websockets.serve(handle_connection, "localhost", 8765) as server:
-        print("WebSocket server started on local NOT wss://carriertech.uk:8765")
-        await asyncio.Future()  # Run forever 
-
-
-def send_email(subject, sender, recipients, password, body):
-    msg = MIMEText(body)
-    msg['Subject'] = subject
-    msg['From'] = sender
-    msg['To'] = ', '.join(recipients)
-    with smtplib.SMTP_SSL('smtp.gmail.com', 465) as smtp_server:
-       smtp_server.login(sender, password)
-       smtp_server.sendmail(sender, recipients, msg.as_string())
-    print("Message sent!")
+    # Start the WebSocket server with SSL
+    async with websockets.serve(
+        handle_connection, 
+        "0.0.0.0",  # Changed from localhost to accept external connections
+        8675, 
+        ssl=ssl_context
+    ):
+        print("WebSocket server started on wss://carriertech.uk:8675")
+        await asyncio.Future()  # Run forever
 
 
 if __name__ == "__main__": #when you use a multi processer load, you use this so it doesnt crash. with asyncio you always have to do it
-    print("we're initializing where tf is the error??")
     asyncio.run(main()) 
-
-
 
