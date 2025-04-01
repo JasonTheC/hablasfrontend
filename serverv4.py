@@ -637,6 +637,73 @@ async def verify_token_task(data_object):
     }
     return response
 
+def pagele_task(data_object):
+    """Get sentences from EPUB book for the Pagele game"""
+    try:
+        # Get user data
+        username = data_object.get("username")
+        book = data_object.get("book")
+        cfi = data_object.get("cfi")
+
+        if not all([username, book]):
+            return {"status": "error", "message": "Missing required data"}
+
+        # Find the book file
+        book_path = None
+        for root, _, files in os.walk(EPUB_DIR):
+            if book in files:
+                book_path = Path(root) / book
+                break
+
+        if not book_path or not book_path.exists():
+            return {"status": "error", "message": "Book not found"}
+
+        # Extract text from EPUB
+        with zipfile.ZipFile(book_path) as zip_file:
+            # Find the content files (usually XHTML/HTML files)
+            content_files = [f for f in zip_file.namelist() if f.endswith(('.xhtml', '.html'))]
+            
+            all_text = []
+            for content_file in content_files:
+                content = zip_file.read(content_file).decode('utf-8')
+                # Parse HTML and extract text
+                root = ET.fromstring(content)
+                # Remove script and style elements
+                for elem in root.findall(".//script"):
+                    elem.clear()
+                for elem in root.findall(".//style"):
+                    elem.clear()
+                
+                # Get text content
+                text = "".join(root.itertext())
+                # Split into sentences (basic implementation)
+                sentences = [s.strip() for s in text.split('.') if len(s.strip()) > 20]
+                all_text.extend(sentences)
+
+            # Find current position using CFI if provided
+            start_index = 0
+            if cfi:
+                # Simple implementation - just use it as an index
+                try:
+                    start_index = int(cfi)
+                except ValueError:
+                    start_index = 0
+
+            # Get next 10 sentences
+            selected_sentences = all_text[start_index:start_index + 10]
+            next_cfi = str(start_index + len(selected_sentences))
+
+            return {
+                "status": "success",
+                "sentences": selected_sentences,
+                "next_cfi": next_cfi,
+                "total_sentences": len(all_text)
+            }
+
+    except Exception as e:
+        print(f"Error in pagele_task: {e}")
+        return {"status": "error", "message": str(e)}
+
 async def handle_connection(websocket):
     print(f"Client connected, {websocket.remote_address}")
     
@@ -671,6 +738,8 @@ async def handle_connection(websocket):
         elif data_object.get("task") == "verify_token":
             message_returned = await verify_token_task(data_object)
             logger.log_event("token_verification", {**data_object, **message_returned}, websocket)
+        elif data_object.get("task") == "pagele":
+            message_returned = await pagele_task(data_object)
 
         await websocket.send(json.dumps(message_returned))
 

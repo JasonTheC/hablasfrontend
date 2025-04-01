@@ -28,7 +28,6 @@ from torch.nn.parallel import DataParallel
 import queue
 from concurrent.futures import ThreadPoolExecutor
 import threading
-import ipaddress
 
 
 LANG_ID = "fr"
@@ -186,8 +185,23 @@ def stt_task(data_object):
         
         print(f"language code: {lang}")
 
-        # Save audio file
-        fpath = f"{data_object['username']}_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.wav"
+        # Determine user identifier (username or IP)
+        user_id = data_object.get('username', None)
+        if not user_id:
+            # Get IP from websocket connection info stored in data_object
+            user_id = f"ip_{data_object.get('ip', 'unknown')}"
+        
+        book_name = data_object.get('book', '').replace('.epub', '')  # Remove .epub extension
+        
+        # Create user and book specific directory
+        user_dir = RECORDINGS_DIR / user_id
+        book_dir = user_dir / book_name if book_name else user_dir / "general"
+        book_dir.mkdir(parents=True, exist_ok=True)
+
+        # Save audio file with timestamp in the appropriate directory
+        timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+        fpath = book_dir / f"recording_{timestamp}.wav"
+        
         with open(fpath, "wb") as audio_file:
             base64_string = data_object["blob"]
             actual_base64 = base64_string.split(',')[1]
@@ -631,38 +645,37 @@ async def handle_connection(websocket):
     try:
         data = await websocket.recv()
         data_object = json.loads(data)
-        print(f"Received data: {data_object}")
+        
+        # Add IP address to data_object
+        client_ip = websocket.remote_address[0]
+        data_object['ip'] = client_ip
+        
         message_returned = {"error": "Invalid task"}  # Default message
         
         if data_object.get("task") == "get_books":
+            # Handle book listing request
             books = await get_available_books()
             message_returned = {"books": books}
         elif data_object.get("task") == "get_book_data":
+            # Handle specific book data request
             message_returned = await get_book_data(data_object)
         elif data_object.get("task") == "stt":
             message_returned = stt_task(data_object)
-            logger.log_event("stt", {**data_object, **message_returned}, websocket)
         elif data_object.get("task") == "login":
             message_returned = await db.login_task(data_object)
-            logger.log_event("login", {**data_object, **message_returned}, websocket)
         elif data_object.get("task") == "signup":
             message_returned = db.signup_task(data_object)
-            logger.log_event("signup", {**data_object, **message_returned}, websocket)
         elif data_object.get("task") == "change_settings":
             message_returned = db.change_settings_task(data_object)
-            logger.log_event("settings_change", {**data_object, **message_returned}, websocket)
         elif data_object.get("task") == "translate":
             message_returned = await translate_task(data_object)
-            logger.log_event("translation", {**data_object, **message_returned}, websocket)
         elif data_object.get("task") == "verify_token":
             message_returned = await verify_token_task(data_object)
-            logger.log_event("token_verification", {**data_object, **message_returned}, websocket)
             
         await websocket.send(json.dumps(message_returned))
     
     except Exception as e:
         print(f"Error: {e}")
-        logger.log_event("error", {"error": str(e)}, websocket)
         await websocket.send(json.dumps({"error": str(e)}))
     finally:
         print("Client disconnected")
@@ -900,162 +913,39 @@ class DatabaseManager:
 
 class TextComparator:
     @staticmethod
-    def generate_html_report(text1, text2, output_file='text_comparison_report.html'):
-        def normalize_text(text):
-            text = text.lower()
-            for char in ',.!?;:«»""()[]{}':
-                text = text.replace(char, ' ')
-            text = text.replace("'", "'")  
-            return [word for word in text.split() if word]
+    def generate_html_report(original_text, spoken_text):
+        """
+        Compare original and spoken text, generating an HTML report highlighting differences
+        Returns: HTML string, similarity ratio, original words list, spoken words list
+        """
+        # Normalize texts
+        original_text = original_text.lower().strip()
+        spoken_text = spoken_text.lower().strip()
         
-        original_words = normalize_text(text1)
-        spoken_words = normalize_text(text2)
+        # Split into words
+        original_words = original_text.split()
+        spoken_words = spoken_text.split()
         
-        print(f"Original words: {original_words}")
-        print(f"Spoken words: {spoken_words}")
-        m, n = len(original_words), len(spoken_words)
-        score = [[0 for _ in range(n+1)] for _ in range(m+1)]
-        traceback = [[None for _ in range(n+1)] for _ in range(m+1)]
-        for i in range(m+1):
-            score[i][0] = -i
-            if i > 0:
-                traceback[i][0] = "up"
+        # Calculate similarity ratio
+        similarity_ratio = Levenshtein.ratio(original_text, spoken_text)
         
-        for j in range(n+1):
-            score[0][j] = -j
-            if j > 0:
-                traceback[0][j] = "left"
-        for i in range(1, m+1):
-            for j in range(1, n+1):
-                word_similarity = 1 - Levenshtein.distance(original_words[i-1], spoken_words[j-1]) / max(len(original_words[i-1]), len(spoken_words[j-1]))
-                
-                match_score = score[i-1][j-1] + (2 * word_similarity - 1)  # Reward for similar words, penalty for different
-                delete_score = score[i-1][j] - 0.5  # Gap penalty
-                insert_score = score[i][j-1] - 0.5  # Gap penalty
-                
-                best_score = max(match_score, delete_score, insert_score)
-                score[i][j] = best_score
-                
-                if best_score == match_score:
-                    traceback[i][j] = "diag"
-                elif best_score == delete_score:
-                    traceback[i][j] = "up"
-                else:
-                    traceback[i][j] = "left"
+        # Generate diff
+        d = difflib.Differ()
+        diff = list(d.compare(original_words, spoken_words))
         
-        # Traceback to find the alignment
-        aligned_original = []
-        aligned_spoken = []
-        i, j = m, n
+        # Build HTML output
+        html_parts = []
+        for word in diff:
+            if word.startswith('  '):  # Words that match
+                html_parts.append(f'<span class="correct">{word[2:]}</span>')
+            elif word.startswith('- '):  # Words in original but not in spoken
+                html_parts.append(f'<span class="wrong">{word[2:]}</span>')
+            elif word.startswith('+ '):  # Words in spoken but not in original
+                html_parts.append(f'<span class="extra">{word[2:]}</span>')
         
-        while i > 0 or j > 0:
-            if i > 0 and j > 0 and traceback[i][j] == "diag":
-                aligned_original.append(original_words[i-1])
-                aligned_spoken.append(spoken_words[j-1])
-                i -= 1
-                j -= 1
-            elif i > 0 and traceback[i][j] == "up":
-                aligned_original.append(original_words[i-1])
-                aligned_spoken.append(None)  # Gap in spoken
-                i -= 1
-            else:  # traceback[i][j] == "left"
-                aligned_original.append(None)  # Gap in original
-                aligned_spoken.append(spoken_words[j-1])
-                j -= 1
+        html_output = ' '.join(html_parts)
         
-        # Reverse the alignments
-        aligned_original.reverse()
-        aligned_spoken.reverse()
-        
-        # Generate HTML output
-        marked_output = []
-        
-        for orig, spoken in zip(aligned_original, aligned_spoken):
-            if orig is None:
-                # Extra word in spoken text
-                marked_output.append(f'<span id="" class="wrong" style="color:red;">{spoken}</span>')
-            elif spoken is None:
-                # Missing word in spoken text (optional to include)
-                continue
-            else:
-                # Both words exist - check similarity
-                distance = Levenshtein.distance(orig, spoken)
-                max_len = max(len(orig), len(spoken))
-                ratio = distance / max_len if max_len > 0 else 0
-                
-                if distance > 1 and ratio > 0.2:
-                    marked_output.append(f'<span id="{orig}" class="wrong" style="color:red;">{spoken}</span>')
-                else:
-                    marked_output.append(spoken)
-        
-        # Join the marked words back into text
-        marked_text = ' '.join(marked_output)
-        print(f"marked_text: {marked_text}")
-        # Calculate overall similarity
-        similarity_ratio = difflib.SequenceMatcher(None, original_words, spoken_words).ratio()
-        
-        return marked_text, similarity_ratio, original_words, spoken_words
-
-class Logger:
-    def __init__(self, log_file="logs/activity_log.json"):
-        self.log_file = Path(log_file)
-        # Create logs directory if it doesn't exist
-        self.log_file.parent.mkdir(parents=True, exist_ok=True)
-        # Create the file if it doesn't exist
-        if not self.log_file.exists():
-            self.log_file.write_text("[]")
-
-    def log_event(self, event_type, data, websocket=None):
-        """Log an event with all relevant details"""
-        try:
-            timestamp = datetime.now().isoformat()
-            ip_address = websocket.remote_address[0] if websocket else "unknown"
-            
-            log_entry = {
-                "timestamp": timestamp,
-                "event_type": event_type,
-                "ip_address": ip_address,
-                "username": data.get("username", "anonymous"),
-                "data": {
-                    key: value for key, value in data.items() 
-                    if key not in ["blob", "epub"] # Exclude large binary data
-                }
-            }
-
-            # Add specific fields based on event type
-            if event_type == "stt":
-                log_entry["stt_details"] = {
-                    "language": data.get("language"),
-                    "sentence": data.get("sentence"),
-                    "predicted_sentence": data.get("pred_sentence", ""),
-                    "points": data.get("points"),
-                    "total_words": data.get("total_words"),
-                    "wrong_words": data.get("wrong_words")
-                }
-            elif event_type == "translation":
-                log_entry["translation_details"] = {
-                    "source_lang": data.get("source_lang"),
-                    "target_lang": data.get("target_lang"),
-                    "source_text": data.get("text"),
-                    "translated_text": data.get("translated_text")
-                }
-
-            # Read existing logs
-            with open(self.log_file, 'r') as f:
-                logs = json.load(f)
-
-            # Append new log
-            logs.append(log_entry)
-
-            # Write updated logs
-            with open(self.log_file, 'w') as f:
-                json.dump(logs, f, indent=2)
-
-        except Exception as e:
-            print(f"Logging error: {e}")
-
-# Initialize the logger
-logger = Logger()
+        return html_output, similarity_ratio, original_words, spoken_words
 
 async def main():
 

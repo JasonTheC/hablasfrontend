@@ -10,18 +10,14 @@
     
     <div id="title">
         <p>Hablas</p>
-        <div id="title-right">
-            <div id="pagele-section">Daily Pagele</div>
-            <div id="user-section">Login</div>
-            <img src="images/settings.png" id="settings"/> 
-        </div>
+        <img src="images/settings.png" id="settings"/> 
     </div>
 
     <div id="div2viewer">
             <div id="viewer">
                 <div id="empty-viewer-message">
-                    <p></p>
-                    <button id="browse-books-btn" onclick="loadAvailableBooks()">Tap here to begin!</button>
+                    <p>No book loaded</p>
+                    <button id="browse-books-btn" onclick="loadAvailableBooks()">Browse Available Books</button>
                 </div>
             </div> 
     </div>
@@ -118,10 +114,7 @@
         <button id="delete-account-button">Delete account</button>
     </div>
 </div>
-<div id="pageleModal" class="modal">
-    <span class="close">&times;</span>
-    
-</div>
+
 <script>
     const fileInput = document.getElementById('fileInput');
     fileInput.style.display= "none";
@@ -147,23 +140,7 @@
     }
     const modalDiv = document.getElementById('myModal');
     const closeBtn = document.getElementsByClassName('close')[0];
-    // Select all elements with the 'close' class
-    const closeButtons = document.getElementsByClassName('close');
-
-    // Add click event listener to each close button
-    Array.from(closeButtons).forEach(closeBtn => {
-        closeBtn.addEventListener('click', () => {
-            // Find the closest parent modal/drawer
-            
-            const container = closeBtn.closest('.modal, .drawer, #books-modal');
-            console.log("closing container:", container);
-            if (container) {
-                container.style.display = 'none';
-            }
-        });
-    });
-    const pageleDiv = document.getElementById('pagele-section');
-    const pageleModal = document.getElementById('pageleModal');
+    
     const selectDiv = document.getElementById('selectedText');
     const prevArrowBtn = document.getElementsByClassName('arrowPrev')[0];
     const nextArrowBtn = document.getElementsByClassName('arrowNext')[0];
@@ -176,7 +153,6 @@
     const selectBtn = document.getElementById('select');
 
     const settingsBtn = document.getElementById ("settings");
-    const userSection = document.getElementById ("user-section");
     const drawer = document.getElementById('settings-drawer');
     const closeDrawerBtn = document.getElementById('close-drawer');
     const availableBooksBtn = document.getElementById('available-books');
@@ -391,7 +367,7 @@ function createBlobAndConnect() {
 // Update login button click handler
 loginButton.addEventListener('click', () => {
     loginButton.style.backgroundColor = '#FFB6C1';
-    username = usernameInput.value.toLowerCase();
+    username = usernameInput.value;
     password = passwordInput.value;
 
     if (!isValidEmail(username)) {
@@ -414,7 +390,7 @@ loginButton.addEventListener('click', () => {
 // Update signup button click handler
 signupButton.addEventListener('click', () => {
     signupButton.style.backgroundColor = '#FFB6C1';
-    username = usernameInput.value.toLowerCase();
+    username = usernameInput.value;
     password = passwordInput.value;
 
     if (!isValidEmail(username)) {
@@ -445,10 +421,7 @@ function handleLogout() {
     // Clear stored token
     localStorage.removeItem('token');
     localStorage.removeItem('username');
-    userSection.innerHTML = "Login";
-    if (pageleDiv){
-        pageleDiv.style.display = 'none';
-    }
+    
     // Update UI
     updateAuthUI(false);
     
@@ -600,14 +573,13 @@ function updateAuthUI(isLoggedIn, username = '', responseData = null) {
         const userInfoDiv = document.createElement('div');
         userInfoDiv.id = 'user-info';
         userInfoDiv.className = 'options';
-        userSection.textContent = username;
         userInfoDiv.innerHTML = `
             <div style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
                 <span>Logged in as: ${username}</span>
                 <button id="logout-button" class="small-button">Logout</button>
             </div>
         `;
-        pageleDiv.style.display = 'block';
+        
         // Insert after the login elements
         const settingsOptions = document.getElementById('settings-options');
         settingsOptions.insertBefore(userInfoDiv, document.getElementById('available-books'));
@@ -637,7 +609,7 @@ function updateAuthUI(isLoggedIn, username = '', responseData = null) {
             const blob = new Blob([ab], {type: mimeString});
             
             // Render the book
-            renderEpub(blob, responseData.cfi).then(() => {
+            renderEpub(blob).then(() => {
                 if (selectedPage && rendition) {
                     rendition.display(selectedPage);
                 }
@@ -672,16 +644,14 @@ async function updateTranslation(text) {
     console.log("targetLang: ", targetLang);
     console.log("sourceLang: ", sourceLang);
     console.log("username: ", username);
-    const contents = rendition.getContents();
-    const cfi = rendition.currentLocation().start.cfi;
-    console.log("cfi: ", cfi);
+    
     sendSocketMessage({ 
         task: 'translate', 
         text: text, 
         source_lang: sourceLang, 
         target_lang: targetLang, 
         current_book: selectedBook, 
-        cfi: cfi,
+        page: selectedPage,
         username: username 
     });
 }
@@ -765,16 +735,20 @@ async function handlePredSentence(response) {
             // Remove 'pressed' class from all wrong words
             document.querySelectorAll('.wrong').forEach(w => w.classList.remove('pressed'));
             
-            // Add 'pressed' class to clicked word
-            wrongWord.classList.add('pressed');
-            
-            // Get the correct word from the ID
+            // Get the correct word from the data attribute instead of ID
             const correctWord = wrongWord.id;
             console.log("Correct word:", correctWord);
             
+            // Add 'pressed' class to clicked word
+            wrongWord.classList.add('pressed');
+            
             // Create popup with the correct word only if we have one
-            if (correctWord && !popupflag) {
-                createPopup(correctWord, event);
+            if (correctWord) {
+                if (!popupflag) {
+                    createPopup(correctWord, event);
+                }
+            } else {
+                console.error("No correct word found for element:", wrongWord);
             }
         });
     });
@@ -807,7 +781,7 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
     });
 });
     // Separate function for epub rendering
-    async function renderEpub(file, cfi=null) {
+    async function renderEpub(file) {
             currentBook = ePub(file);
             const viewer = document.getElementById("viewer");
             viewer.innerHTML = "";
@@ -819,20 +793,14 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
                 flow: "scrolled-doc",
                 manager: "continuous"
             });
-            console.log("cfi: ", cfi);
-            if (cfi) {
-                rendition.display(cfi, { offsetTop: 1000 });
-            } else {
-                rendition.display().then(() => {
-                    addClickHandlersToPage();
-                });
-            }
+            
+            rendition.display().then(() => {
+                addClickHandlersToPage();
+            });
             
             rendition.on("rendered", (section) => {
                 selectedPage = section.href;
                 addClickHandlersToPage();
-                const contents = rendition.getContents();
-                console.log("contents: ", contents);
             });
             
             // Function to add click handlers to the current page
@@ -840,7 +808,6 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
                 const contents = rendition.getContents();
                 
                 contents.forEach(content => {
-                    console.log("content it: ", content.document.querySelector('p'));
                     // Add CSS for pulsing animation to the document head
                     const style = content.document.createElement('style');
                     style.textContent = `
@@ -872,10 +839,7 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
                             icon.remove();
                         }
                     });
-                    // Scroll up half a page
-                   
-                                
-
+                    
                     let isFirstSentence = true;
                     
                     content.document.querySelectorAll('p, span').forEach((element, elementIndex) => {
@@ -907,6 +871,7 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
                                 sentence.trim() !== sentence.trim().toUpperCase() && 
                                 sentence.trim().length > 10) { // Basic check for actual sentence
                                 const selectIcon = content.document.createElement('span');
+                                selectIcon.textContent = '👉';
                                 selectIcon.className = 'sentence-icon';
                                 selectIcon.style.opacity = '1';
                                 sentenceSpan.insertBefore(selectIcon, sentenceSpan.firstChild);
@@ -1038,10 +1003,7 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
                 // Make sure div2viewer has a position for absolute positioning to work properly
                 div2viewer.style.position = div2viewer.style.position || 'relative';
             }
-            if (cfi) {
-                rendition.display(cfi, { offsetTop: 1000 });
-            }
-        }
+    }
 
     recordBtn.addEventListener('click', async () => { //standarised procedure 
         if (!isRecording) {
@@ -1103,17 +1065,6 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
     fileDiv.addEventListener('click',()=> {
         fileInput.click();
     })
-    userSection.addEventListener('click', (event) => {
-        if (userSection.textContent == "Login") {
-            console.log("user section clicked");
-            console.log("Drawer classList before:", drawer.classList);
-            drawer.style.display = 'block';  // First set display to block
-            setTimeout(() => {
-                drawer.classList.add('open'); // Then add the open class
-            }, 10);
-            event.stopPropagation();
-        }
-    });
 
     settingsBtn.addEventListener('click', (event) => {
         console.log("settings button clicked");
@@ -1176,56 +1127,122 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
         if ('speechSynthesis' in window) {
             console.log('Starting text-to-speech for:', textToSpeak);
             
-            // Cancel any ongoing speech
-            window.speechSynthesis.cancel();
-            
             let msg = new SpeechSynthesisUtterance();
             msg.text = textToSpeak;
             
-            // Get the current language (first 2 chars)
+            // Make sure we're using the correct language
             const currentLang = languageSel.substring(0,2);
             console.log('Using language:', currentLang);
             msg.lang = currentLang;
             
-            // Set standard speech parameters
-            msg.rate = 0.8;
+            // Match the settings from the robot button
+            msg.rate = 1;
             msg.volume = 1;
             msg.pitch = 1;
             
-            // Get available voices
-            const voices = window.speechSynthesis.getVoices();
+            // Check if running on iOS
+            const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
             
-            // Find a voice that matches our language
-            const matchingVoice = voices.find(voice => 
-                voice.lang.toLowerCase().startsWith(currentLang.toLowerCase())
-            );
+            // Get voices and handle iOS specific behavior
+            let voices = [];
             
-            if (matchingVoice) {
-                msg.voice = matchingVoice;
-                console.log("Selected voice:", matchingVoice.name);
-            }
-            
-            // Add event listeners for state management
-            msg.onstart = () => {
-                console.log('Speech started');
-                textToSpeechBtn.setAttribute('data-speaking', 'true');
-                textToSpeechBtn.style.filter = 'brightness(0.7)';
+            // Function to set voice
+            const setVoice = () => {
+                voices = window.speechSynthesis.getVoices();
+                console.log('Available voices:', voices);
+                
+                if (isIOS) {
+                    // On iOS, filter only by language as gender detection is unreliable
+                    const matchingVoices = voices.filter(voice => {
+                        const voiceLang = voice.lang.toLowerCase();
+                        const targetLang = currentLang.toLowerCase();
+                        return voiceLang.startsWith(targetLang);
+                    });
+                    
+                    console.log(`Found ${matchingVoices.length} matching voices for ${currentLang} on iOS`);
+                    
+                    if (matchingVoices.length > 0) {
+                        msg.voice = matchingVoices[0];
+                        console.log("Selected iOS voice:", msg.voice.name);
+                    }
+                } else {
+                    // Original voice filtering logic for non-iOS devices
+                    const matchingVoices = voices.filter(voice => {
+                        // Check if voice language matches or contains our target language
+                        const voiceLang = voice.lang.toLowerCase();
+                        const targetLang = currentLang.toLowerCase();
+                        const langMatch = voiceLang.startsWith(targetLang) || voiceLang.includes(targetLang);
+                        
+                        // Determine gender based on voice name (common pattern in voice APIs)
+                        // This is a heuristic and may not be 100% accurate
+                        const isFemaleName = voice.name.toLowerCase().includes('female') || 
+                                           voice.name.toLowerCase().includes('woman') ||
+                                           voice.name.toLowerCase().includes('girl') ||
+                                           voice.name.toLowerCase().includes('fiona') ||
+                                           voice.name.toLowerCase().includes('samantha') ||
+                                           voice.name.toLowerCase().includes('victoria');
+                                           
+                        const isMaleName = voice.name.toLowerCase().includes('male') || 
+                                         voice.name.toLowerCase().includes('man') ||
+                                         voice.name.toLowerCase().includes('guy') ||
+                                         voice.name.toLowerCase().includes('david') ||
+                                         voice.name.toLowerCase().includes('thomas') ||
+                                         voice.name.toLowerCase().includes('daniel');
+                        
+                        // Match based on selected gender
+                        const genderMatch = (selectedVoiceGender === 'female' && isFemaleName) || 
+                                          (selectedVoiceGender === 'male' && isMaleName);
+                        
+                        return langMatch && genderMatch;
+                    });
+                    
+                    console.log(`Found ${matchingVoices.length} matching voices for ${currentLang} and gender ${selectedVoiceGender}`);
+                    
+                    // Use the first matching voice, or fall back to default
+                    if (matchingVoices.length > 0) {
+                        msg.voice = matchingVoices[0];
+                        console.log("Selected voice:", msg.voice.name);
+                    } else {
+                        console.log("No matching voice found, using default");
+                    }
+                }
             };
             
+            // Handle voice loading
+            if (voices.length === 0) {
+                // iOS and some browsers need a little time to load voices
+                window.speechSynthesis.onvoiceschanged = setVoice;
+            } else {
+                setVoice();
+            }
+            
+            // Add event listeners
+            msg.onstart = () => console.log('Speech started');
             msg.onend = () => {
                 console.log('Speech ended');
                 textToSpeechBtn.setAttribute('data-speaking', 'false');
                 textToSpeechBtn.style.filter = 'brightness(1)';
+                
+                // Cancel any pending speech (iOS specific fix)
+                window.speechSynthesis.cancel();
             };
-            
             msg.onerror = (e) => {
                 console.error('Speech error:', e);
                 textToSpeechBtn.setAttribute('data-speaking', 'false');
                 textToSpeechBtn.style.filter = 'brightness(1)';
+                
+                // Cancel any pending speech (iOS specific fix)
+                window.speechSynthesis.cancel();
             };
             
-            // For iOS compatibility, we need to speak immediately after user interaction
-            window.speechSynthesis.speak(msg);
+            // iOS specific: Cancel any ongoing speech before starting new one
+            window.speechSynthesis.cancel();
+            
+            // Small delay before speaking (helps on iOS)
+            setTimeout(() => {
+                window.speechSynthesis.speak(msg);
+            }, 100);
+            
         } else {
             console.error("Speech synthesis not supported in this browser");
         }
@@ -1506,7 +1523,19 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
     
     }
 
+    // Select all elements with the 'close' class
+    const closeButtons = document.getElementsByClassName('close');
 
+    // Add click event listener to each close button
+    Array.from(closeButtons).forEach(closeBtn => {
+        closeBtn.addEventListener('click', () => {
+            // Find the closest parent modal/drawer
+            const container = closeBtn.closest('.modal, .drawer, #books-modal');
+            if (container) {
+                container.style.display = 'none';
+            }
+        });
+    });
 
     function updatePointsDisplay(points) {
         // Update all points displays
@@ -1534,13 +1563,4 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
         }
     }
 
-    pageleDiv.addEventListener('click', () => {
-        if (!selectedBook) {
-            //open book modal
-            booksModal.style.display = "block";
-        }
-        dataToSend= {username: username, task: "pagele",book: selectedBook, cfi: cfi}
-        sendSocketMessage(dataToSend);
-        pageleModal.style.display = "block";
-    });
 </script>
