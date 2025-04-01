@@ -127,7 +127,10 @@
 </div>
 <div id="pageleModal" class="modal">
     <span class="close">&times;</span>
-    
+    <div id="pagele-content" class="modal-content">
+        <!-- Content will be loaded here -->
+        <div class="loading-spinner">Loading...</div>
+    </div>
 </div>
 
 <div id="tutorialModal" class="modal">
@@ -154,6 +157,7 @@
     let mediaRecorder; 
     let audioChunks = []; //buffer
     let userPoints = 0;
+    let cfi = null;
     const lang_conversion = {
         "francais": "fr",
         "english": "en",
@@ -181,7 +185,6 @@
         });
     });
     const pageleDiv = document.getElementById('pagele-section');
-    const pageleModal = document.getElementById('pageleModal');
     const selectDiv = document.getElementById('selectedText');
     const prevArrowBtn = document.getElementsByClassName('arrowPrev')[0];
     const nextArrowBtn = document.getElementsByClassName('arrowNext')[0];
@@ -228,7 +231,8 @@
     const userAccountOptionsBtn = document.getElementById ('user-account-options');
     const changeInfoButton = document.getElementById ('change-info-button');
     const deleteAccountButton = document.getElementById ('delete-account-button');
-
+    const pageleModal = document.getElementById('pageleModal');
+    const pageleContent = document.getElementById('pagele-content');
     let username = '';
     let password = '';
 
@@ -245,6 +249,10 @@
     // Add these variables at the start of your script
     let processingStartTime = 0;
     let timerInterval = null;
+
+    // Add these variables at the top of your script with other variables
+    let currentSentenceIndex = 0;
+    let currentChapterSentences = [];
 
 console.log ("starting script");
 
@@ -272,8 +280,8 @@ function waitForEpub() {
 
 // Replace the existing WebSocket implementation with a simpler function-based approach
 function createWebSocketConnection() {
-    const socket = new WebSocket('wss://carriertech.uk:8675');
-    
+    //const socket = new WebSocket('wss://carriertech.uk:8675');
+    const socket = new WebSocket('ws://localhost:8675');
     socket.addEventListener('open', (event) => {
         console.log('WebSocket connection established');
     });
@@ -303,7 +311,10 @@ function createWebSocketConnection() {
                 handleBooksResponse(response);
             } else if (response.hasOwnProperty('pred_sentence')) {
                 handlePredSentence(response);
-            } else if (response.hasOwnProperty('translation') || 
+            }else if (response.task === 'pagele') {
+                pageleContent.innerHTML = response.content;
+            
+            }else if (response.hasOwnProperty('translation') || 
                         (response.status === 'success' && response.hasOwnProperty('translated_text'))) {
                 handleTranslationResponse(response);
             } else if (response.hasOwnProperty('token')) {
@@ -653,7 +664,7 @@ function updateAuthUI(isLoggedIn, username = '', responseData = null) {
             }
             
             const blob = new Blob([ab], {type: mimeString});
-            
+            cfi = responseData.cfi;
             // Render the book
             renderEpub(blob, responseData.cfi).then(() => {
                 if (selectedPage && rendition) {
@@ -691,7 +702,7 @@ async function updateTranslation(text) {
     console.log("sourceLang: ", sourceLang);
     console.log("username: ", username);
     const contents = rendition.getContents();
-    const cfi = rendition.currentLocation().start.cfi;
+    cfi = rendition.currentLocation().start.cfi;
     console.log("cfi: ", cfi);
     sendSocketMessage({ 
         task: 'translate', 
@@ -850,7 +861,6 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
                 selectedPage = section.href;
                 addClickHandlersToPage();
                 const contents = rendition.getContents();
-                console.log("contents: ", contents);
             });
             
             // Function to add click handlers to the current page
@@ -858,7 +868,6 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
                 const contents = rendition.getContents();
                 
                 contents.forEach(content => {
-                    console.log("content it: ", content.document.querySelector('p'));
                     // Add CSS for pulsing animation to the document head
                     const style = content.document.createElement('style');
                     style.textContent = `
@@ -1017,44 +1026,51 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
                 scrollBtn.style.cursor = 'pointer';
                 scrollBtn.style.marginBottom = '10px';
                 
-                scrollBtn.onclick = () => {
-                    // Get all iframe contents
-                    const contents = rendition.getContents();
-                    if (contents && contents.length > 0) {
-                        // For each content iframe
-                        contents.forEach(content => {
-                            const iframe = content.document.defaultView;
-                            // Scroll down by 80% of the viewport height
-                            const scrollAmount = iframe.innerHeight * 0.8;
-                            iframe.scrollBy({
-                                top: scrollAmount,
-                                behavior: 'smooth'
-                            });
-                        });
+                let currentSpinePosition = 0;
+                
+                scrollBtn.onclick = async () => {
+                    try {
+                        // Get current spine position
+                        const currentLocation = rendition.currentLocation();
+                        if (!currentLocation) {
+                            console.log("No current location found");
+                            return;
+                        }
                         
-                        // After scrolling, try to load more content if needed
-                        setTimeout(() => {
-                            // If we're near the bottom, load more
-                            const lastContent = contents[contents.length - 1];
-                            const iframe = lastContent.document.defaultView;
-                            const scrollPos = iframe.scrollY + iframe.innerHeight;
-                            const scrollHeight = lastContent.document.body.scrollHeight;
-                            
-                            if (scrollHeight - scrollPos < iframe.innerHeight * 0.2) {
-                                console.log("Near bottom, attempting to load more content");
-                                rendition.next();
-                            }
-                        }, 300);
+                        // Get the spine items
+                        const spine = currentBook.spine;
+                        if (!spine) {
+                            console.log("No spine found");
+                            return;
+                        }
+                        
+                        // Move to next spine item
+                        currentSpinePosition++;
+                        if (currentSpinePosition >= spine.length) {
+                            console.log("Reached end of book");
+                            scrollBtn.style.display = 'none';
+                            return;
+                        }
+                        
+                        console.log(`Moving to spine position ${currentSpinePosition}`);
+                        
+                        // Display the next section
+                        await rendition.display(spine.get(currentSpinePosition).href);
+                        
+                        // Add click handlers to the new content
+                        addClickHandlersToPage();
+                        
+                        console.log("Moved to next section");
                         scrollBtn.style.display = 'none';
+                    } catch (error) {
+                        console.error("Error navigating:", error);
                     }
                 };
                 
-                // Append to div2viewer instead of body
+                // Append to div2viewer
                 const div2viewer = document.getElementById('div2viewer');
                 div2viewer.appendChild(scrollBtn);
-                
-                // Make sure div2viewer has a position for absolute positioning to work properly
-                div2viewer.style.position = div2viewer.style.position || 'relative';
+                div2viewer.style.position = 'relative';
             }
             if (cfi) {
                 rendition.display(cfi, { offsetTop: 1000 });
@@ -1392,7 +1408,7 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
         const makeRangeCfi = (a, b) => {
                 const CFI = new ePub.CFI()
                 const start = CFI.parse(a), end = CFI.parse(b)
-                const cfi = {
+                const cfiRange = {
                     range: true,
                     base: start.base,
                     path: {
@@ -1402,19 +1418,19 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
                     start: start.path,
                     end: end.path
                 }
-                const len = cfi.start.steps.length
+                const len = cfiRange.start.steps.length
                 for (let i = 0; i < len; i++) {
-                    if (CFI.equalStep(cfi.start.steps[i], cfi.end.steps[i])) {
+                    if (CFI.equalStep(cfiRange.start.steps[i], cfiRange.end.steps[i])) {
                         if (i == len - 1) {
-                            if (cfi.start.terminal === cfi.end.terminal) {
-                                cfi.path.steps.push(cfi.start.steps[i])
-                                cfi.range = false
+                            if (cfiRange.start.terminal === cfiRange.end.terminal) {
+                                cfiRange.path.steps.push(cfiRange.start.steps[i])
+                                cfiRange.range = false
                             }
-                        } else cfi.path.steps.push(cfi.start.steps[i])
+                        } else cfiRange.path.steps.push(cfiRange.start.steps[i])
                     } else break
                 }
-                cfi.start.steps = cfi.start.steps.slice(cfi.path.steps.length)
-                cfi.end.steps = cfi.end.steps.slice(cfi.path.steps.length)
+                cfiRange.start.steps = cfiRange.start.steps.slice(cfiRange.path.steps.length)
+                cfiRange.end.steps = cfiRange.end.steps.slice(cfiRange.path.steps.length)
 
                 return 'epubcfi(' + CFI.segmentString(cfi.base)
                     + '!' + CFI.segmentString(cfi.path)
@@ -1553,14 +1569,243 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
     }
 
     pageleDiv.addEventListener('click', () => {
-        if (!selectedBook) {
-            //open book modal
-            booksModal.style.display = "block";
-        }
-        dataToSend= {username: username, task: "pagele",book: selectedBook, cfi: cfi}
-        sendSocketMessage(dataToSend);
+        // Show modal with loading spinner
         pageleModal.style.display = "block";
+
+        if (!selectedBook) {
+            // If no book is selected, show the books modal instead
+            booksModal.style.display = "block";
+            pageleModal.style.display = "none";
+            return;
+        }
+
+        // Get current chapter's content
+        const currentLocation = rendition.currentLocation();
+        if (!currentLocation || !currentLocation.start) {
+            console.error("Could not get current location");
+            return;
+        }
+
+        // Get the current spine item (chapter)
+        const spineItem = currentBook.spine.get(currentLocation.start.index);
+        
+        // Get the full text content of the current chapter
+        spineItem.load(currentBook.load.bind(currentBook))
+            .then(doc => {
+                // Extract text content from paragraphs and other text elements
+                const textNodes = doc.querySelectorAll('p, div, span, article');
+                const textContent = Array.from(textNodes)
+                    .map(node => node.textContent.trim())
+                    .filter(text => text.length > 0)
+                    .join(' ');
+                
+                // Split into sentences and store them globally
+                currentChapterSentences = textContent
+                    .split(/(?<=[.!?])\s+/)
+                    .map(sentence => sentence.trim())
+                    .filter(sentence => 
+                        sentence.length > 10 && // Minimum length
+                        !/^[0-9\s]*$/.test(sentence) && // Not just numbers
+                        sentence !== sentence.toUpperCase() // Not all caps (likely headers)
+                    );
+
+                // Reset to first sentence
+                currentSentenceIndex = 0;
+                
+                // Create navigation HTML with action buttons
+                pageleContent.innerHTML = `
+                    <div style="display: flex; align-items: center; justify-content: center; gap: 20px;">
+                        <button id="prevSentence" style="font-size: 24px; padding: 10px 20px;">←</button>
+                        <div id="sentenceDisplay" style="flex: 1; text-align: center; font-size: 18px; padding: 20px;">
+                            ${currentChapterSentences[currentSentenceIndex]}
+                        </div>
+                        <button id="nextSentence" style="font-size: 24px; padding: 10px 20px;">→</button>
+                    </div>
+                    <div style="text-align: center; margin-top: 10px;">
+                        <span id="sentenceCounter">
+                            ${currentSentenceIndex + 1} / ${currentChapterSentences.length}
+                        </span>
+                    </div>
+                    <div id="actionButtons" style="position: relative; margin-top: 20px; text-align: center;">
+                        <img id="pageleRecord" src="images/recordingButton.png" alt="record icon"/>
+                        <img id="pageleRobot" src="images/robot_talk_white.png" alt="robot" data-speaking="false"/>
+                        
+                        <div id="recording-status" style="
+                            display: none;
+                            position: absolute;
+                            top: 0;
+                            left: 0;
+                            right: 0;
+                            bottom: 0;
+                            background-color: rgba(0, 0, 0, 0.7);
+                            flex-direction: column;
+                            align-items: center;
+                            justify-content: center;
+                            z-index: 1000;">
+                            <div class="status-spinner"></div>
+                            <div class="status-message">Processing...</div>
+                            <div class="timer">0.0s</div>
+                        </div>
+                    </div>
+                `;
+
+                // Add event listeners for navigation
+                document.getElementById('prevSentence').addEventListener('click', () => {
+                    if (currentSentenceIndex > 0) {
+                        currentSentenceIndex--;
+                        updateSentenceDisplay();
+                    }
+                });
+
+                document.getElementById('nextSentence').addEventListener('click', () => {
+                    if (currentSentenceIndex < currentChapterSentences.length - 1) {
+                        currentSentenceIndex++;
+                        updateSentenceDisplay();
+                    }
+                });
+
+                // Add event listeners for action buttons
+                const pageleRecordBtn = document.getElementById('pageleRecord');
+                const pageleRobotBtn = document.getElementById('pageleRobot');
+
+                pageleRecordBtn.addEventListener('click', async () => {
+                    if (!isRecording) {
+                        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                        mediaRecorder = new MediaRecorder(stream);
+                        
+                        mediaRecorder.ondataavailable = event => {
+                            audioChunks.push(event.data);
+                        };
+
+                        mediaRecorder.start();
+                        pageleRecordBtn.src = "images/stopRecButton.png";
+                        isRecording = true;
+                    } else {
+                        mediaRecorder.stop();
+                        isRecording = false;
+                        pageleRecordBtn.src = "images/recordingButton.png";
+                    }
+                    
+                    mediaRecorder.onstop = () => {
+                        // Use the current sentence for comparison
+                        lines = [currentChapterSentences[currentSentenceIndex]];
+                        lineNum = 0;
+                        createBlobAndConnect();
+                    };
+                });
+
+                pageleRobotBtn.addEventListener('click', () => {
+                    const isCurrentlySpeaking = pageleRobotBtn.getAttribute('data-speaking') === 'true';
+                    
+                    if (isCurrentlySpeaking) {
+                        window.speechSynthesis.cancel();
+                        pageleRobotBtn.setAttribute('data-speaking', 'false');
+                        pageleRobotBtn.style.filter = 'brightness(1)';
+                    } else {
+                        pageleRobotBtn.setAttribute('data-speaking', 'true');
+                        pageleRobotBtn.style.filter = 'brightness(0.7)';
+                        textToSpeech(currentChapterSentences[currentSentenceIndex]);
+                    }
+                });
+            })
+            .catch(error => {
+                console.error("Error loading chapter content:", error);
+                pageleModal.style.display = "none";
+                alert("Error loading chapter content. Please try again.");
+            });
     });
+
+    // Add this function to update the sentence display
+    function updateSentenceDisplay() {
+        document.getElementById('sentenceDisplay').textContent = currentChapterSentences[currentSentenceIndex];
+        document.getElementById('sentenceCounter').textContent = 
+            `${currentSentenceIndex + 1} / ${currentChapterSentences.length}`;
+    }
+
+    // Add this new function to convert CFIs
+    function convertCfiForServer(clientCfi) {
+        console.log("Original CFI:", clientCfi);
+        
+        // If no CFI is available, return null
+        if (!clientCfi) return null;
+        
+        // Extract the spine index from the CFI
+        const spineMatch = clientCfi.match(/\/([0-9]+)!/);
+        if (!spineMatch || spineMatch.length < 2) {
+            console.error("Could not extract spine index from CFI");
+            return clientCfi; // Return original if we can't parse it
+        }
+        
+        // Get the spine index from the CFI (JavaScript format)
+        const jsSpineIndex = parseInt(spineMatch[1]);
+        
+        // Convert to Python-compatible spine index (handle the off-by-two difference)
+        // This is an approximation based on our testing - may need adjustment
+        const pySpineIndex = jsSpineIndex - 2; // JS uses 4, Python uses 2 for same content
+        
+        // Create a simplified CFI that focuses just on the spine position
+        // This is more likely to be interpreted correctly by the server
+        const simplifiedCfi = `epubcfi(/6/${pySpineIndex}!/)`;
+        
+        console.log("Converted CFI:", simplifiedCfi);
+        return simplifiedCfi;
+    }
+
+    // Get the current spine position directly from the reader
+    function getCurrentSpinePosition() {
+        try {
+            if (rendition && rendition.location) {
+                const location = rendition.location.start;
+                if (location && location.index) {
+                    return location.index;
+                }
+            }
+        } catch (error) {
+            console.error("Error getting spine position:", error);
+        }
+        return 0; // Default to 0 if we can't determine position
+    }
+
+    // Get text surrounding the current position to help with content matching
+    function getTextAroundCurrentPosition(charCount) {
+        try {
+            if (rendition && rendition.getContents().length > 0) {
+                const contents = rendition.getContents()[0];
+                const win = contents.window;
+                const selection = win.getSelection();
+                
+                // If there's a selection, use that as the center point
+                if (selection && selection.rangeCount > 0) {
+                    const range = selection.getRangeAt(0);
+                    const startNode = range.startContainer;
+                    
+                    // Get the parent paragraph or element
+                    let parentElement = startNode;
+                    while (parentElement && parentElement.nodeType !== 1) {
+                        parentElement = parentElement.parentNode;
+                    }
+                    
+                    if (parentElement) {
+                        // Return the text content of this element
+                        return parentElement.textContent.trim();
+                    }
+                }
+                
+                // If no selection, try to get text from current visible area
+                const visibleElements = contents.document.querySelectorAll('p, div');
+                for (let i = 0; i < visibleElements.length; i++) {
+                    const rect = visibleElements[i].getBoundingClientRect();
+                    // Check if element is visible in viewport
+                    if (rect.top >= 0 && rect.bottom <= win.innerHeight) {
+                        return visibleElements[i].textContent.trim();
+                    }
+                }
+            }
+        } catch (error) {
+            console.error("Error getting text context:", error);
+        }
+        return ""; // Return empty string if we can't get context
+    }
 
     tutorialBtn.addEventListener('click', () => {
         const tutorialModal = document.getElementById('tutorialModal');
@@ -1603,6 +1848,21 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
         const tutorialModal = document.getElementById('tutorialModal');
         if (event.target === tutorialModal) {
             tutorialModal.style.display = 'none';
+        }
+    });
+
+    // Make sure the close button works properly for the pagele modal
+    document.querySelectorAll('#pageleModal .close').forEach(closeBtn => {
+        closeBtn.addEventListener('click', () => {
+            document.getElementById('pageleModal').style.display = 'none';
+        });
+    });
+
+    // Close modal when clicking outside
+    window.addEventListener('click', (event) => {
+        const pageleModal = document.getElementById('pageleModal');
+        if (event.target === pageleModal) {
+            pageleModal.style.display = 'none';
         }
     });
 </script>

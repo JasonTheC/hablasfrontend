@@ -1013,3 +1013,107 @@ flex-direction: column;
         height: 60px;
     }
 }
+
+/* Page Modal Styles */
+#pageleModal.modal {
+    display: none;
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 90%;
+    max-width: 600px;
+    background-color: #f9f9f9;
+    border-radius: 10px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+    z-index: 1000;
+    font-family: 'Quicksand', sans-serif;
+}
+
+#pageleModal .modal-content {
+    max-height: 60vh;
+    overflow-y: auto;
+    padding: 20px;
+    background-color: white;
+    border-radius: 10px;
+}
+
+#pageleModal .close {
+    position: absolute;
+    right: 15px;
+    top: 10px;
+    color: #4588a0;
+    font-size: 24px;
+    font-weight: bold;
+    cursor: pointer;
+    background: rgba(255, 255, 255, 0.1);
+    border: none;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+}
+
+#pageleModal .close:hover {
+    color: #366b7c;
+    transform: rotate(90deg);
+}
+
+/* Loading spinner */
+#pageleModal .loading-spinner {
+    text-align: center;
+    padding: 20px;
+    color: #4588a0;
+    font-weight: 500;
+}
+
+/* Challenge content styling */
+#pagele-content {
+    padding: 20px;
+}
+
+#pagele-content h2 {
+    color: #4588a0;
+    margin-bottom: 15px;
+    font-weight: 600;
+}
+
+#pagele-content p {
+    color: #333;
+    line-height: 1.5;
+    margin-bottom: 10px;
+}
+
+/* Scrollbar styling */
+#pagele-content::-webkit-scrollbar {
+    width: 6px;
+}
+
+#pagele-content::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 3px;
+}
+
+#pagele-content::-webkit-scrollbar-thumb {
+    background: #4588a0;
+    border-radius: 3px;
+}
+
+#pagele-content::-webkit-scrollbar-thumb:hover {
+    background: #366b7c;
+}
+
+/* Mobile responsiveness */
+@media screen and (max-width: 768px) {
+    #pageleModal.modal {
+        width: 95%;
+        margin: 10px;
+    }
+
+    #pagele-content {
+        padding: 15px;
+    }
+}

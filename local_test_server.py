@@ -29,7 +29,7 @@ end_time = time.time()
 print(f"Time taken to import ssl: {end_time - start_time} seconds")
 print("importing secrets")
 start_time = time.time()
-import secrets  # Add secrets to generate tokens
+import secrets 
 end_time = time.time()
 print(f"Time taken to import secrets: {end_time - start_time} seconds")
 print("importing datetime")
@@ -65,6 +65,15 @@ import uuid  # Add this import for UUID generation
 import soundfile as sf
 import numpy as np
 import wave
+from bs4 import BeautifulSoup  # Add this import at the top of the file
+import ebooklib
+from ebooklib import epub
+import random
+import re
+from bs4 import BeautifulSoup
+import nltk
+nltk.download('punkt')
+from nltk.tokenize import sent_tokenize, word_tokenize
 
 LANG_ID = "fr"
 MODEL_ID = "jonatasgrosman/wav2vec2-large-xlsr-53-french"
@@ -518,7 +527,7 @@ async def translate_task(data_object):
     source_lang = data_object.get("source_lang", "en")
     target_lang = data_object.get("target_lang", "fr")
     current_book = data_object.get("current_book", "")
-    page = data_object.get("page", 0)
+    cfi = data_object.get("cfi", 0)
     username = data_object.get("username", "")  # Add username from data_object
     
     if not source_text:
@@ -554,11 +563,11 @@ async def translate_task(data_object):
         print(f"current_book: {current_book}")
         print(f"username: {username}")
         if current_book and username:  
-            print(f"Updating database for user {username} with book {current_book} and page {page}")
+            print(f"Updating database for user {username} with book {current_book} and cfi {cfi}")
             db.set_current_book_task({
                 "username": username,
                 "book": current_book,
-                "page": page
+                "cfi": cfi
             }, "", "")
         
         return {
@@ -567,7 +576,6 @@ async def translate_task(data_object):
             "source_lang": source_lang,
             "target_lang": target_lang,
             "current_book": current_book,  # Add these fields to the response
-            "page": page
         }
     else:
         print(f"Translation result has no 'text' attribute: {result}")
@@ -580,6 +588,11 @@ async def translate_task(data_object):
    
 
 async def login_task(self, data_object):
+    # Initialize message and variables at the start
+    message = {"status": "error", "message": "Invalid credentials"}
+    epub = None
+    language = None
+    
     conn = sqlite3.connect(self.DB_PATH)
     cursor = conn.cursor()
     
@@ -609,24 +622,41 @@ async def login_task(self, data_object):
             WHERE username = ?""", 
             (token, expiry, username))
         conn.commit()
-        
+
+        print(f"user.get('current_book'): {user.get('current_book')}")    
+        if user.get("current_book"):
+            print("getting books")
+            epubs = os.walk(EPUB_DIR)
+            for root, dirs, files in epubs:
+                for file in files:
+                    if file == user["current_book"]:
+                        book_path = Path(root) / file
+                        break
+            print(f"book_path: {book_path}")
+            if 'book_path' in locals() and book_path.exists():
+                language = book_path.parent.name
+                print(f"language: {language}")
+                with open(book_path, "rb") as f:
+                    book_data = f.read()
+                    book_base64 = base64.b64encode(book_data).decode('utf-8')
+                    epub = f"data:application/epub+zip;base64,{book_base64}"
+                    print(f"Including book data for {user['current_book']}")
+
         message = {
             "status": "success",
             "token": token,
             "username": username,
             "current_book": user.get("current_book", ""),
-            "page": user.get("page", 0),
-            "utterance_fname": user.get("utterrance_fname", ""),
-            "predicted_sentence": user.get("predicted_sentence", ""),
             "book_position": user.get("book_position", 0),
             "preferred_language": user.get("preferred_language", "en"),
             "type": "login"
         }
-    else:
-        message = {
-            "status": "error",
-            "message": "Invalid credentials"
-        }
+
+        # Only add epub and language to message if they were set
+        if epub is not None:
+            message["epub"] = epub
+        if language is not None:
+            message["language"] = language
     
     conn.close()
     return message
@@ -682,85 +712,21 @@ async def verify_token_task(data_object):
                 book_base64 = base64.b64encode(book_data).decode('utf-8')
                 epub = f"data:application/epub+zip;base64,{book_base64}"
                 print(f"Including book data for {user['current_book']}")
-       
+    else:
+        epub = None
+        language = None
     response = {
         "status": "success",
         "username": user.get("username", ""),
         "current_book": user.get("current_book", ""),
-        "page": user.get("page", 0),
         "preferred_language": user.get("preferred_language", "en"),
         "token": token,
         "epub": epub,
-        "language": language
+        "language": language,
+        "cfi": user.get("cfi", "")
     }
     return response
 
-def pagele_task(data_object):
-    """Get sentences from EPUB book for the Pagele game"""
-    try:
-        # Get user data
-        username = data_object.get("username")
-        book = data_object.get("book")
-        cfi = data_object.get("cfi")
-
-        if not all([username, book]):
-            return {"status": "error", "message": "Missing required data"}
-
-        # Find the book file
-        book_path = None
-        for root, _, files in os.walk(EPUB_DIR):
-            if book in files:
-                book_path = Path(root) / book
-                break
-
-        if not book_path or not book_path.exists():
-            return {"status": "error", "message": "Book not found"}
-
-        # Extract text from EPUB
-        with zipfile.ZipFile(book_path) as zip_file:
-            # Find the content files (usually XHTML/HTML files)
-            content_files = [f for f in zip_file.namelist() if f.endswith(('.xhtml', '.html'))]
-            
-            all_text = []
-            for content_file in content_files:
-                content = zip_file.read(content_file).decode('utf-8')
-                # Parse HTML and extract text
-                root = ET.fromstring(content)
-                # Remove script and style elements
-                for elem in root.findall(".//script"):
-                    elem.clear()
-                for elem in root.findall(".//style"):
-                    elem.clear()
-                
-                # Get text content
-                text = "".join(root.itertext())
-                # Split into sentences (basic implementation)
-                sentences = [s.strip() for s in text.split('.') if len(s.strip()) > 20]
-                all_text.extend(sentences)
-
-            # Find current position using CFI if provided
-            start_index = 0
-            if cfi:
-                # Simple implementation - just use it as an index
-                try:
-                    start_index = int(cfi)
-                except ValueError:
-                    start_index = 0
-
-            # Get next 10 sentences
-            selected_sentences = all_text[start_index:start_index + 10]
-            next_cfi = str(start_index + len(selected_sentences))
-
-            return {
-                "status": "success",
-                "sentences": selected_sentences,
-                "next_cfi": next_cfi,
-                "total_sentences": len(all_text)
-            }
-
-    except Exception as e:
-        print(f"Error in pagele_task: {e}")
-        return {"status": "error", "message": str(e)}
 
 async def handle_connection(websocket):
     print(f"Client connected, {websocket.remote_address}")
@@ -776,7 +742,6 @@ async def handle_connection(websocket):
             books = await get_available_books()
             message_returned = {"books": books}
         elif data_object.get("task") == "get_book_data":
-            # Handle specific book data request
             message_returned = await get_book_data(data_object)
         elif data_object.get("task") == "stt":
             message_returned = stt_task(data_object)
@@ -791,7 +756,7 @@ async def handle_connection(websocket):
         elif data_object.get("task") == "verify_token":
             message_returned = await verify_token_task(data_object)
         elif data_object.get("task") == "pagele":
-            message_returned = await pagele_task(data_object)
+            message_returned = pagele_task(data_object)  # Remove await since it's not async
             
         await websocket.send(json.dumps(message_returned))
     
@@ -818,15 +783,14 @@ class DatabaseManager:
         """Initialize the SQLite database with necessary tables"""
         conn = sqlite3.connect(self.DB_PATH)
         cursor = conn.cursor()
-        
-        # Create users table with additional columns for page and utterance tracking
+
+        # Create users table with CFI instead of page
         cursor.execute('''
-        CREATE TABLE IF NOT EXISTS users ( 
+        CREATE TABLE IF NOT EXISTS users (
             username TEXT PRIMARY KEY,
             password TEXT NOT NULL,
             current_book TEXT DEFAULT '',
-            book_position INTEGER DEFAULT 0,
-            page TEXT DEFAULT '',
+            cfi TEXT DEFAULT '',  -- Changed from page to cfi
             utterrance_fname TEXT DEFAULT '',
             predicted_sentence TEXT DEFAULT '',
             preferred_language TEXT DEFAULT 'en',
@@ -834,86 +798,9 @@ class DatabaseManager:
             token_expiry TIMESTAMP
         )
         ''')
-        
+
         conn.commit()
         conn.close()
-
-    async def login_task(self, data_object):
-        conn = sqlite3.connect(self.DB_PATH)
-        cursor = conn.cursor()
-        
-        username = data_object.get("username")
-        password = data_object.get("password")
-        
-        # Get column names
-        cursor.execute("PRAGMA table_info(users)")
-        columns = [column[1] for column in cursor.fetchall()]
-        
-        cursor.execute("SELECT * FROM users WHERE username = ? AND password = ?", 
-                    (username, password))
-        user_row = cursor.fetchone()
-        
-        if user_row:
-            # Convert row to dictionary
-            user = dict(zip(columns, user_row))
-            print(user)
-            
-            # Generate new token using UUID and set expiry to 24 hours from now
-            token = str(uuid.uuid4())
-            expiry = datetime.now() + timedelta(days=10000)
-            
-            cursor.execute("""
-                UPDATE users 
-                SET login_token = ?, token_expiry = ? 
-                WHERE username = ?""", 
-                (token, expiry, username))
-            conn.commit()
-            
-            
-
-
-            print(f"user.get('current_book'): {user.get('current_book')}")    
-            if user.get("current_book"):
-                print("getting books")
-                epubs = os.walk(EPUB_DIR)
-                for root, dirs, files in epubs:
-                    for file in files:
-                        if file == user["current_book"]:
-                            book_path = Path(root) / file
-                            break
-                print(f"book_path: {book_path}")
-                if book_path.exists():
-                    language = book_path.parent.name
-                    print(f"language: {language}")
-                    with open(book_path, "rb") as f:
-                        book_data = f.read()
-                        book_base64 = base64.b64encode(book_data).decode('utf-8')
-                        epub = f"data:application/epub+zip;base64,{book_base64}"
-                        print(f"Including book data for {user['current_book']}")
-            
-          
-
-            message = {
-                "status": "success",
-                "token": token,
-                "username": username,
-                "current_book": user.get("current_book", ""),
-                "page": user.get("page", 0),
-                "book_position": user.get("book_position", 0),
-                "preferred_language": user.get("preferred_language", "en"),
-                "type": "login",
-                "epub": epub,
-                "language": language
-            }
-        else:
-            message = {
-                "status": "error",
-                "message": "Invalid credentials"
-            }
-        
-        conn.close()
-        return message
-        
 
     def signup_task(self, data_object):
         conn = sqlite3.connect(self.DB_PATH)
@@ -953,10 +840,15 @@ class DatabaseManager:
             cursor = conn.cursor()
             
             username = data_object.get("username")
-            current_book = data_object.get("book", data_object.get("current_book", ""))  # Try both book and current_book
-            page = data_object.get("page", 0)
+            current_book = data_object.get("book", data_object.get("current_book", ""))
+            
+            # Store the full CFI string instead of trying to convert it
+            cfi = data_object.get("cfi", data_object.get("page", ""))
+            if isinstance(cfi, (int, float)):  # If it's a number, convert to string
+                cfi = str(cfi)
 
-            print(f"Updating database for {username} with book: {current_book}, page: {page}")
+            print(f"Received CFI from client: {cfi}")
+            print(f"Updating database for {username} with book: {current_book}, cfi: {cfi}")
             
             # First verify the user exists
             cursor.execute("SELECT username FROM users WHERE username = ?", (username,))
@@ -964,15 +856,15 @@ class DatabaseManager:
                 print(f"User {username} not found in database")
                 return False
 
-            # Update the user's current book and page
+            # Update the user's current book and cfi
             cursor.execute("""
                 UPDATE users 
                 SET current_book = ?, 
-                    page = ?, 
+                    cfi = ?, 
                     utterrance_fname = ?, 
                     predicted_sentence = ? 
                 WHERE username = ?
-            """, (current_book, page, utterrance_fname, predicted_sentence, username))
+            """, (current_book, cfi, utterrance_fname, predicted_sentence, username))
             
             if cursor.rowcount == 0:
                 print(f"No rows were updated for user {username}")
@@ -982,9 +874,9 @@ class DatabaseManager:
             conn.commit()
             
             # Verify the update
-            cursor.execute("SELECT current_book, page FROM users WHERE username = ?", (username,))
+            cursor.execute("SELECT current_book, cfi FROM users WHERE username = ?", (username,))
             result = cursor.fetchone()
-            print(f"After update - Book: {result[0]}, Page: {result[1]}")
+            print(f"After update - Book: {result[0]}, CFI: {result[1]}")
             
             return True
         except Exception as e:
@@ -1040,8 +932,8 @@ async def main():
     preload_all_models()
     print("Preloaded all models")
 
-    async with websockets.serve(handle_connection, "localhost", 8765) as server:
-        print("WebSocket server started on local NOT wss://carriertech.uk:8765")
+    async with websockets.serve(handle_connection, "localhost", 8675) as server:
+        print("WebSocket server started on local NOT wss://carriertech.uk:8675")
         await asyncio.Future()  # Run forever 
 
 if __name__ == "__main__": #when you use a multi processer load, you use this so it doesnt crash. with asyncio you always have to do it
