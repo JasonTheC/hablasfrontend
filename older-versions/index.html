@@ -102,7 +102,7 @@
                 <div id="points-display">Points Display</div>
             </div>
         </div>
-   
+        
         <!-- Add status indicator -->
         <div id="recording-status" style="display: none;">
             <div class="status-spinner"></div>
@@ -136,8 +136,8 @@
             </div>
         </div>
     </div>
-    </div>
-       
+</div>
+
 <div id="suggestions-modal" class="modal">
     <div class="modal-content">
         <span class="close">&times;</span>
@@ -388,7 +388,7 @@ function createWebSocketConnection() {
             return new Promise((resolve, reject) => {
                 // Set up event handlers
                 socketInstance.addEventListener('open', () => {
-        console.log('WebSocket connection established');
+                    console.log('WebSocket connection established');
                     isConnecting = false;
                     reconnectAttempts = 0; // Reset reconnect attempts on successful connection
                     
@@ -424,7 +424,7 @@ function createWebSocketConnection() {
                 });
                 
                 socketInstance.addEventListener('error', (error) => {
-        console.error('WebSocket error:', error);
+                    console.error('WebSocket error:', error);
                     
                     // If we're still connecting, this is an error
                     if (isConnecting) {
@@ -439,36 +439,36 @@ function createWebSocketConnection() {
                 
                 socketInstance.addEventListener('message', (event) => {
                     try {
-            const response = JSON.parse(event.data);
-            console.log("Received WebSocket message:", response);
-            
-            const statusIndicator = document.getElementById('recording-status');
-            if (statusIndicator) {
-                statusIndicator.style.display = 'none';
-            }
+                        const response = JSON.parse(event.data);
+                        console.log("Received WebSocket message:", response);
+                        
+                        const statusIndicator = document.getElementById('recording-status');
+                        if (statusIndicator) {
+                            statusIndicator.style.display = 'none';
+                        }
                         
                         if (response.id && messageCallbacks.has(response.id)) {
                             messageCallbacks.get(response.id)(response);
                             return;
                         }
-            
-            if (response.books) {
-                handleBooksResponse(response);
-            } else if (response.hasOwnProperty('pred_sentence')) {
+                        
+                        if (response.books) {
+                            handleBooksResponse(response);
+                        } else if (response.hasOwnProperty('pred_sentence')) {
                             handlePredSentenceResponse(response);
-            } else if (response.hasOwnProperty('translation') || 
-                        (response.status === 'success' && response.hasOwnProperty('translated_text'))) {
-                handleTranslationResponse(response);
-            } else if (response.hasOwnProperty('token')) {
-                handleTokenResponse(response);
-            } else if (response.status === 'success' && response.hasOwnProperty('epub')) {
-                // Handle book data response
-                handleBookDataResponse(response);
-            } else if (response.message === "Invalid credentials") {
-                alert("Invalid credentials, have you signed up?");
+                        } else if (response.hasOwnProperty('translation') || 
+                                  (response.status === 'success' && response.hasOwnProperty('translated_text'))) {
+                            handleTranslationResponse(response);
+                        } else if (response.hasOwnProperty('token')) {
+                            handleTokenResponse(response);
+                        } else if (response.status === 'success' && response.hasOwnProperty('epub')) {
+                            // Handle book data response
+                            handleBookDataResponse(response);
+                        } else if (response.message === "Invalid credentials") {
+                            alert("Invalid credentials, have you signed up?");
                         } else {
-                console.log("Unhandled response from server:", response);
-            }
+                            console.log("Unhandled response from server:", response);
+                        }
                     } catch (error) {
                         console.error("Error processing WebSocket message:", error);
                     }
@@ -522,7 +522,7 @@ function createWebSocketConnection() {
         speechToText: async function(blob, language, sentence, username, book, page) {
             return makeWebSocketRequest({
                 task: "stt",
-            username: username, 
+                username: username,
                 language: language,
                 blob: blob,
                 sentence: sentence,
@@ -534,7 +534,7 @@ function createWebSocketConnection() {
         // Login
         login: async function(username, password) {
             return makeWebSocketRequest({
-        username: username,
+                username: username,
                 password: password,
                 task: "login"
             });
@@ -580,9 +580,7 @@ function createWebSocketConnection() {
             return makeWebSocketRequest({
                 task: "submit_suggestion",
                 suggestion: suggestion,
-                username: username,
-                country: country,
-                
+                username: username
             });
         }
     };
@@ -650,7 +648,7 @@ function handleBooksResponse(response) {
                         task: "get_book_data",
                         filename: book.filename,
                     });
-                  
+                    
                     if (response.error) {
                         throw new Error(response.error);
                     }
@@ -1115,7 +1113,7 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
                         if (words.length < 2) return; // Skip elements with fewer than 2 words
                         
                         // Mark as processed to avoid duplicate handlers
-                            element.dataset.processed = "true";
+                        element.dataset.processed = "true";
                         
                         // Create and add the select icon
                         const selectIcon = content.document.createElement('div');
@@ -1162,21 +1160,21 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
                                 if (circleElement) {
                                     circleElement.setAttribute('fill-opacity', '0.7');
                                 }
-                                }
-                            });
-                            
-                            // Add click handler
+                            }
+                        });
+                        
+                        // Add click handler
                         element.addEventListener('click', (event) => {
                             console.log("Element clicked:", element.textContent.substring(0, 30) + "...");
                             
                             // Check if device is mobile
                             const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
                             console.log("Is mobile device:", isMobile);
-                                
-                                // Remove previous selection
-                                content.document.querySelectorAll('.selected-line').forEach(el => {
-                                    el.classList.remove('selected-line');
-                                    el.style.backgroundColor = 'transparent';
+                            
+                            // Remove previous selection
+                            content.document.querySelectorAll('.selected-line').forEach(el => {
+                                el.classList.remove('selected-line');
+                                el.style.backgroundColor = 'transparent';
                                 const circleEl = el.querySelector('circle');
                                 if (circleEl) {
                                     circleEl.setAttribute('fill-opacity', '0.7');
@@ -1200,9 +1198,9 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
                             });
                             
                             // Position and show modal
-                                const modal = document.getElementById('myModal');
-                                const modalContent = modal.querySelector('.modal-content');
-                                
+                            const modal = document.getElementById('myModal');
+                            const modalContent = modal.querySelector('.modal-content');
+                            
                             if (modal) {
                                 // Calculate position relative to viewport
                                 const padding = isMobile ? 10 : 20; // Less padding on mobile
@@ -1283,7 +1281,7 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
                                 
                                 const translationDiv = document.getElementById('translation');
                                 if (translationDiv) {
-                                updateTranslation(selectedText);
+                                    updateTranslation(selectedText);
                                 }
                                 
                                 // Prevent the click from propagating
@@ -1395,7 +1393,7 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
 
     textToSpeechBtn.addEventListener('click', () => {
         if ('speechSynthesis' in window) {
-                textToSpeech(lines[lineNum]);
+            textToSpeech(lines[lineNum]);
         } else {
             console.log("Sorry, your browser doesn't support text to speech!");
         }

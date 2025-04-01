@@ -1,0 +1,57 @@
+<span class="close">&times;</span>
+<h2>Feedback Survey</h2>
+<form id="feedback-form">
+    <div class="form-group">
+        <label for="rating">How would you rate your experience?</label>
+        <select id="rating" name="rating" required>
+            <option value="">Select a rating</option>
+            <option value="5">5 - Excellent</option>
+            <option value="4">4 - Good</option>
+            <option value="3">3 - Average</option>
+            <option value="2">2 - Poor</option>
+            <option value="1">1 - Very Poor</option>
+        </select>
+    </div>
+    
+    <div class="form-group">
+        <label for="feedback-text">Please share your feedback:</label>
+        <textarea id="feedback-text" name="feedback" rows="4" required></textarea>
+    </div>
+    
+    <button type="submit" id="send-feedback-button" class="options">Submit Feedback</button>
+</form>
+
+<style>
+    .form-group {
+        margin-bottom: 20px;
+    }
+    
+    label {
+        display: block;
+        margin-bottom: 5px;
+    }
+    
+    select, textarea {
+        width: 100%;
+        padding: 8px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+    }
+    
+    textarea {
+        resize: vertical;
+    }
+    
+    #send-feedback-button {
+        background-color: #4CAF50;
+        color: white;
+        padding: 10px 20px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+    }
+    
+    #send-feedback-button:hover {
+        background-color: #45a049;
+    }
+</style>
