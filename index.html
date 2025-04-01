@@ -5,12 +5,19 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.1.5/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/epubjs/dist/epub.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700&family=Roboto:wght@400;700&family=Quicksand:wght@400;700&family=Montserrat:wght@400;700&display=swap" rel="stylesheet"> <!-- Include Lato, Roboto, and Montserrat fonts -->
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="style.css?v=1.0">
+<head>
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <!-- your other head elements -->
+</head>
 <body>
     
     <div id="title">
         <p>Hablas</p>
         <div id="title-right">
+            <div id="tutorial">Tutorial</div>
             <div id="pagele-section">Daily Pagele</div>
             <div id="user-section">Login</div>
             <img src="images/settings.png" id="settings"/> 
@@ -122,6 +129,17 @@
     <span class="close">&times;</span>
     
 </div>
+
+<div id="tutorialModal" class="modal">
+    <span class="close">&times;</span>
+    <div id="tutorial-content" class="modal-content">
+        <!-- Content will be loaded here -->
+        <div class="loading-spinner">Loading...</div>
+    </div>
+</div>
+
+
+
 <script>
     const fileInput = document.getElementById('fileInput');
     fileInput.style.display= "none";
@@ -200,7 +218,7 @@
     let speechRate = 1; // Default speech rate
     let popupflag=false;
     // Add event listener to the slider
-   
+    const tutorialBtn = document.getElementById('tutorial');
     const userAccountBtn = document.getElementById('user-account');
     const usernameInput = document.getElementById('user-name');
     const passwordInput = document.getElementById('user-password');
@@ -1542,5 +1560,49 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
         dataToSend= {username: username, task: "pagele",book: selectedBook, cfi: cfi}
         sendSocketMessage(dataToSend);
         pageleModal.style.display = "block";
+    });
+
+    tutorialBtn.addEventListener('click', () => {
+        const tutorialModal = document.getElementById('tutorialModal');
+        const tutorialContent = document.getElementById('tutorial-content');
+        
+        // Show modal with loading spinner
+        tutorialModal.style.display = "block";
+        
+        // Fetch the tutorial content
+        fetch('tutorial.html')
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return response.text();
+            })
+            .then(html => {
+                tutorialContent.innerHTML = html;
+            })
+            .catch(error => {
+                console.error('Error loading tutorial:', error);
+                tutorialContent.innerHTML = `
+                    <div style="text-align: center; padding: 20px;">
+                        <h3>Error loading tutorial content</h3>
+                        <p>Please try again later.</p>
+                    </div>
+                `;
+            });
+    });
+
+    // Make sure the close button works properly for the tutorial modal
+    document.querySelectorAll('#tutorialModal .close').forEach(closeBtn => {
+        closeBtn.addEventListener('click', () => {
+            document.getElementById('tutorialModal').style.display = 'none';
+        });
+    });
+
+    // Close modal when clicking outside
+    window.addEventListener('click', (event) => {
+        const tutorialModal = document.getElementById('tutorialModal');
+        if (event.target === tutorialModal) {
+            tutorialModal.style.display = 'none';
+        }
     });
 </script>

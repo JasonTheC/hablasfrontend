@@ -865,151 +865,75 @@ flex-direction: column;
 .wrong.pressed {
     filter: brightness(0.7);
 }
-/* Add these styles */
-.loading-spinner {
-    text-align: center;
-    padding: 20px;
-    color: #666;
-}
 
-#tutorialModal .modal-content {
-    max-width: 800px;
-    margin: 20px auto;
-    padding: 20px;
-    background: white;
-    border-radius: 10px;
-    max-height: 90vh;
-    overflow-y: auto;
-}
-
-#tutorialModal.modal {
-    background-color: rgba(0, 0, 0, 0.5);
-}
-
-/* Tutorial Modal Styles */
-#tutorialModal {
+.daily-pagele-btn {
+    padding: 8px 16px;
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    margin-left: 16px;
+  }
+  
+  .daily-pagele-btn:hover {
+    background-color: #45a049;
+  }
+  
+  .modal {
+    display: none;
     position: fixed;
     top: 0;
     left: 0;
     width: 100%;
     height: 100%;
-    background-color: rgba(0, 0, 0, 0.5);
+    background-color: rgba(0,0,0,0.5);
     z-index: 1000;
-    display: none;
-}
-
-#tutorialModal .modal-content {
+  }
+  
+  .modal-content {
+    background-color: white;
+    margin: 15% auto;
+    padding: 20px;
+    border-radius: 8px;
+    width: 70%;
+    max-width: 600px;
     position: relative;
-    background-color: #f9f9f9;
-    margin: 5vh auto;
-    padding: 20px;
-    width: 90%;
-    max-width: 800px;
-    border: 1px solid #ccc;
-    border-radius: 10px;
-    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
-    max-height: 90vh;
-    overflow-y: auto;
-    font-family: 'Roboto', sans-serif;
-}
-
-#tutorialModal .tutorial-title {
-    color: #4588a0;
-    text-align: center;
-    margin-bottom: 30px;
-    font-family: 'Quicksand', sans-serif;
-    font-weight: 600;
-}
-
-#tutorialModal .tutorial-step {
-    background: #fff;
-    border-radius: 8px;
-    margin-bottom: 20px;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-    padding: 20px;
-}
-
-#tutorialModal .tutorial-step h3 {
-    color: #4588a0;
-    margin-bottom: 15px;
-    font-family: 'Quicksand', sans-serif;
-    font-weight: 600;
-}
-
-#tutorialModal .tutorial-step p,
-#tutorialModal .tutorial-step li {
-    color: #333;
-    line-height: 1.6;
-    margin-bottom: 10px;
-}
-
-#tutorialModal .tutorial-images {
-    display: flex;
-    gap: 20px;
-    justify-content: center;
-    flex-wrap: wrap;
-    margin: 20px 0;
-}
-
-#tutorialModal .tutorial-images img {
-    max-width: 100%;
-    height: auto;
-    border-radius: 8px;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-}
-
-#tutorialModal .icon-button {
-    width: 80px;
-    height: 80px;
-    display: block;
-    margin: 20px auto;
-}
-
-#tutorialModal .close-modal {
-    position: sticky;
+  }
+  
+  .close-btn {
+    position: absolute;
+    right: 20px;
     top: 10px;
-    float: right;
-    color: #aaa;
-    font-size: 28px;
-    font-weight: bold;
+    font-size: 24px;
     cursor: pointer;
-    z-index: 1001;
-    width: 30px;
-    height: 30px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background-color: rgba(0, 0, 0, 0.1);
-    border-radius: 50%;
-    padding: 5px;
-    margin-bottom: -30px;
-}
+  }
+  
+  .close-btn:hover {
+    color: #666;
+  } 
+  #pageleModal {
+    height: 90%;
+    width: 90%;
+    background-color: #e9f0f3;
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+  }
+  #pagele-section {
+    display: none;
+  }
 
-#tutorialModal .close-modal:hover {
-    color: #333;
-    background-color: rgba(0, 0, 0, 0.2);
-}
+  #tutorialModal {
+    height: 90%;
+    width: 90%;
+    background-color: #e9f0f3;
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    display: none;
+  }
 
-/* Update media queries section */
-@media screen and (max-width: 768px) {
-    #tutorialModal .modal-content {
-        width: 95%;
-        margin: 3vh auto;
-        padding: 15px;
-    }
-
-    #tutorialModal .tutorial-step {
-        padding: 15px;
-    }
-
-    #tutorialModal .close-modal {
-        font-size: 32px;
-        width: 40px;
-        height: 40px;
-    }
-
-    #tutorialModal .icon-button {
-        width: 60px;
-        height: 60px;
-    }
-}
+  
