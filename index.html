@@ -252,7 +252,12 @@
 
     // Add these variables at the top of your script with other variables
     let currentSentenceIndex = 0;
-    let currentChapterSentences = [];
+    let allSentences = [];
+    let totalDailySentences = 10;
+    let currentDailySentences = []; //sentences of today
+    let lastSentencePosition = 0;   // Track where we left off the daily sentences
+
+    let positionFirstDailySentence = 0;
 
 console.log ("starting script");
 
@@ -1619,7 +1624,7 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
                     .join(' ');
                 
                 // Split into sentences and store them globally
-                currentChapterSentences = textContent
+                allSentences = textContent //these are ALL the sentences of the book
                     .split(/(?<=[.!?])\s+/)
                     .map(sentence => sentence.trim())
                     .filter(sentence => 
@@ -1629,20 +1634,31 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
                     );
 
                 // Reset to first sentence
-                currentSentenceIndex = 0;
+                totalDailySentences = 10;
+                currentDailySentences = [];
+                positionFirstDailySentence = 0;
                 
+
+                for (let i = 0; i < totalDailySentences; i++) {
+                    let index = (lastSentencePosition + i) % allSentences.length;
+                    currentDailySentences.push(allSentences[index]);
+                }
+                //reset the sentence index to today's first sentence
+                currentSentenceIndex = 0; 
                 // Create navigation HTML with action buttons
+                //${allSentences[currentSentenceIndex]}
+                //${currentSentenceIndex + 1} / ${allSentences.length}
                 pageleContent.innerHTML = `
                     <div style="display: flex; align-items: center; justify-content: center; gap: 20px;">
                         <button id="prevSentence" style="font-size: 24px; padding: 10px 20px;">←</button>
                         <div id="sentenceDisplay" style="flex: 1; text-align: center; font-size: 18px; padding: 20px;">
-                            ${currentChapterSentences[currentSentenceIndex]}
+                            ${currentDailySentences[currentSentenceIndex]}
                         </div>
                         <button id="nextSentence" style="font-size: 24px; padding: 10px 20px;">→</button>
                     </div>
                     <div style="text-align: center; margin-top: 10px;">
                         <span id="sentenceCounter">
-                            ${currentSentenceIndex + 1} / ${currentChapterSentences.length}
+                            ${currentSentenceIndex + 1} / ${totalDailySentences}
                         </span>
                     </div>
                     <div id="actionButtons" style="position: relative; margin-top: 20px; text-align: center;">
@@ -1677,9 +1693,22 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
                 });
 
                 document.getElementById('nextSentence').addEventListener('click', () => {
-                    if (currentSentenceIndex < currentChapterSentences.length - 1) {
+                    if (currentSentenceIndex < totalDailySentences - 1) {
+                        //if (currentSentenceIndex < allSentences.length - 1) { //previous code
                         currentSentenceIndex++;
                         updateSentenceDisplay();
+
+                        //if we're at the end of the daily sentences, update the last sentence position
+                        if (currentSentenceIndex === totalDailySentences - 1) {
+                            lastSentencePosition = (lastSentencePosition + totalDailySentences + 1) % allSentences.length; //I should add +1 so next time we start on the next sentence ASK JASON
+                            // We should also save the last sentence position in the server right? 
+                            sendSocketMessage({
+                                task: "save_last_sentence_position",
+                                last_sentence_position: lastSentencePosition,
+                                username:username,
+                                book:selectedBook,
+                            })
+                        }
                     }
                 });
 
@@ -1707,7 +1736,7 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
                     
                     mediaRecorder.onstop = () => {
                         // Use the current sentence for comparison
-                        lines = [currentChapterSentences[currentSentenceIndex]];
+                        lines = [allSentences[currentSentenceIndex]];
                         lineNum = 0;
                         createBlobAndConnect();
                     };
@@ -1723,7 +1752,7 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
                     } else {
                         pageleRobotBtn.setAttribute('data-speaking', 'true');
                         pageleRobotBtn.style.filter = 'brightness(0.7)';
-                        textToSpeech(currentChapterSentences[currentSentenceIndex]);
+                        textToSpeech(allSentences[currentSentenceIndex]);
                     }
                 });
             })
@@ -1736,9 +1765,11 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
 
     // Add this function to update the sentence display
     function updateSentenceDisplay() {
-        document.getElementById('sentenceDisplay').textContent = currentChapterSentences[currentSentenceIndex];
+        //document.getElementById('sentenceDisplay').textContent = allSentences[currentSentenceIndex];
+        document.getElementById('sentenceDisplay').textContent = currentDailySentences[currentSentenceIndex];
         document.getElementById('sentenceCounter').textContent = 
-            `${currentSentenceIndex + 1} / ${currentChapterSentences.length}`;
+            //`${currentSentenceIndex + 1} / ${allSentences.length}`;
+            `${currentSentenceIndex + 1} / ${totalDailySentences}`;
     }
 
     // Add this new function to convert CFIs
