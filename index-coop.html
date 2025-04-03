@@ -5,30 +5,19 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.1.5/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/epubjs/dist/epub.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700&family=Roboto:wght@400;700&family=Quicksand:wght@400;700&family=Montserrat:wght@400;700&display=swap" rel="stylesheet"> <!-- Include Lato, Roboto, and Montserrat fonts -->
-<link rel="stylesheet" href="style.css?v=1.0">
-<head>
-    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-    <meta http-equiv="Pragma" content="no-cache">
-    <meta http-equiv="Expires" content="0">
-    <!-- your other head elements -->
-</head>
+<link rel="stylesheet" href="style.css">
 <body>
     
     <div id="title">
         <p>Hablas</p>
-        <div id="title-right">
-            <div id="tutorial">Tutorial</div>
-            <div id="pagele-section">Daily Pagele</div>
-            <div id="user-section">Login</div>
-            <img src="images/settings.png" id="settings"/> 
-        </div>
+        <img src="images/settings.png" id="settings"/> 
     </div>
 
     <div id="div2viewer">
             <div id="viewer">
                 <div id="empty-viewer-message">
-                    <p></p>
-                    <button id="browse-books-btn" onclick="loadAvailableBooks()">Tap here to begin!</button>
+                    <p>No book loaded</p>
+                    <button id="browse-books-btn" onclick="loadAvailableBooks()">Browse Available Books</button>
                 </div>
             </div> 
     </div>
@@ -64,6 +53,7 @@
                     <img src="images/upload-icon-white.png" alt="upload symbol" />
                     <img src="images/epub-icon-white.png" alt="upload symbol" />
                 </div>
+                <div id="feedback-button" class="options">Feedback</div>
             </div>
     </div>
 
@@ -116,7 +106,6 @@
 </div>
 
 
-
 <div id="user-account-options-modal" class="modal user-account-options-modal">
     <div class="modal-content user-account-options-modal-content">
         <span class="close options-close">&times;</span>
@@ -125,23 +114,16 @@
         <button id="delete-account-button">Delete account</button>
     </div>
 </div>
-<div id="pageleModal" class="modal">
-    <span class="close">&times;</span>
-    <div id="pagele-content" class="modal-content">
-        <!-- Content will be loaded here -->
-        <div class="loading-spinner">Loading...</div>
+
+<div id="feedback-modal">
+    <div class="modal-content">
+        <span class="close">&times;</span>
+        <p>Feedback modal</p>
+        <div id="send-feedback-button" class="options">Send feedback!</div>
     </div>
+       
+    
 </div>
-
-<div id="tutorialModal" class="modal">
-    <span class="close">&times;</span>
-    <div id="tutorial-content" class="modal-content">
-        <!-- Content will be loaded here -->
-        <div class="loading-spinner">Loading...</div>
-    </div>
-</div>
-
-
 
 <script>
     const fileInput = document.getElementById('fileInput');
@@ -157,7 +139,6 @@
     let mediaRecorder; 
     let audioChunks = []; //buffer
     let userPoints = 0;
-    let cfi = null;
     const lang_conversion = {
         "francais": "fr",
         "english": "en",
@@ -169,22 +150,7 @@
     }
     const modalDiv = document.getElementById('myModal');
     const closeBtn = document.getElementsByClassName('close')[0];
-    // Select all elements with the 'close' class
-    const closeButtons = document.getElementsByClassName('close');
-
-    // Add click event listener to each close button
-    Array.from(closeButtons).forEach(closeBtn => {
-        closeBtn.addEventListener('click', () => {
-            // Find the closest parent modal/drawer
-            
-            const container = closeBtn.closest('.modal, .drawer, #books-modal');
-            console.log("closing container:", container);
-            if (container) {
-                container.style.display = 'none';
-            }
-        });
-    });
-    const pageleDiv = document.getElementById('pagele-section');
+    
     const selectDiv = document.getElementById('selectedText');
     const prevArrowBtn = document.getElementsByClassName('arrowPrev')[0];
     const nextArrowBtn = document.getElementsByClassName('arrowNext')[0];
@@ -197,7 +163,6 @@
     const selectBtn = document.getElementById('select');
 
     const settingsBtn = document.getElementById ("settings");
-    const userSection = document.getElementById ("user-section");
     const drawer = document.getElementById('settings-drawer');
     const closeDrawerBtn = document.getElementById('close-drawer');
     const availableBooksBtn = document.getElementById('available-books');
@@ -221,7 +186,7 @@
     let speechRate = 1; // Default speech rate
     let popupflag=false;
     // Add event listener to the slider
-    const tutorialBtn = document.getElementById('tutorial');
+   
     const userAccountBtn = document.getElementById('user-account');
     const usernameInput = document.getElementById('user-name');
     const passwordInput = document.getElementById('user-password');
@@ -231,13 +196,15 @@
     const userAccountOptionsBtn = document.getElementById ('user-account-options');
     const changeInfoButton = document.getElementById ('change-info-button');
     const deleteAccountButton = document.getElementById ('delete-account-button');
-    const pageleModal = document.getElementById('pageleModal');
-    const pageleContent = document.getElementById('pagele-content');
+
     let username = '';
     let password = '';
 
     const voiceGenderDisplay = document.getElementById('voice-gender');
     const voiceGenderSelect = document.getElementById('voice-gender-select');
+    const feedbackBtn = document.getElementById('feedback-button');
+    const feedbackModal = document.getElementById('feedback-modal');
+    const sendFeedbackBtn = document.getElementById('send-feedback-button');
     let voiceGenderOptionsOpen = false;
     let availableVoices = [];
     let selectedVoiceGender = 'female'; // Default to female
@@ -249,10 +216,6 @@
     // Add these variables at the start of your script
     let processingStartTime = 0;
     let timerInterval = null;
-
-    // Add these variables at the top of your script with other variables
-    let currentSentenceIndex = 0;
-    let currentChapterSentences = [];
 
 console.log ("starting script");
 
@@ -281,7 +244,7 @@ function waitForEpub() {
 // Replace the existing WebSocket implementation with a simpler function-based approach
 function createWebSocketConnection() {
     const socket = new WebSocket('wss://carriertech.uk:8675');
-    //const socket = new WebSocket('ws://localhost:8675');
+    
     socket.addEventListener('open', (event) => {
         console.log('WebSocket connection established');
     });
@@ -311,10 +274,7 @@ function createWebSocketConnection() {
                 handleBooksResponse(response);
             } else if (response.hasOwnProperty('pred_sentence')) {
                 handlePredSentence(response);
-            }else if (response.task === 'pagele') {
-                pageleContent.innerHTML = response.content;
-            
-            }else if (response.hasOwnProperty('translation') || 
+            } else if (response.hasOwnProperty('translation') || 
                         (response.status === 'success' && response.hasOwnProperty('translated_text'))) {
                 handleTranslationResponse(response);
             } else if (response.hasOwnProperty('token')) {
@@ -420,7 +380,7 @@ function createBlobAndConnect() {
 // Update login button click handler
 loginButton.addEventListener('click', () => {
     loginButton.style.backgroundColor = '#FFB6C1';
-    username = usernameInput.value.toLowerCase();
+    username = usernameInput.value;
     password = passwordInput.value;
 
     if (!isValidEmail(username)) {
@@ -443,7 +403,7 @@ loginButton.addEventListener('click', () => {
 // Update signup button click handler
 signupButton.addEventListener('click', () => {
     signupButton.style.backgroundColor = '#FFB6C1';
-    username = usernameInput.value.toLowerCase();
+    username = usernameInput.value;
     password = passwordInput.value;
 
     if (!isValidEmail(username)) {
@@ -474,10 +434,7 @@ function handleLogout() {
     // Clear stored token
     localStorage.removeItem('token');
     localStorage.removeItem('username');
-    userSection.innerHTML = "Login";
-    if (pageleDiv){
-        pageleDiv.style.display = 'none';
-    }
+    
     // Update UI
     updateAuthUI(false);
     
@@ -629,14 +586,13 @@ function updateAuthUI(isLoggedIn, username = '', responseData = null) {
         const userInfoDiv = document.createElement('div');
         userInfoDiv.id = 'user-info';
         userInfoDiv.className = 'options';
-        userSection.textContent = username;
         userInfoDiv.innerHTML = `
             <div style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
                 <span>Logged in as: ${username}</span>
                 <button id="logout-button" class="small-button">Logout</button>
             </div>
         `;
-        pageleDiv.style.display = 'block';
+        
         // Insert after the login elements
         const settingsOptions = document.getElementById('settings-options');
         settingsOptions.insertBefore(userInfoDiv, document.getElementById('available-books'));
@@ -664,9 +620,9 @@ function updateAuthUI(isLoggedIn, username = '', responseData = null) {
             }
             
             const blob = new Blob([ab], {type: mimeString});
-            cfi = responseData.cfi;
+            
             // Render the book
-            renderEpub(blob, responseData.cfi).then(() => {
+            renderEpub(blob).then(() => {
                 if (selectedPage && rendition) {
                     rendition.display(selectedPage);
                 }
@@ -701,16 +657,14 @@ async function updateTranslation(text) {
     console.log("targetLang: ", targetLang);
     console.log("sourceLang: ", sourceLang);
     console.log("username: ", username);
-    const contents = rendition.getContents();
-    cfi = rendition.currentLocation().start.cfi;
-    console.log("cfi: ", cfi);
+    
     sendSocketMessage({ 
         task: 'translate', 
         text: text, 
         source_lang: sourceLang, 
         target_lang: targetLang, 
         current_book: selectedBook, 
-        cfi: cfi,
+        page: selectedPage,
         username: username 
     });
 }
@@ -801,8 +755,8 @@ async function handlePredSentence(response) {
             const correctWord = wrongWord.id;
             console.log("Correct word:", correctWord);
             
-            // Create popup with the correct word only if we have one
-            if (correctWord && !popupflag) {
+            // Create popup with the correct word
+            if (!popupflag) {
                 createPopup(correctWord, event);
             }
         });
@@ -836,7 +790,7 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
     });
 });
     // Separate function for epub rendering
-    async function renderEpub(file, cfi=null) {
+    async function renderEpub(file) {
             currentBook = ePub(file);
             const viewer = document.getElementById("viewer");
             viewer.innerHTML = "";
@@ -848,19 +802,14 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
                 flow: "scrolled-doc",
                 manager: "continuous"
             });
-            console.log("cfi: ", cfi);
-            if (cfi) {
-                rendition.display(cfi, { offsetTop: 1000 });
-            } else {
-                rendition.display().then(() => {
-                    addClickHandlersToPage();
-                });
-            }
+            
+            rendition.display().then(() => {
+                addClickHandlersToPage();
+            });
             
             rendition.on("rendered", (section) => {
                 selectedPage = section.href;
                 addClickHandlersToPage();
-                const contents = rendition.getContents();
             });
             
             // Function to add click handlers to the current page
@@ -899,10 +848,7 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
                             icon.remove();
                         }
                     });
-                    // Scroll up half a page
-                   
-                                
-
+                    
                     let isFirstSentence = true;
                     
                     content.document.querySelectorAll('p, span').forEach((element, elementIndex) => {
@@ -934,6 +880,7 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
                                 sentence.trim() !== sentence.trim().toUpperCase() && 
                                 sentence.trim().length > 10) { // Basic check for actual sentence
                                 const selectIcon = content.document.createElement('span');
+                                selectIcon.textContent = '👉';
                                 selectIcon.className = 'sentence-icon';
                                 selectIcon.style.opacity = '1';
                                 sentenceSpan.insertBefore(selectIcon, sentenceSpan.firstChild);
@@ -1026,71 +973,56 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
                 scrollBtn.style.cursor = 'pointer';
                 scrollBtn.style.marginBottom = '10px';
                 
-                let currentSpinePosition = 0;
-                
-                scrollBtn.onclick = async () => {
-                    try {
-                        // Get current spine position
-                        const currentLocation = rendition.currentLocation();
-                        if (!currentLocation) {
-                            console.log("No current location found");
-                            return;
-                        }
+                scrollBtn.onclick = () => {
+                    // Get all iframe contents
+                    const contents = rendition.getContents();
+                    if (contents && contents.length > 0) {
+                        // For each content iframe
+                        contents.forEach(content => {
+                            const iframe = content.document.defaultView;
+                            // Scroll down by 80% of the viewport height
+                            const scrollAmount = iframe.innerHeight * 0.8;
+                            iframe.scrollBy({
+                                top: scrollAmount,
+                                behavior: 'smooth'
+                            });
+                        });
                         
-                        // Get the spine items
-                        const spine = currentBook.spine;
-                        if (!spine) {
-                            console.log("No spine found");
-                            return;
-                        }
-                        
-                        // Move to next spine item
-                        currentSpinePosition++;
-                        if (currentSpinePosition >= spine.length) {
-                            console.log("Reached end of book");
-                            scrollBtn.style.display = 'none';
-                            return;
-                        }
-                        
-                        console.log(`Moving to spine position ${currentSpinePosition}`);
-                        
-                        // Display the next section
-                        await rendition.display(spine.get(currentSpinePosition).href);
-                        
-                        // Add click handlers to the new content
-                        addClickHandlersToPage();
-                        
-                        console.log("Moved to next section");
+                        // After scrolling, try to load more content if needed
+                        setTimeout(() => {
+                            // If we're near the bottom, load more
+                            const lastContent = contents[contents.length - 1];
+                            const iframe = lastContent.document.defaultView;
+                            const scrollPos = iframe.scrollY + iframe.innerHeight;
+                            const scrollHeight = lastContent.document.body.scrollHeight;
+                            
+                            if (scrollHeight - scrollPos < iframe.innerHeight * 0.2) {
+                                console.log("Near bottom, attempting to load more content");
+                                rendition.next();
+                            }
+                        }, 300);
                         scrollBtn.style.display = 'none';
-                    } catch (error) {
-                        console.error("Error navigating:", error);
                     }
                 };
                 
-                // Append to div2viewer
+                // Append to div2viewer instead of body
                 const div2viewer = document.getElementById('div2viewer');
                 div2viewer.appendChild(scrollBtn);
-                div2viewer.style.position = 'relative';
+                
+                // Make sure div2viewer has a position for absolute positioning to work properly
+                div2viewer.style.position = div2viewer.style.position || 'relative';
             }
-            if (cfi) {
-                rendition.display(cfi, { offsetTop: 1000 });
-            }
-        }
+    }
 
     recordBtn.addEventListener('click', async () => { //standarised procedure 
-        let permissionResult = await navigator.permissions.query({ name: 'microphone' });
+        const permissionResult = await navigator.permissions.query({ name: 'microphone' });
         console.log("permissionResult: ", permissionResult);
-
+        
         if (permissionResult.state != 'granted') {
-            permissionResult = await navigator.permissions.query({ name: 'microphone' });
-            console.log("permissionResult: ", permissionResult);
-
             alert('Please grant permission to access the microphone');
-            const streamPermission = await navigator.mediaDevices.getUserMedia({ audio: true });
-    
+            return;
         } else if (permissionResult.state == 'granted') {
             console.log("permission granted");
-
             if (!isRecording) {
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true }); //built-in function of mozilla to get the media of the user
                 mediaRecorder = new MediaRecorder(stream); //object pre-built
@@ -1100,27 +1032,20 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
                 };
 
                 mediaRecorder.start();
+                recordBtn.src = "images/stopRecButton.png";
+                //socket.send(JSON.stringify({ event: 'start' })); // Notify server that recording has started
                 isRecording=true;
-                if (mediaRecorder.state === 'recording') {
-                    console.log('Recording started successfully, this is the state: ', mediaRecorder.state);
-                    recordBtn.src = "images/stopRecButton.png"; //this is the button in DARK RED
-                } else {
-                    alert('Failed to start recording. Please try again.');
-                    isRecording = false;
-                    recordBtn.src = "images/recordingButton.png";
-                }
 
             } else {   //this means that isRecording==true;
                 mediaRecorder.stop(); 
                 isRecording=false;
                 recordBtn.src = "images/recordingButton.png";
-            } 
-                   
+            }        
             mediaRecorder.onstop = () => {
                 createBlobAndConnect(); // Call the function to create the blob and connect
                 //socket.send(JSON.stringify({ event: 'stop' })); // Notify server that recording has stopped
             };
-            }
+        }
     });
 
     const closeModalBtn = document.querySelector('.close-modal');
@@ -1156,17 +1081,6 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
     fileDiv.addEventListener('click',()=> {
         fileInput.click();
     })
-    userSection.addEventListener('click', (event) => {
-        if (userSection.textContent == "Login") {
-            console.log("user section clicked");
-            console.log("Drawer classList before:", drawer.classList);
-            drawer.style.display = 'block';  // First set display to block
-            setTimeout(() => {
-                drawer.classList.add('open'); // Then add the open class
-            }, 10);
-            event.stopPropagation();
-        }
-    });
 
     settingsBtn.addEventListener('click', (event) => {
         console.log("settings button clicked");
@@ -1229,55 +1143,75 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
         if ('speechSynthesis' in window) {
             console.log('Starting text-to-speech for:', textToSpeak);
             
-            // Cancel any ongoing speech
-            window.speechSynthesis.cancel();
-            
             let msg = new SpeechSynthesisUtterance();
             msg.text = textToSpeak;
             
-            // Get the current language (first 2 chars)
+            // Make sure we're using the correct language
             const currentLang = languageSel.substring(0,2);
             console.log('Using language:', currentLang);
             msg.lang = currentLang;
             
-            // Set standard speech parameters
-            msg.rate = 0.8;
+            // Match the settings from the robot button
+            msg.rate = 1;
             msg.volume = 1;
             msg.pitch = 1;
             
-            // Get available voices
+            // Select a voice based on gender preference
             const voices = window.speechSynthesis.getVoices();
             
-            // Find a voice that matches our language
-            const matchingVoice = voices.find(voice => 
-                voice.lang.toLowerCase().startsWith(currentLang.toLowerCase())
-            );
+            // Filter voices by language and gender
+            const matchingVoices = voices.filter(voice => {
+                // Check if voice language matches or contains our target language
+                const voiceLang = voice.lang.toLowerCase();
+                const targetLang = currentLang.toLowerCase();
+                const langMatch = voiceLang.startsWith(targetLang) || voiceLang.includes(targetLang);
+                
+                // Determine gender based on voice name (common pattern in voice APIs)
+                // This is a heuristic and may not be 100% accurate
+                const isFemaleName = voice.name.toLowerCase().includes('female') || 
+                                   voice.name.toLowerCase().includes('woman') ||
+                                   voice.name.toLowerCase().includes('girl') ||
+                                   voice.name.toLowerCase().includes('fiona') ||
+                                   voice.name.toLowerCase().includes('samantha') ||
+                                   voice.name.toLowerCase().includes('victoria');
+                                   
+                const isMaleName = voice.name.toLowerCase().includes('male') || 
+                                 voice.name.toLowerCase().includes('man') ||
+                                 voice.name.toLowerCase().includes('guy') ||
+                                 voice.name.toLowerCase().includes('david') ||
+                                 voice.name.toLowerCase().includes('thomas') ||
+                                 voice.name.toLowerCase().includes('daniel');
+                
+                // Match based on selected gender
+                const genderMatch = (selectedVoiceGender === 'female' && isFemaleName) || 
+                                  (selectedVoiceGender === 'male' && isMaleName);
+                
+                return langMatch && genderMatch;
+            });
             
-            if (matchingVoice) {
-                msg.voice = matchingVoice;
-                console.log("Selected voice:", matchingVoice.name);
+            console.log(`Found ${matchingVoices.length} matching voices for ${currentLang} and gender ${selectedVoiceGender}`);
+            
+            // Use the first matching voice, or fall back to default
+            if (matchingVoices.length > 0) {
+                msg.voice = matchingVoices[0];
+                console.log("Selected voice:", msg.voice.name);
+            } else {
+                console.log("No matching voice found, using default");
             }
             
-            // Add event listeners for state management
-            msg.onstart = () => {
-                console.log('Speech started');
-                textToSpeechBtn.setAttribute('data-speaking', 'true');
-                textToSpeechBtn.style.filter = 'brightness(0.7)';
-            };
-            
+            // Add event listeners to debug TTS issues
+            msg.onstart = () => console.log('Speech started');
             msg.onend = () => {
                 console.log('Speech ended');
                 textToSpeechBtn.setAttribute('data-speaking', 'false');
                 textToSpeechBtn.style.filter = 'brightness(1)';
             };
-            
             msg.onerror = (e) => {
                 console.error('Speech error:', e);
                 textToSpeechBtn.setAttribute('data-speaking', 'false');
                 textToSpeechBtn.style.filter = 'brightness(1)';
             };
             
-            // For iOS compatibility, we need to speak immediately after user interaction
             window.speechSynthesis.speak(msg);
         } else {
             console.error("Speech synthesis not supported in this browser");
@@ -1427,7 +1361,7 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
         const makeRangeCfi = (a, b) => {
                 const CFI = new ePub.CFI()
                 const start = CFI.parse(a), end = CFI.parse(b)
-                const cfiRange = {
+                const cfi = {
                     range: true,
                     base: start.base,
                     path: {
@@ -1437,19 +1371,19 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
                     start: start.path,
                     end: end.path
                 }
-                const len = cfiRange.start.steps.length
+                const len = cfi.start.steps.length
                 for (let i = 0; i < len; i++) {
-                    if (CFI.equalStep(cfiRange.start.steps[i], cfiRange.end.steps[i])) {
+                    if (CFI.equalStep(cfi.start.steps[i], cfi.end.steps[i])) {
                         if (i == len - 1) {
-                            if (cfiRange.start.terminal === cfiRange.end.terminal) {
-                                cfiRange.path.steps.push(cfiRange.start.steps[i])
-                                cfiRange.range = false
+                            if (cfi.start.terminal === cfi.end.terminal) {
+                                cfi.path.steps.push(cfi.start.steps[i])
+                                cfi.range = false
                             }
-                        } else cfiRange.path.steps.push(cfiRange.start.steps[i])
+                        } else cfi.path.steps.push(cfi.start.steps[i])
                     } else break
                 }
-                cfiRange.start.steps = cfiRange.start.steps.slice(cfiRange.path.steps.length)
-                cfiRange.end.steps = cfiRange.end.steps.slice(cfiRange.path.steps.length)
+                cfi.start.steps = cfi.start.steps.slice(cfi.path.steps.length)
+                cfi.end.steps = cfi.end.steps.slice(cfi.path.steps.length)
 
                 return 'epubcfi(' + CFI.segmentString(cfi.base)
                     + '!' + CFI.segmentString(cfi.path)
@@ -1559,7 +1493,19 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
     
     }
 
+    // Select all elements with the 'close' class
+    const closeButtons = document.getElementsByClassName('close');
 
+    // Add click event listener to each close button
+    Array.from(closeButtons).forEach(closeBtn => {
+        closeBtn.addEventListener('click', () => {
+            // Find the closest parent modal/drawer
+            const container = closeBtn.closest('.modal, .drawer, #books-modal');
+            if (container) {
+                container.style.display = 'none';
+            }
+        });
+    });
 
     function updatePointsDisplay(points) {
         // Update all points displays
@@ -1587,301 +1533,22 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
         }
     }
 
-    pageleDiv.addEventListener('click', () => {
-        // Show modal with loading spinner
-        pageleModal.style.display = "block";
-
-        if (!selectedBook) {
-            // If no book is selected, show the books modal instead
-            booksModal.style.display = "block";
-            pageleModal.style.display = "none";
-            return;
-        }
-
-        // Get current chapter's content
-        const currentLocation = rendition.currentLocation();
-        if (!currentLocation || !currentLocation.start) {
-            console.error("Could not get current location");
-            return;
-        }
-
-        // Get the current spine item (chapter)
-        const spineItem = currentBook.spine.get(currentLocation.start.index);
+    feedbackBtn.addEventListener('click', async () => {
+        const response = await fetch('surveycopy.html');
+        const surveyHtml = await response.text();
         
-        // Get the full text content of the current chapter
-        spineItem.load(currentBook.load.bind(currentBook))
-            .then(doc => {
-                // Extract text content from paragraphs and other text elements
-                const textNodes = doc.querySelectorAll('p, div, span, article');
-                const textContent = Array.from(textNodes)
-                    .map(node => node.textContent.trim())
-                    .filter(text => text.length > 0)
-                    .join(' ');
-                
-                // Split into sentences and store them globally
-                currentChapterSentences = textContent
-                    .split(/(?<=[.!?])\s+/)
-                    .map(sentence => sentence.trim())
-                    .filter(sentence => 
-                        sentence.length > 10 && // Minimum length
-                        !/^[0-9\s]*$/.test(sentence) && // Not just numbers
-                        sentence !== sentence.toUpperCase() // Not all caps (likely headers)
-                    );
-
-                // Reset to first sentence
-                currentSentenceIndex = 0;
-                
-                // Create navigation HTML with action buttons
-                pageleContent.innerHTML = `
-                    <div style="display: flex; align-items: center; justify-content: center; gap: 20px;">
-                        <button id="prevSentence" style="font-size: 24px; padding: 10px 20px;">←</button>
-                        <div id="sentenceDisplay" style="flex: 1; text-align: center; font-size: 18px; padding: 20px;">
-                            ${currentChapterSentences[currentSentenceIndex]}
-                        </div>
-                        <button id="nextSentence" style="font-size: 24px; padding: 10px 20px;">→</button>
-                    </div>
-                    <div style="text-align: center; margin-top: 10px;">
-                        <span id="sentenceCounter">
-                            ${currentSentenceIndex + 1} / ${currentChapterSentences.length}
-                        </span>
-                    </div>
-                    <div id="actionButtons" style="position: relative; margin-top: 20px; text-align: center;">
-                        <img id="pageleRecord" src="images/recordingButton.png" alt="record icon"/>
-                        <img id="pageleRobot" src="images/robot_talk_white.png" alt="robot" data-speaking="false"/>
-                        
-                        <div id="recording-status" style="
-                            display: none;
-                            position: absolute;
-                            top: 0;
-                            left: 0;
-                            right: 0;
-                            bottom: 0;
-                            background-color: rgba(0, 0, 0, 0.7);
-                            flex-direction: column;
-                            align-items: center;
-                            justify-content: center;
-                            z-index: 1000;">
-                            <div class="status-spinner"></div>
-                            <div class="status-message">Processing...</div>
-                            <div class="timer">0.0s</div>
-                        </div>
-                    </div>
-                `;
-
-                // Add event listeners for navigation
-                document.getElementById('prevSentence').addEventListener('click', () => {
-                    if (currentSentenceIndex > 0) {
-                        currentSentenceIndex--;
-                        updateSentenceDisplay();
-                    }
-                });
-
-                document.getElementById('nextSentence').addEventListener('click', () => {
-                    if (currentSentenceIndex < currentChapterSentences.length - 1) {
-                        currentSentenceIndex++;
-                        updateSentenceDisplay();
-                    }
-                });
-
-                // Add event listeners for action buttons
-                const pageleRecordBtn = document.getElementById('pageleRecord');
-                const pageleRobotBtn = document.getElementById('pageleRobot');
-
-                pageleRecordBtn.addEventListener('click', async () => {
-                    if (!isRecording) {
-                        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                        mediaRecorder = new MediaRecorder(stream);
-                        
-                        mediaRecorder.ondataavailable = event => {
-                            audioChunks.push(event.data);
-                        };
-
-                        mediaRecorder.start();
-                        pageleRecordBtn.src = "images/stopRecButton.png";
-                        isRecording = true;
-                    } else {
-                        mediaRecorder.stop();
-                        isRecording = false;
-                        pageleRecordBtn.src = "images/recordingButton.png";
-                    }
-                    
-                    mediaRecorder.onstop = () => {
-                        // Use the current sentence for comparison
-                        lines = [currentChapterSentences[currentSentenceIndex]];
-                        lineNum = 0;
-                        createBlobAndConnect();
-                    };
-                });
-
-                pageleRobotBtn.addEventListener('click', () => {
-                    const isCurrentlySpeaking = pageleRobotBtn.getAttribute('data-speaking') === 'true';
-                    
-                    if (isCurrentlySpeaking) {
-                        window.speechSynthesis.cancel();
-                        pageleRobotBtn.setAttribute('data-speaking', 'false');
-                        pageleRobotBtn.style.filter = 'brightness(1)';
-                    } else {
-                        pageleRobotBtn.setAttribute('data-speaking', 'true');
-                        pageleRobotBtn.style.filter = 'brightness(0.7)';
-                        textToSpeech(currentChapterSentences[currentSentenceIndex]);
-                    }
-                });
-            })
-            .catch(error => {
-                console.error("Error loading chapter content:", error);
-                pageleModal.style.display = "none";
-                alert("Error loading chapter content. Please try again.");
-            });
+        feedbackModal.style.display = 'block';
+        feedbackModal.innerHTML = surveyHtml; 
     });
 
-    // Add this function to update the sentence display
-    function updateSentenceDisplay() {
-        document.getElementById('sentenceDisplay').textContent = currentChapterSentences[currentSentenceIndex];
-        document.getElementById('sentenceCounter').textContent = 
-            `${currentSentenceIndex + 1} / ${currentChapterSentences.length}`;
-    }
-
-    // Add this new function to convert CFIs
-    function convertCfiForServer(clientCfi) {
-        console.log("Original CFI:", clientCfi);
-        
-        // If no CFI is available, return null
-        if (!clientCfi) return null;
-        
-        // Extract the spine index from the CFI
-        const spineMatch = clientCfi.match(/\/([0-9]+)!/);
-        if (!spineMatch || spineMatch.length < 2) {
-            console.error("Could not extract spine index from CFI");
-            return clientCfi; // Return original if we can't parse it
-        }
-        
-        // Get the spine index from the CFI (JavaScript format)
-        const jsSpineIndex = parseInt(spineMatch[1]);
-        
-        // Convert to Python-compatible spine index (handle the off-by-two difference)
-        // This is an approximation based on our testing - may need adjustment
-        const pySpineIndex = jsSpineIndex - 2; // JS uses 4, Python uses 2 for same content
-        
-        // Create a simplified CFI that focuses just on the spine position
-        // This is more likely to be interpreted correctly by the server
-        const simplifiedCfi = `epubcfi(/6/${pySpineIndex}!/)`;
-        
-        console.log("Converted CFI:", simplifiedCfi);
-        return simplifiedCfi;
-    }
-
-    // Get the current spine position directly from the reader
-    function getCurrentSpinePosition() {
-        try {
-            if (rendition && rendition.location) {
-                const location = rendition.location.start;
-                if (location && location.index) {
-                    return location.index;
-                }
-            }
-        } catch (error) {
-            console.error("Error getting spine position:", error);
-        }
-        return 0; // Default to 0 if we can't determine position
-    }
-
-    // Get text surrounding the current position to help with content matching
-    function getTextAroundCurrentPosition(charCount) {
-        try {
-            if (rendition && rendition.getContents().length > 0) {
-                const contents = rendition.getContents()[0];
-                const win = contents.window;
-                const selection = win.getSelection();
-                
-                // If there's a selection, use that as the center point
-                if (selection && selection.rangeCount > 0) {
-                    const range = selection.getRangeAt(0);
-                    const startNode = range.startContainer;
-                    
-                    // Get the parent paragraph or element
-                    let parentElement = startNode;
-                    while (parentElement && parentElement.nodeType !== 1) {
-                        parentElement = parentElement.parentNode;
-                    }
-                    
-                    if (parentElement) {
-                        // Return the text content of this element
-                        return parentElement.textContent.trim();
-                    }
-                }
-                
-                // If no selection, try to get text from current visible area
-                const visibleElements = contents.document.querySelectorAll('p, div');
-                for (let i = 0; i < visibleElements.length; i++) {
-                    const rect = visibleElements[i].getBoundingClientRect();
-                    // Check if element is visible in viewport
-                    if (rect.top >= 0 && rect.bottom <= win.innerHeight) {
-                        return visibleElements[i].textContent.trim();
-                    }
-                }
-            }
-        } catch (error) {
-            console.error("Error getting text context:", error);
-        }
-        return ""; // Return empty string if we can't get context
-    }
-
-    tutorialBtn.addEventListener('click', () => {
-        const tutorialModal = document.getElementById('tutorialModal');
-        const tutorialContent = document.getElementById('tutorial-content');
-        
-        // Show modal with loading spinner
-        tutorialModal.style.display = "block";
-        
-        // Fetch the tutorial content
-        fetch('tutorial.html')
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error('Network response was not ok');
-                }
-                return response.text();
-            })
-            .then(html => {
-                tutorialContent.innerHTML = html;
-            })
-            .catch(error => {
-                console.error('Error loading tutorial:', error);
-                tutorialContent.innerHTML = `
-                    <div style="text-align: center; padding: 20px;">
-                        <h3>Error loading tutorial content</h3>
-                        <p>Please try again later.</p>
-                    </div>
-                `;
-            });
+    sendFeedbackBtn.addEventListener('click', () => {
+        feedbackModal.style.display = 'none';
+        //console.log("sendFeedbackBtn clicked");
+        //const message = {
+        //    task: "get_survey"
+        //};
+        //sendSocketMessage(JSON.stringify(message));
     });
 
-    // Make sure the close button works properly for the tutorial modal
-    document.querySelectorAll('#tutorialModal .close').forEach(closeBtn => {
-        closeBtn.addEventListener('click', () => {
-            document.getElementById('tutorialModal').style.display = 'none';
-        });
-    });
 
-    // Close modal when clicking outside
-    window.addEventListener('click', (event) => {
-        const tutorialModal = document.getElementById('tutorialModal');
-        if (event.target === tutorialModal) {
-            tutorialModal.style.display = 'none';
-        }
-    });
-
-    // Make sure the close button works properly for the pagele modal
-    document.querySelectorAll('#pageleModal .close').forEach(closeBtn => {
-        closeBtn.addEventListener('click', () => {
-            document.getElementById('pageleModal').style.display = 'none';
-        });
-    });
-
-    // Close modal when clicking outside
-    window.addEventListener('click', (event) => {
-        const pageleModal = document.getElementById('pageleModal');
-        if (event.target === pageleModal) {
-            pageleModal.style.display = 'none';
-        }
-    });
 </script>

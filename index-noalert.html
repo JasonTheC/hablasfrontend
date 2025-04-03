@@ -280,8 +280,8 @@ function waitForEpub() {
 
 // Replace the existing WebSocket implementation with a simpler function-based approach
 function createWebSocketConnection() {
-    const socket = new WebSocket('wss://carriertech.uk:8675');
-    //const socket = new WebSocket('ws://localhost:8675');
+    //const socket = new WebSocket('wss://carriertech.uk:8675');
+    const socket = new WebSocket('ws://localhost:8675');
     socket.addEventListener('open', (event) => {
         console.log('WebSocket connection established');
     });
@@ -1078,49 +1078,30 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
         }
 
     recordBtn.addEventListener('click', async () => { //standarised procedure 
-        let permissionResult = await navigator.permissions.query({ name: 'microphone' });
-        console.log("permissionResult: ", permissionResult);
-
-        if (permissionResult.state != 'granted') {
-            permissionResult = await navigator.permissions.query({ name: 'microphone' });
-            console.log("permissionResult: ", permissionResult);
-
-            alert('Please grant permission to access the microphone');
-            const streamPermission = await navigator.mediaDevices.getUserMedia({ audio: true });
-    
-        } else if (permissionResult.state == 'granted') {
-            console.log("permission granted");
-
-            if (!isRecording) {
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true }); //built-in function of mozilla to get the media of the user
-                mediaRecorder = new MediaRecorder(stream); //object pre-built
-                
-                mediaRecorder.ondataavailable = event => { //event = the object has changed in some way. every ms that you talk and it gets saved in the array
-                    audioChunks.push(event.data);  //saving the audio into an array
-                };
-
-                mediaRecorder.start();
-                isRecording=true;
-                if (mediaRecorder.state === 'recording') {
-                    console.log('Recording started successfully, this is the state: ', mediaRecorder.state);
-                    recordBtn.src = "images/stopRecButton.png"; //this is the button in DARK RED
-                } else {
-                    alert('Failed to start recording. Please try again.');
-                    isRecording = false;
-                    recordBtn.src = "images/recordingButton.png";
-                }
-
-            } else {   //this means that isRecording==true;
-                mediaRecorder.stop(); 
-                isRecording=false;
-                recordBtn.src = "images/recordingButton.png";
-            } 
-                   
-            mediaRecorder.onstop = () => {
-                createBlobAndConnect(); // Call the function to create the blob and connect
-                //socket.send(JSON.stringify({ event: 'stop' })); // Notify server that recording has stopped
+        if (!isRecording) {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true }); //built-in function of mozilla to get the media of the user
+            mediaRecorder = new MediaRecorder(stream); //object pre-built
+            
+            mediaRecorder.ondataavailable = event => { //event = the object has changed in some way. every ms that you talk and it gets saved in the array
+                audioChunks.push(event.data);  //saving the audio into an array
             };
-            }
+
+            mediaRecorder.start();
+            recordBtn.src = "images/stopRecButton.png";
+            //socket.send(JSON.stringify({ event: 'start' })); // Notify server that recording has started
+            isRecording=true;
+
+         } else {   //this means that isRecording==true;
+            mediaRecorder.stop(); 
+            isRecording=false;
+            recordBtn.src = "images/recordingButton.png";
+         }        
+        mediaRecorder.onstop = () => {
+            createBlobAndConnect(); // Call the function to create the blob and connect
+            //socket.send(JSON.stringify({ event: 'stop' })); // Notify server that recording has stopped
+        };
+
+       
     });
 
     const closeModalBtn = document.querySelector('.close-modal');
