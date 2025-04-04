@@ -1598,6 +1598,8 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
 
     pageleDiv.addEventListener('click', () => {
         // Show modal with loading spinner
+        
+        document.getElementById('myModal').style.display = "none";
         pageleModal.style.cssText = `
             position: fixed;
             top: 50%;
@@ -1613,6 +1615,7 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
             height: auto;
             width: auto;
         `;
+        
 
         if (!selectedBook) {
             // If no book is selected, show the books modal instead
@@ -1651,6 +1654,7 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
                         sentence !== sentence.toUpperCase() // Not all caps (likely headers)
                     );
 
+
                 // Reset to first sentence
                 totalDailySentences = 10;
                 currentDailySentences = [];
@@ -1670,6 +1674,8 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
                 
                 updateTranslation(sentenceToTranslate); //has inside handleTranslationResponse
                 console.log("dailySentenceToTranslate:", sentenceToTranslate);
+
+                //document.getElementById('div2viewer').style.display = "none"; //04 April 2025 STOPPED HERE
             
                 pageleContent.innerHTML = `
                     <div style="
@@ -1948,6 +1954,8 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
     document.querySelectorAll('#pageleModal .close').forEach(closeBtn => {
         closeBtn.addEventListener('click', () => {
             document.getElementById('pageleModal').style.display = 'none';
+            document.getElementById('div2viewer').style.display = "block";
+            document.getElementById('myModal').style.display = "block";
         });
     });
 
