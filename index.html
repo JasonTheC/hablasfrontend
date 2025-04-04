@@ -256,6 +256,8 @@
     let totalDailySentences = 10;
     let currentDailySentences = []; //sentences of today
     let lastSentencePosition = 0;   // Track where we left off the daily sentences
+    let sentenceToTranslate = "";
+    let dailyTranslationSentence = "translating daily sentence...";
 
     let positionFirstDailySentence = 0;
 
@@ -589,8 +591,10 @@ function setLanguage(language){
 
 function handleTranslationResponse(response) {
     // Handle translation response
-    const translatedText = response.translation || response.translated_text;
+    const translatedText = response.translated_text;
     translation.innerHTML = translatedText;
+    document.getElementById('daily-translation-sentence').innerHTML = translatedText;
+    //dailyTranslationSentence = translatedText; 
     console.log("Updated translation with:", translatedText);
 }
 
@@ -1648,6 +1652,11 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
                 // Create navigation HTML with action buttons
                 //${allSentences[currentSentenceIndex]}
                 //${currentSentenceIndex + 1} / ${allSentences.length}
+                sentenceToTranslate = currentDailySentences[currentSentenceIndex];
+                
+                updateTranslation(sentenceToTranslate); //has inside handleTranslationResponse
+                console.log("dailySentenceToTranslate:", sentenceToTranslate);
+            
                 pageleContent.innerHTML = `
                     <div style="display: flex; align-items: center; justify-content: center; gap: 20px;">
                         <button id="prevSentence" style="font-size: 24px; padding: 10px 20px;">←</button>
@@ -1656,6 +1665,8 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
                         </div>
                         <button id="nextSentence" style="font-size: 24px; padding: 10px 20px;">→</button>
                     </div>
+                    <div id="daily-translation-sentence" style="font-size: 13px; padding: 10px 20px; text-align: center;">loading...</div>
+                    
                     <div style="text-align: center; margin-top: 10px;">
                         <span id="sentenceCounter">
                             ${currentSentenceIndex + 1} / ${totalDailySentences}
@@ -1688,6 +1699,9 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
                 document.getElementById('prevSentence').addEventListener('click', () => {
                     if (currentSentenceIndex > 0) {
                         currentSentenceIndex--;
+                        sentenceToTranslate = currentDailySentences[currentSentenceIndex];
+                        console.log("dailySentenceToTranslate:", sentenceToTranslate);
+                        updateTranslation(sentenceToTranslate); //has inside handleTranslationResponse
                         updateSentenceDisplay();
                     }
                 });
@@ -1696,18 +1710,16 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
                     if (currentSentenceIndex < totalDailySentences - 1) {
                         //if (currentSentenceIndex < allSentences.length - 1) { //previous code
                         currentSentenceIndex++;
+                        sentenceToTranslate = currentDailySentences[currentSentenceIndex];
+                        updateTranslation(sentenceToTranslate); //has inside handleTranslationResponse
+                        console.log("dailySentenceToTranslate:", sentenceToTranslate);
                         updateSentenceDisplay();
 
                         //if we're at the end of the daily sentences, update the last sentence position
                         if (currentSentenceIndex === totalDailySentences - 1) {
                             lastSentencePosition = (lastSentencePosition + totalDailySentences + 1) % allSentences.length; //I should add +1 so next time we start on the next sentence ASK JASON
                             // We should also save the last sentence position in the server right? 
-                            sendSocketMessage({
-                                task: "save_last_sentence_position",
-                                last_sentence_position: lastSentencePosition,
-                                username:username,
-                                book:selectedBook,
-                            })
+                            
                         }
                     }
                 });
