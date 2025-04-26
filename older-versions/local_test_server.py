@@ -65,15 +65,7 @@ import uuid  # Add this import for UUID generation
 import soundfile as sf
 import numpy as np
 import wave
-from bs4 import BeautifulSoup  # Add this import at the top of the file
-import ebooklib
-from ebooklib import epub
-import random
-import re
-from bs4 import BeautifulSoup
-import nltk
-nltk.download('punkt')
-from nltk.tokenize import sent_tokenize, word_tokenize
+
 
 LANG_ID = "fr"
 MODEL_ID = "jonatasgrosman/wav2vec2-large-xlsr-53-french"
