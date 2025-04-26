@@ -4,6 +4,7 @@ import websockets , json # the json is bc we're sending a json object from the w
 import wave , base64
 import os #library for anything that has to do with your hard-drive
 import torch, sqlite3
+from gtts import gTTS  # Add this import for Google Text-to-Speech
 
 import librosa #library to analyse and process audio . soundfile is similar
 from transformers import Wav2Vec2ForCTC, Wav2Vec2Processor
@@ -704,6 +705,45 @@ def pagele_task(data_object):
         print(f"Error in pagele_task: {e}")
         return {"status": "error", "message": str(e)}
 
+async def tts_task(data_object):
+    """Convert text to speech using Google Text-to-Speech"""
+    try:
+        text = data_object.get("text", "")
+        lang = data_object.get("language", "en")
+        
+        # Map language name to code if needed
+        if lang.lower() in language_name_map:
+            lang = language_name_map[lang.lower()]
+            
+        if not text:
+            return {"status": "error", "message": "No text provided for TTS conversion"}
+            
+        # Generate a unique filename
+        timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+        audio_filename = f"tts_{timestamp}.mp3"
+        audio_path = Path("tts_output") / audio_filename
+        audio_path.parent.mkdir(exist_ok=True, parents=True)
+        
+        # Generate speech using gTTS
+        tts = gTTS(text=text, lang=lang, slow=False)
+        tts.save(str(audio_path))
+        
+        # Convert the audio file to base64
+        with open(audio_path, "rb") as audio_file:
+            audio_data = audio_file.read()
+            audio_base64 = base64.b64encode(audio_data).decode('utf-8')
+            
+        # Return the audio as base64 with appropriate MIME type
+        return {
+            "status": "success",
+            "audio": f"data:audio/mp3;base64,{audio_base64}",
+            "language": lang
+        }
+        
+    except Exception as e:
+        print(f"Error in tts_task: {e}")
+        return {"status": "error", "message": str(e)}
+
 async def handle_connection(websocket):
     print(f"Client connected, {websocket.remote_address}")
     
@@ -723,6 +763,9 @@ async def handle_connection(websocket):
         elif data_object.get("task") == "stt":
             message_returned = stt_task(data_object)
             logger.log_event("stt", {**data_object, **message_returned}, websocket)
+        elif data_object.get("task") == "tts":
+            message_returned = await tts_task(data_object)
+            logger.log_event("tts", {**data_object, **message_returned}, websocket)
         elif data_object.get("task") == "login":
             message_returned = await db.login_task(data_object)
             logger.log_event("login", {**data_object, **message_returned}, websocket)

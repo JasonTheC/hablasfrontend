@@ -1,0 +1,29 @@
+<html>
+<body>
+    <textarea id="text-input" rows="4" cols="50">Hello, world!</textarea>
+    <br>
+    <select id="language-select">
+        <option value="en-US">English (US)</option>
+        <option value="fr-FR">French</option>
+        <option value="de-DE">German</option>
+        <option value="es-ES">Spanish</option>
+        <option value="it-IT">Italian</option>
+    </select>
+    <button id="speak-button">Speak</button>
+
+    <script src="https://js.puter.com/v2/"></script>
+    <script>
+        document.getElementById('speak-button').addEventListener('click', () => {
+            const text = document.getElementById('text-input').value;
+            const language = document.getElementById('language-select').value;
+            puter.ai.txt2speech(text, language)
+                .then((audio) => {
+                    audio.play();
+                })
+                .catch((error) => {
+                    console.error('Error:', error);
+                });
+        });
+    </script>
+</body>
+</html>

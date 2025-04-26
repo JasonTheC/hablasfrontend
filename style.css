@@ -68,7 +68,7 @@ div {
     height: 55svh; /* Automatic height */
     background-blend-mode: overlay; /* Blend texture with background color */
     padding: 0; /* Remove padding that might cause overflow */
-    display: flex; /* Make it a flex container */
+    display: none; /* Make it a flex container */
     flex-direction: column; /* Stack children vertically */
     overflow: hidden; /* Prevent overflow */
 }
@@ -1011,5 +1011,159 @@ flex-direction: column;
     #tutorialModal .icon-button {
         width: 60px;
         height: 60px;
+    }
+}
+
+#pageleModal {
+position: fixed;
+top: 50%;
+left: 50%;
+transform: translate(-50%, -50%);
+background-color: white;
+border-radius: 10px;
+box-shadow: rgba(0, 0, 0, 0.1) 0px 2px 10px;
+padding: 20px;
+max-width: 600px;
+z-index: 1000;
+display: none;
+height: auto;
+width: auto;
+}
+
+#initChoice {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 80vh;
+    text-align: center;
+    padding: 20px;
+    background-color: #f9f9f9;
+    border-radius: 12px;
+    margin: 20px auto;
+    max-width: 800px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+}
+
+#initChoice h2 {
+    color: #333;
+    font-size: 2.5em;
+    margin-bottom: 10px;
+    font-family: 'Montserrat', sans-serif;
+    font-weight: 700;
+}
+
+.intro-text {
+    color: #666;
+    font-size: 1.2em;
+    margin-bottom: 40px;
+    font-family: 'Lato', sans-serif;
+}
+
+.choice-container {
+    display: flex;
+    justify-content: center;
+    gap: 30px;
+    width: 100%;
+    max-width: 800px;
+    flex-direction: column;
+    align-items: center;
+}
+
+.choice-option {
+    flex: 1;
+    background: white;
+    border-radius: 15px;
+    padding: 40px 30px;
+    transition: all 0.3s ease;
+    cursor: pointer;
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.1);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 280px;
+    width: 90%;
+    max-width: 400px;
+    margin-bottom: 25px;
+    border: 2px solid #f0f0f0;
+}
+
+.choice-option:hover {
+    transform: translateY(-8px);
+    box-shadow: 0 15px 30px rgba(0, 0, 0, 0.15);
+}
+
+.choice-option:active {
+    transform: translateY(2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.choice-icon {
+    width: 80px;
+    height: 80px;
+    margin-bottom: 20px;
+}
+
+.choice-option h3 {
+    font-family: 'Roboto', sans-serif;
+    font-weight: 700;
+    font-size: 1.8em;
+    margin: 15px 0;
+    color: #222;
+}
+
+.choice-option p {
+    color: #555;
+    font-family: 'Quicksand', sans-serif;
+    font-size: 1.2em;
+    line-height: 1.5;
+}
+
+#initDailyPagele, #initFreeRead {
+    display: block;
+    width: 80%;
+    max-width: 400px;
+    margin: 15px auto;
+    padding: 20px;
+    text-align: center;
+    font-size: 1.4rem;
+    font-weight: bold;
+    border-radius: 5px; /* More square-shaped */
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-family: 'Roboto', sans-serif;
+    background: transparent; /* Transparent background */
+    border-width: 3px;
+    border-style: solid;
+}
+
+#initDailyPagele {
+    border-color: #4A90E2;
+    color: #4A90E2;
+}
+
+#initFreeRead {
+    border-color: #50C878;
+    color: #50C878;
+}
+
+#initDailyPagele:hover, #initFreeRead:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+}
+
+#initDailyPagele:active, #initFreeRead:active {
+    transform: translateY(2px);
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+/* Mobile-specific adjustments */
+@media (max-width: 768px) {
+    #initDailyPagele, #initFreeRead {
+        width: 90%;
+        padding: 25px 15px;
+        font-size: 1.6rem;
+        margin: 20px auto;
     }
 }

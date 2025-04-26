@@ -4,6 +4,7 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.1.5/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/epubjs/dist/epub.min.js"></script>
+<script src="https://js.puter.com/v2/"></script>
 <link href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700&family=Roboto:wght@400;700&family=Quicksand:wght@400;700&family=Montserrat:wght@400;700&display=swap" rel="stylesheet"> <!-- Include Lato, Roboto, and Montserrat fonts -->
 <link rel="stylesheet" href="style.css?v=1.0">
 <head>
@@ -22,6 +23,11 @@
             <div id="user-section">Login</div>
             <img src="images/settings.png" id="settings"/> 
         </div>
+    </div>
+
+    <div id="initChoice">
+        <div id="initDailyPagele">Daily Pagele</div>
+        <div id="initFreeRead">Free read</div>
     </div>
 
     <div id="div2viewer">
@@ -144,6 +150,10 @@
 
 
 <script>
+    
+    const EVENT_TYPE = ('ontouchstart' in window) ? 'touchend' : 'click';
+    console.log(`Using ${EVENT_TYPE} events for this device`);
+
     const fileInput = document.getElementById('fileInput');
     fileInput.style.display= "none";
     let currentBook = null;
@@ -174,7 +184,7 @@
 
     // Add click event listener to each close button
     Array.from(closeButtons).forEach(closeBtn => {
-        closeBtn.addEventListener('click', () => {
+        closeBtn.addEventListener(EVENT_TYPE, () => {
             // Find the closest parent modal/drawer
             
             const container = closeBtn.closest('.modal, .drawer, #books-modal');
@@ -233,6 +243,9 @@
     const deleteAccountButton = document.getElementById ('delete-account-button');
     const pageleModal = document.getElementById('pageleModal');
     const pageleContent = document.getElementById('pagele-content');
+    const initDailyPagele = document.getElementById('initDailyPagele');
+    const initFreeRead = document.getElementById("initFreeRead");
+    const initChoice = document.getElementById('initChoice');
     let username = '';
     let password = '';
 
@@ -260,6 +273,9 @@
     let dailyTranslationSentence = "translating daily sentence...";
 
     let positionFirstDailySentence = 0;
+
+    // Add this variable with other globals at the top
+    let currentAudio = null;
 
 console.log ("starting script");
 
@@ -329,6 +345,9 @@ function createWebSocketConnection() {
             } else if (response.status === 'success' && response.hasOwnProperty('epub')) {
                 // Handle book data response
                 handleBookDataResponse(response);
+            } else if (response.status === 'success' && response.hasOwnProperty('audio')) {
+                // Handle TTS response
+                handleTTSResponse(response);
             } else if (response.message === "Invalid credentials") {
                 alert("Invalid credentials, have you signed up?");
             } else if(response.hasOwnProperty('filename')) {
@@ -425,7 +444,7 @@ function createBlobAndConnect() {
 }
 
 // Update login button click handler
-loginButton.addEventListener('click', () => {
+loginButton.addEventListener(EVENT_TYPE, () => {
     loginButton.style.backgroundColor = '#FFB6C1';
     username = usernameInput.value.toLowerCase();
     password = passwordInput.value;
@@ -448,7 +467,7 @@ loginButton.addEventListener('click', () => {
 });
 
 // Update signup button click handler
-signupButton.addEventListener('click', () => {
+signupButton.addEventListener(EVENT_TYPE, () => {
     signupButton.style.backgroundColor = '#FFB6C1';
     username = usernameInput.value.toLowerCase();
     password = passwordInput.value;
@@ -551,7 +570,7 @@ function handleBooksResponse(response) {
             bookElement.appendChild(title);
             
             // Add click event to load the book (now using the async function)
-            bookElement.addEventListener('click', async () => {
+            bookElement.addEventListener(EVENT_TYPE, async () => {
                     // Show loading indicator
                     title.textContent = "Loading...";
                     
@@ -651,7 +670,7 @@ function updateAuthUI(isLoggedIn, username = '', responseData = null) {
         settingsOptions.insertBefore(userInfoDiv, document.getElementById('available-books'));
         
         // Add logout functionality
-        document.getElementById('logout-button').addEventListener('click', handleLogout);
+        document.getElementById('logout-button').addEventListener(EVENT_TYPE, handleLogout);
 
         // Load user's current book if available - use responseData instead of response
         if (responseData && responseData.current_book && responseData.epub) {
@@ -799,7 +818,7 @@ async function handlePredSentence(response) {
     
     // Add click handlers to wrong words
     document.querySelectorAll('.wrong').forEach(wrongWord => {
-        wrongWord.addEventListener('click', (event) => {
+        wrongWord.addEventListener(EVENT_TYPE, (event) => {
             // Remove 'pressed' class from all wrong words
             document.querySelectorAll('.wrong').forEach(w => w.classList.remove('pressed'));
             
@@ -833,14 +852,14 @@ async function handlePredSentence(response) {
 }
 
 // Call loadAvailableBooks when the available books button is clicked
-availableBooksBtn.addEventListener('click', () => {
+availableBooksBtn.addEventListener(EVENT_TYPE, () => {
     loadAvailableBooks();
     
 });
 
 // Close books modal
 document.querySelectorAll('.modal .close').forEach(closeBtn => {
-    closeBtn.addEventListener('click', () => {
+    closeBtn.addEventListener(EVENT_TYPE, () => {
         closeBtn.closest('.modal').style.display = 'none';
     });
 });
@@ -962,7 +981,7 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
                             });
                             
                             // Add click handler
-                            sentenceSpan.addEventListener('click', (event) => {
+                            sentenceSpan.addEventListener(EVENT_TYPE, (event) => {
                                 // Remove pulsing animation and icon from any sentence
                                 content.document.querySelectorAll('.pulse-animation').forEach(el => {
                                     el.classList.remove('pulse-animation');
@@ -1086,7 +1105,7 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
             }
         }
 
-    recordBtn.addEventListener('click', async () => { //standarised procedure 
+    recordBtn.addEventListener(EVENT_TYPE, async () => { //standarised procedure 
         let permissionResult = await navigator.permissions.query({ name: 'microphone' });
         console.log("permissionResult: ", permissionResult);
 
@@ -1135,7 +1154,7 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
     const closeModalBtn = document.querySelector('.close-modal');
 
     // Add event listener for the new close button
-    closeModalBtn.addEventListener('click', () => {
+    closeModalBtn.addEventListener(EVENT_TYPE, () => {
         modalDiv.style.display = "none";
         lineNum = 0;
         
@@ -1145,7 +1164,7 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
     });
 
     // Close modal when clicking outside
-    window.addEventListener('click',(event)=> {
+    window.addEventListener(EVENT_TYPE,(event)=> {
         if (event.target==modalDiv) {
             modalDiv.style.display = "none";
         }
@@ -1162,10 +1181,10 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
         }
     });
 
-    fileDiv.addEventListener('click',()=> {
+    fileDiv.addEventListener(EVENT_TYPE,()=> {
         fileInput.click();
     })
-    userSection.addEventListener('click', (event) => {
+    userSection.addEventListener(EVENT_TYPE, (event) => {
         if (userSection.textContent == "Login") {
             console.log("user section clicked");
             console.log("Drawer classList before:", drawer.classList);
@@ -1177,7 +1196,7 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
         }
     });
 
-    settingsBtn.addEventListener('click', (event) => {
+    settingsBtn.addEventListener(EVENT_TYPE, (event) => {
         console.log("settings button clicked");
         console.log("Drawer classList before:", drawer.classList);
         drawer.style.display = 'block';  // First set display to block
@@ -1187,7 +1206,7 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
         event.stopPropagation();
     });
 
-    closeDrawerBtn.addEventListener('click', () => {
+    closeDrawerBtn.addEventListener(EVENT_TYPE, () => {
         console.log("close button clicked");
         drawer.classList.remove('open');
         setTimeout(() => {
@@ -1195,7 +1214,7 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
         }, 300); // Wait for transition to complete
     });
 
-    window.addEventListener('click', (event) => {
+    window.addEventListener(EVENT_TYPE, (event) => {
         // Check if the click was on the settings button or its children (like the image)
         if (!drawer.contains(event.target) && !settingsBtn.contains(event.target)) {
             drawer.classList.remove('open');
@@ -1208,23 +1227,23 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
     // Make sure the drawer starts hidden
     drawer.style.display = 'none';
 
-    textToSpeechBtn.addEventListener('click', () => {
-        if ('speechSynthesis' in window) {
-            const isCurrentlySpeaking = textToSpeechBtn.getAttribute('data-speaking') === 'true';
-            
-            if (isCurrentlySpeaking) {
-                // Stop speaking and reset the button
-                window.speechSynthesis.cancel();
-                textToSpeechBtn.setAttribute('data-speaking', 'false');
-                textToSpeechBtn.style.filter = 'brightness(1)';
-            } else {
-                // Start speaking and darken the button
-                textToSpeechBtn.setAttribute('data-speaking', 'true');
-                textToSpeechBtn.style.filter = 'brightness(0.7)';
-                textToSpeech(lines[lineNum]);
+    textToSpeechBtn.addEventListener(EVENT_TYPE, () => {
+        const isCurrentlySpeaking = textToSpeechBtn.getAttribute('data-speaking') === 'true';
+        
+        if (isCurrentlySpeaking) {
+            // Stop any currently playing audio
+            if (currentAudio) {
+                currentAudio.pause();
+                currentAudio.currentTime = 0;
+                currentAudio = null;
             }
+            
+            textToSpeechBtn.setAttribute('data-speaking', 'false');
+            textToSpeechBtn.style.filter = 'brightness(1)';
         } else {
-            console.log("Sorry, your browser doesn't support text to speech!");
+            textToSpeechBtn.setAttribute('data-speaking', 'true');
+            textToSpeechBtn.style.filter = 'brightness(0.7)';
+            textToSpeech(lines[lineNum]);
         }
     });
     
@@ -1235,62 +1254,35 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
     }
 
     function textToSpeech(textToSpeak) {
-        if ('speechSynthesis' in window) {
-            console.log('Starting text-to-speech for:', textToSpeak);
-            
-            // Cancel any ongoing speech
-            window.speechSynthesis.cancel();
-            
-            let msg = new SpeechSynthesisUtterance();
-            msg.text = textToSpeak;
-            
-            // Get the current language (first 2 chars)
-            const currentLang = languageSel.substring(0,2);
-            console.log('Using language:', currentLang);
-            msg.lang = currentLang;
-            
-            // Set standard speech parameters
-            msg.rate = 0.8;
-            msg.volume = 1;
-            msg.pitch = 1;
-            
-            // Get available voices
-            const voices = window.speechSynthesis.getVoices();
-            
-            // Find a voice that matches our language
-            const matchingVoice = voices.find(voice => 
-                voice.lang.toLowerCase().startsWith(currentLang.toLowerCase())
-            );
-            
-            if (matchingVoice) {
-                msg.voice = matchingVoice;
-                console.log("Selected voice:", matchingVoice.name);
-            }
-            
-            // Add event listeners for state management
-            msg.onstart = () => {
-                console.log('Speech started');
-                textToSpeechBtn.setAttribute('data-speaking', 'true');
-                textToSpeechBtn.style.filter = 'brightness(0.7)';
-            };
-            
-            msg.onend = () => {
-                console.log('Speech ended');
-                textToSpeechBtn.setAttribute('data-speaking', 'false');
-                textToSpeechBtn.style.filter = 'brightness(1)';
-            };
-            
-            msg.onerror = (e) => {
-                console.error('Speech error:', e);
-                textToSpeechBtn.setAttribute('data-speaking', 'false');
-                textToSpeechBtn.style.filter = 'brightness(1)';
-            };
-            
-            // For iOS compatibility, we need to speak immediately after user interaction
-            window.speechSynthesis.speak(msg);
-        } else {
-            console.error("Speech synthesis not supported in this browser");
-        }
+        console.log('Starting text-to-speech for:', textToSpeak);
+        
+        // Map language codes to supported language codes
+        const langMap = {
+            'en': 'en',
+            'es': 'es',
+            'fr': 'fr',
+            'de': 'de',
+            'it': 'it'
+        };
+        
+        // Get the proper language code from our map
+        const currentLang = languageSel.substring(0,2);
+        const ttsLang = langMap[currentLang] || 'en'; // Default to en if not mapped
+        console.log('Using language:', ttsLang);
+        
+        // Set data-speaking attribute to true and update UI
+        textToSpeechBtn.setAttribute('data-speaking', 'true');
+        textToSpeechBtn.style.filter = 'brightness(0.7)';
+        
+        // Use our WebSocket server for TTS
+        sendSocketMessage({
+            task: 'tts',
+            text: textToSpeak,
+            language: ttsLang
+        });
+        
+        // The socket.addEventListener('message') handler will process the response
+        // We need to add code there to handle TTS responses
     }
     
     function createPopup(content, event) {
@@ -1316,12 +1308,12 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
         popup.appendChild(contentElement);
         popup.appendChild(closePopupButton);
         
-        closePopupButton.addEventListener('click', (e) => {
+        closePopupButton.addEventListener(EVENT_TYPE, (e) => {
             popup.remove();
             popupflag = false;
             e.stopPropagation();
         });
-        popup.addEventListener('click', (e) => {
+        popup.addEventListener(EVENT_TYPE, (e) => {
             popup.remove();
             popupflag = false;
             e.stopPropagation();
@@ -1351,7 +1343,7 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
     }
     
     // Add a global click event listener to document
-    document.addEventListener('click', (event) => {
+    document.addEventListener(EVENT_TYPE, (event) => {
         const popups = document.querySelectorAll('.popup');
         if (popups.length > 0) {
             // Check if the click was inside a popup or on a wrong element
@@ -1387,7 +1379,7 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
     }
 
     // Add event listener for voice gender selection
-    voiceGenderDisplay.addEventListener('click', () => {
+    voiceGenderDisplay.addEventListener(EVENT_TYPE, () => {
         if (voiceGenderOptionsOpen) {
             voiceGenderOptionsOpen = false;
             voiceGenderSelect.style.transform = 'translateX(1000%)';
@@ -1596,25 +1588,11 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
         }
     }
 
-    pageleDiv.addEventListener('click', () => {
+    pageleDiv.addEventListener(EVENT_TYPE, () => {
         // Show modal with loading spinner
         
         document.getElementById('myModal').style.display = "none";
-        pageleModal.style.cssText = `
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background-color: white;
-            border-radius: 10px;
-            box-shadow: rgba(0, 0, 0, 0.1) 0px 2px 10px;
-            padding: 20px;
-            max-width: 600px;
-            z-index: 1000;
-            display: block;
-            height: auto;
-            width: auto;
-        `;
+        pageleModal.style.display = 'block';
         
 
         if (!selectedBook) {
@@ -1733,7 +1711,7 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
                 `;
 
                 // Add event listeners for navigation
-                document.getElementById('prevSentence').addEventListener('click', () => {
+                document.getElementById('prevSentence').addEventListener(EVENT_TYPE, () => {
                     if (currentSentenceIndex > 0) {
                         currentSentenceIndex--;
                         sentenceToTranslate = currentDailySentences[currentSentenceIndex];
@@ -1743,7 +1721,7 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
                     }
                 });
 
-                document.getElementById('nextSentence').addEventListener('click', () => {
+                document.getElementById('nextSentence').addEventListener(EVENT_TYPE, () => {
                     if (currentSentenceIndex < totalDailySentences - 1) {
                         //if (currentSentenceIndex < allSentences.length - 1) { //previous code
                         currentSentenceIndex++;
@@ -1765,7 +1743,7 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
                 const pageleRecordBtn = document.getElementById('pageleRecord');
                 const pageleRobotBtn = document.getElementById('pageleRobot');
 
-                pageleRecordBtn.addEventListener('click', async () => {
+                pageleRecordBtn.addEventListener(EVENT_TYPE, async () => {
                     if (!isRecording) {
                         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
                         mediaRecorder = new MediaRecorder(stream);
@@ -1791,17 +1769,23 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
                     };
                 });
 
-                pageleRobotBtn.addEventListener('click', () => {
+                pageleRobotBtn.addEventListener(EVENT_TYPE, () => {
                     const isCurrentlySpeaking = pageleRobotBtn.getAttribute('data-speaking') === 'true';
                     
                     if (isCurrentlySpeaking) {
-                        window.speechSynthesis.cancel();
+                        // Stop any currently playing audio
+                        if (currentAudio) {
+                            currentAudio.pause();
+                            currentAudio.currentTime = 0;
+                            currentAudio = null;
+                        }
+                        
                         pageleRobotBtn.setAttribute('data-speaking', 'false');
                         pageleRobotBtn.style.filter = 'brightness(1)';
                     } else {
                         pageleRobotBtn.setAttribute('data-speaking', 'true');
                         pageleRobotBtn.style.filter = 'brightness(0.7)';
-                        textToSpeech(allSentences[currentSentenceIndex]);
+                        textToSpeech(currentDailySentences[currentSentenceIndex]);
                     }
                 });
             })
@@ -1906,7 +1890,7 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
         return ""; // Return empty string if we can't get context
     }
 
-    tutorialBtn.addEventListener('click', () => {
+    tutorialBtn.addEventListener(EVENT_TYPE, () => {
         const tutorialModal = document.getElementById('tutorialModal');
         const tutorialContent = document.getElementById('tutorial-content');
         
@@ -1937,13 +1921,13 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
 
     // Make sure the close button works properly for the tutorial modal
     document.querySelectorAll('#tutorialModal .close').forEach(closeBtn => {
-        closeBtn.addEventListener('click', () => {
+        closeBtn.addEventListener(EVENT_TYPE, () => {
             document.getElementById('tutorialModal').style.display = 'none';
         });
     });
 
     // Close modal when clicking outside
-    window.addEventListener('click', (event) => {
+    window.addEventListener(EVENT_TYPE, (event) => {
         const tutorialModal = document.getElementById('tutorialModal');
         if (event.target === tutorialModal) {
             tutorialModal.style.display = 'none';
@@ -1952,7 +1936,7 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
 
     // Make sure the close button works properly for the pagele modal
     document.querySelectorAll('#pageleModal .close').forEach(closeBtn => {
-        closeBtn.addEventListener('click', () => {
+        closeBtn.addEventListener(EVENT_TYPE, () => {
             document.getElementById('pageleModal').style.display = 'none';
             document.getElementById('div2viewer').style.display = "block";
             document.getElementById('myModal').style.display = "block";
@@ -1960,10 +1944,56 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
     });
 
     // Close modal when clicking outside
-    window.addEventListener('click', (event) => {
+    window.addEventListener(EVENT_TYPE, (event) => {
         const pageleModal = document.getElementById('pageleModal');
         if (event.target === pageleModal) {
             pageleModal.style.display = 'none';
         }
     });
+
+    initDailyPagele.addEventListener(EVENT_TYPE, () => {
+        div2viewer.style.display = "none";
+        initChoice.style.display="none";
+        pageleModal.style.display = "block"
+    })
+
+    initFreeRead.addEventListener(EVENT_TYPE,() => {
+        div2viewer.style.display = "Flex";
+        initChoice.style.display = "none";
+        pageleModal.style.display = "none";
+    })
+
+    // Add this new function to handle TTS responses
+    function handleTTSResponse(response) {
+        console.log("Received TTS response:", response);
+        
+        // Stop any previously playing audio
+        if (currentAudio) {
+            currentAudio.pause();
+            currentAudio.currentTime = 0;
+        }
+        
+        // Create and play audio element with the base64 audio data
+        const audio = new Audio(response.audio);
+        currentAudio = audio;
+        
+        // Add event listeners for state management
+        audio.onended = () => {
+            console.log('Speech ended');
+            textToSpeechBtn.setAttribute('data-speaking', 'false');
+            textToSpeechBtn.style.filter = 'brightness(1)';
+            currentAudio = null;
+        };
+        
+        audio.onerror = (e) => {
+            console.error('Speech error:', e);
+            textToSpeechBtn.setAttribute('data-speaking', 'false');
+            textToSpeechBtn.style.filter = 'brightness(1)';
+            currentAudio = null;
+        };
+        
+        // Play the audio
+        audio.play();
+    }
+
 </script>
