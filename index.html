@@ -131,13 +131,7 @@
         <button id="delete-account-button">Delete account</button>
     </div>
 </div>
-<div id="pageleModal" class="modal">
-    <span class="close">&times;</span>
-    <div id="pagele-content" class="modal-content">
-        <!-- Content will be loaded here -->
-        <div class="loading-spinner">Loading...</div>
-    </div>
-</div>
+
 
 <div id="tutorialModal" class="modal">
     <span class="close">&times;</span>
@@ -779,13 +773,7 @@ function createBlobAndConnect() {
     };
 }
 
-// Add a function to verify token on page load
-function verifyToken(token) {
-    sendSocketMessage({
-        task: "verify_token",
-        token: token
-    });
-}
+
 
 // Update token verification on page load
 window.addEventListener('DOMContentLoaded', () => {
@@ -1952,9 +1940,9 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
     });
 
     initDailyPagele.addEventListener(EVENT_TYPE, () => {
-        div2viewer.style.display = "none";
-        initChoice.style.display="none";
-        pageleModal.style.display = "block"
+        //redirect to pagele.html
+        
+        window.location.href = 'pagele.html';
     })
 
     initFreeRead.addEventListener(EVENT_TYPE,() => {

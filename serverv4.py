@@ -164,23 +164,11 @@ class ModelManager:
                 item['future'].set_exception(e)
 
 # Initialize the model manager
-model_manager = ModelManager()
+#model_manager = ModelManager()
 
-async def stt(audio_path, lang):
-    """Asynchronous STT with batching support"""
-    loop = asyncio.get_running_loop()
-    future = loop.create_future()
 
-    model_manager.batch_queue.put({
-        'audio_path': audio_path,
-        'lang': lang,
-        'future': future
-    })
-
-    return await future
 
 def stt_task(data_object):
-    """Modified STT task to use the new batching system"""
     try:
         # Map language name to code if needed
         lang = data_object['language'].lower()
@@ -551,13 +539,6 @@ async def login_task(self, data_object):
                 for file in files:
                     if file == user["current_book"]:
                         book_path = Path(root) / file
-                        language = book_path.parent.name
-                        print(f"language: {language}")
-                        with open(book_path, "rb") as f:
-                            book_data = f.read()
-                            book_base64 = base64.b64encode(book_data).decode('utf-8')
-                            epub = f"data:application/epub+zip;base64,{book_base64}"
-                            print(f"Including book data for {user['current_book']}")
                         break
 
             if epub and language:
@@ -744,6 +725,60 @@ async def tts_task(data_object):
         print(f"Error in tts_task: {e}")
         return {"status": "error", "message": str(e)}
 
+async def get_available_pagele():
+    pagele_books = []  # Initialize the list to store pagele data
+    
+    try:
+        # Look for pagele JSON files in each language directory
+        for lang_dir in EPUB_DIR.glob("*"):
+            if lang_dir.is_dir():
+                language = lang_dir.name
+                print(f"\nProcessing pagele files for language: {language}")
+                
+                # Look for pagele JSON files
+                for pagele_path in lang_dir.glob("*.pagele.json"):
+                    print(f"\nProcessing pagele file: {pagele_path.name}")
+                    
+                    try:
+                        # Load the pagele JSON file
+                        with open(pagele_path, 'r') as f:
+                            pagele_data = json.load(f)
+                        
+                        # Get associated book info for cover image
+                        book_name = pagele_path.stem.replace('.pagele', '')
+                        book_path = lang_dir / f"{book_name}.epub"
+                        
+                        # Get cover image if the book exists
+                        cover_base64 = ""
+                        if book_path.exists():
+                            cover_dir = COVERS_DIR / language
+                            cover_path = extract_epub_cover(book_path, cover_dir)
+                            
+                            if cover_path == DEFAULT_COVER:
+                                cover_file = Path("images/default-cover.png")
+                            else:
+                                cover_file = COVERS_DIR.parent / cover_path
+                                
+                            cover_base64 = get_file_as_base64(cover_file)
+                        
+                        # Add pagele information to the list
+                        pagele_books.append({
+                            "filename": pagele_path.name,
+                            "book_name": book_name,
+                            "language": language,
+                            "path": str(pagele_path.relative_to(EPUB_DIR.parent)),
+                            "cover": cover_base64,
+                        })
+                        print(f"Successfully processed pagele file: {pagele_path.name}")
+                    except Exception as e:
+                        print(f"Error processing pagele file {pagele_path.name}: {e}")
+                        continue
+        
+        return pagele_books
+    except Exception as e:
+        print(f"Error getting available pagele files: {e}")
+        return []
+
 async def handle_connection(websocket):
     print(f"Client connected, {websocket.remote_address}")
     
@@ -822,9 +857,16 @@ class DatabaseManager:
             predicted_sentence TEXT DEFAULT '',
             preferred_language TEXT DEFAULT 'en',
             login_token TEXT,
-            token_expiry TIMESTAMP
+            token_expiry TIMESTAMP,
+            pagele TEXT DEFAULT '{}'  -- New column for storing pagele data as JSON
         )
         ''')
+
+        # Check if pagele column exists, add it if it doesn't
+        cursor.execute("PRAGMA table_info(users)")
+        columns = [column[1] for column in cursor.fetchall()]
+        if 'pagele' not in columns:
+            cursor.execute("ALTER TABLE users ADD COLUMN pagele TEXT DEFAULT '{}'")
 
         conn.commit()
         conn.close()
@@ -867,6 +909,7 @@ class DatabaseManager:
                 "current_book": user.get("current_book", ""),
                 "cfi": user.get("cfi", ""),  # Use CFI instead of page
                 "preferred_language": user.get("preferred_language", "en"),
+                "pagele": json.loads(user.get("pagele", "{}")),
                 "type": "login"
             }
 
@@ -1019,6 +1062,39 @@ class DatabaseManager:
         conn.close()
 
         return {"status": "success", "message": "Settings updated successfully"}
+
+    def update_pagele_data(self, data_object):
+        conn = sqlite3.connect(self.DB_PATH)
+        cursor = conn.cursor()            
+        cursor.execute("SELECT pagele FROM users WHERE username = ?", (data_object.get("username"),))
+        result = cursor.fetchone()
+        pagele_data = json.loads(result[0])
+        pagele_data[data_object.get("book_name")] = data_object.get("index")
+        cursor.execute(
+            "UPDATE users SET pagele = ? WHERE username = ?",
+            (json.dumps(pagele_data), username)
+        )
+        
+        conn.commit()
+        conn.close()
+        
+    def get_pagele_data(self, username, book_name=None):
+        conn = sqlite3.connect(self.DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("SELECT pagele FROM users WHERE username = ?", (username,))
+        result = cursor.fetchone()
+        
+        if not result:
+            return {} if book_name is None else 0
+        
+        try:
+            pagele_data = json.loads(result[0])
+        except (json.JSONDecodeError, TypeError):
+            pagele_data = {}
+        conn.close()
+
+        return pagele_data
+       
 
 class TextComparator:
     @staticmethod
@@ -1184,21 +1260,21 @@ async def main():
     global db
     db = DatabaseManager("usersHablas.db")
     db.init_database();
-    preload_all_models()
+    #preload_all_models()
 
     # Create SSL context
-    ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    """ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
     ssl_context.load_cert_chain(
         '/media/nas/SSLCerts/carriertech.uk/fullchain.pem',
         '/media/nas/SSLCerts/carriertech.uk/privkey.pem'
-    )
+    )"""
 
     # Start the WebSocket server with SSL
     async with websockets.serve(
         handle_connection,
         "0.0.0.0",  # Changed from localhost to accept external connections
         8675,
-        ssl=ssl_context
+        #ssl=ssl_context
     ):
         print("WebSocket server started on wss://carriertech.uk:8675")
         await asyncio.Future()  # Run forever
