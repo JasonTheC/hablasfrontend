@@ -615,7 +615,8 @@ async def verify_token_task(data_object):
         "preferred_language": user.get("preferred_language", "en"),
         "token": token,
         "epub": epub,
-        "language": language
+        "language": language,
+        "pagele": user.get("pagele", {})
     }
     return response
 
@@ -725,6 +726,42 @@ async def tts_task(data_object):
         print(f"Error in tts_task: {e}")
         return {"status": "error", "message": str(e)}
 
+async def init_pagele_task(data_object):
+    print(f"init_pagele_task: {data_object}")
+    token = data_object["token"]
+    print(f"token: {token}")
+    pagele_filename = data_object["pagele_filename"]
+    print(f"pagele_filename: {pagele_filename}")
+    language = data_object["language"]
+    print(f"language: {language}")
+    user_data = db.get_user_data(token)
+    print(f"user_data: {user_data}")
+    
+    """if user_data["pagele"] == '{}':
+        pagele_data = {}
+    else:"""
+    pagele_data = json.loads(user_data["pagele"])
+        
+    # Update user_data with the parsed dictionary
+    user_data["pagele"] = pagele_data
+    
+    if not user_data["pagele"]:
+        user_data["pagele"] = {"current_pagele": pagele_filename, "current_index": 0,
+                                "books": {pagele_filename: {"completed_indices": {}, "total_points": 0, "last_played": ""}}}
+    elif pagele_filename in user_data["pagele"]["books"].keys():
+        user_data["pagele"]["current_pagele"] = pagele_filename
+        user_data["pagele"]["current_index"] = user_data["pagele"]["books"][pagele_filename]["completed_indices"][-1] + 1
+    else:
+        user_data["pagele"]["current_pagele"] = pagele_filename
+        user_data["pagele"]["current_index"] = 0
+        user_data["pagele"]["books"][pagele_filename] = {"completed_indices": {}, "total_points": 0, "last_played": ""}
+
+
+    pagele_data = open(f"{EPUB_DIR}/{language}/{pagele_filename}", "r")
+    pagele_data = json.load(pagele_data)
+
+    return {"status": "success", "pagele_data": pagele_data, "index": user_data["pagele"]["current_index"], "type": "get_pagele", "user_pagele": user_data["pagele"]}
+
 async def get_available_pagele():
     pagele_books = []  # Initialize the list to store pagele data
     
@@ -736,16 +773,13 @@ async def get_available_pagele():
                 print(f"\nProcessing pagele files for language: {language}")
                 
                 # Look for pagele JSON files
-                for pagele_path in lang_dir.glob("*.pagele.json"):
+                for pagele_path in lang_dir.glob("*.json"):
                     print(f"\nProcessing pagele file: {pagele_path.name}")
                     
                     try:
                         # Load the pagele JSON file
-                        with open(pagele_path, 'r') as f:
-                            pagele_data = json.load(f)
                         
-                        # Get associated book info for cover image
-                        book_name = pagele_path.stem.replace('.pagele', '')
+                        book_name = pagele_path.stem.replace('.json', '')
                         book_path = lang_dir / f"{book_name}.epub"
                         
                         # Get cover image if the book exists
@@ -773,7 +807,7 @@ async def get_available_pagele():
                     except Exception as e:
                         print(f"Error processing pagele file {pagele_path.name}: {e}")
                         continue
-        
+        print(f"pagele_books: {pagele_books}")
         return pagele_books
     except Exception as e:
         print(f"Error getting available pagele files: {e}")
@@ -818,6 +852,10 @@ async def handle_connection(websocket):
             logger.log_event("token_verification", {**data_object, **message_returned}, websocket)
         elif data_object.get("task") == "pagele":
             message_returned = await pagele_task(data_object)
+        elif data_object.get("task") == "get_pagele_list":
+            message_returned = await get_available_pagele()
+        elif data_object.get("task") == "init_pagele":
+            message_returned = await init_pagele_task(data_object)
 
         await websocket.send(json.dumps(message_returned))
 
@@ -867,6 +905,8 @@ class DatabaseManager:
         columns = [column[1] for column in cursor.fetchall()]
         if 'pagele' not in columns:
             cursor.execute("ALTER TABLE users ADD COLUMN pagele TEXT DEFAULT '{}'")
+            conn.commit()
+            print("Added pagele column to users table")
 
         conn.commit()
         conn.close()
@@ -1068,11 +1108,10 @@ class DatabaseManager:
         cursor = conn.cursor()            
         cursor.execute("SELECT pagele FROM users WHERE username = ?", (data_object.get("username"),))
         result = cursor.fetchone()
-        pagele_data = json.loads(result[0])
-        pagele_data[data_object.get("book_name")] = data_object.get("index")
+        pagele_data = data_object.get("pagele")
         cursor.execute(
             "UPDATE users SET pagele = ? WHERE username = ?",
-            (json.dumps(pagele_data), username)
+            (json.dumps(pagele_data), data_object.get("username"))
         )
         
         conn.commit()
@@ -1094,7 +1133,19 @@ class DatabaseManager:
         conn.close()
 
         return pagele_data
-       
+    
+    def get_user_data(self, token):
+        print(f"get_user_data: {token}")
+        conn = sqlite3.connect(self.DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("PRAGMA table_info(users)")
+        columns = [column[1] for column in cursor.fetchall()]
+        cursor.execute("SELECT * FROM users WHERE login_token = ?", (token,))
+        result = cursor.fetchone()
+        conn.close()
+        result = dict(zip(columns, result))
+        print(f"result: {result}")
+        return result
 
 class TextComparator:
     @staticmethod

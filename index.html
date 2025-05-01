@@ -297,8 +297,8 @@ function waitForEpub() {
 
 // Replace the existing WebSocket implementation with a simpler function-based approach
 function createWebSocketConnection() {
-    const socket = new WebSocket('wss://carriertech.uk:8675');
-    //const socket = new WebSocket('ws://localhost:8675');
+    //const socket = new WebSocket('wss://carriertech.uk:8675');
+    const socket = new WebSocket('ws://localhost:8675');
     socket.addEventListener('open', (event) => {
         console.log('WebSocket connection established');
     });
