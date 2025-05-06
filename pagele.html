@@ -1,45 +1,133 @@
-<html>
-    <body>
-        <div id="pagele-content">
-            <div id="pagele-header">
-                <h1>Pagele</h1>
-            </div>
-            
-            <!-- Pagele Selection Modal -->
-            <div id="pagele-modal" class="modal">
-                <div class="modal-content">
-                    <h2>Select a Pagele</h2>
-                    <div id="pagele-list-container">
-                        <div id="pagele-list"></div>
-                    </div>
+<!DOCTYPE html>
+<html lang="en">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<link href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700&family=Roboto:wght@400;700&family=Quicksand:wght@400;700&family=Montserrat:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css?v=1.0">
+<head>
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>Pagele</title>
+</head>
+<body>
+    <div id="title">
+        <p>Pagele</p>
+        <div id="title-right">
+            <img src="images/settings.png" id="settings"/> 
+        </div>
+    </div>
+
+    <div id="pagele-content">
+        <!-- Pagele Selection Modal -->
+        <div id="pagele-modal" class="modal">
+            <div class="modal-content">
+                <span class="close">&times;</span>
+                <h2>Select a Pagele</h2>
+                <div id="pagele-list-container">
+                    <div id="pagele-list"></div>
                 </div>
             </div>
-            
-            <!-- Chapters Grid Modal -->
-            <div id="chapters-modal" class="modal">
-                <div class="modal-content">
-                    <h2>Chapters</h2>
-                    <div id="chapters-grid"></div>
-                </div>
+        </div>
+        
+        <!-- Chapters Grid Modal -->
+        <div id="chapters-modal" class="modal">
+            <div class="modal-content">
+                <span class="close">&times;</span>
+                <h2>Chapters</h2>
+                <div id="chapters-grid"></div>
             </div>
-            
-            <!-- Sentence Display Modal -->
-            <div id="sentence-modal" class="modal">
-                <div class="modal-content">
-                    <h2 id="chapter-title">Chapter Title</h2>
-                    <div id="sentence-container">
-                        <p id="current-sentence"></p>
-                    </div>
-                    <div id="sentence-controls">
-                        <button id="prev-sentence">Previous</button>
-                        <span id="sentence-counter">1/10</span>
-                        <button id="next-sentence">Next</button>
+        </div>
+        
+        <!-- Sentence Display Modal -->
+        <div id="sentence-modal" class="modal">
+            <div class="modal-content">
+                <span class="close-modal">&times;</span>
+                <h2 id="chapter-title">Chapter Title</h2>
+                <div id="sentence-container">
+                    <p id="current-sentence"></p>
+                </div>
+                <div id="sentence-controls">
+                    <button id="prev-sentence">Previous</button>
+                    <span id="sentence-counter">1/10</span>
+                    <button id="next-sentence">Next</button>
+                </div>
+                
+                <div id="actionButtons" style="position: relative; margin-top: 2%; text-align: center; display: flex; justify-content: center; align-items: center; gap: 2%;">
+                    <img id="record" src="images/recordingButton.png" alt="record icon" style="width: auto; height: 25%;"/>
+                    <img id="robot" src="images/robot_talk_white.png" alt="robot" data-speaking="false" style="width: auto; height: 25%;"/>
+                    <div id="points-display">Points: <span id="points">0</span></div>
+                    
+                    <div id="recording-status" style="
+                        display: none;
+                        position: absolute;
+                        top: 0;
+                        left: 0;
+                        right: 0;
+                        bottom: 0;
+                        background-color: rgba(0, 0, 0, 0.7);
+                        display: flex;
+                        flex-direction: column;
+                        align-items: center;
+                        justify-content: center;
+                        z-index: 1000;">
+                        <div class="status-spinner"></div>
+                        <div class="status-message">Processing...</div>
+                        <div class="timer">0.0s</div>
                     </div>
                 </div>
             </div>
         </div>
-    </body>
+    </div>
+
     <style>
+        body {
+            font-family: 'Roboto', 'Lato', sans-serif;
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(135deg, #6e8efb, #a777e3);
+            min-height: 100vh;
+            color: #333;
+        }
+
+        #title {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background-color: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 10px 20px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+        }
+
+        #title p {
+            font-family: 'Montserrat', sans-serif;
+            font-size: 1.5em;
+            font-weight: bold;
+            margin: 0;
+        }
+
+        #title-right {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        #title-right div {
+            cursor: pointer;
+            padding: 5px 10px;
+            border-radius: 4px;
+        }
+
+        #title-right div:hover {
+            background-color: rgba(255, 255, 255, 0.2);
+        }
+
+        #settings {
+            width: 24px;
+            height: 24px;
+            cursor: pointer;
+        }
+
         /* Modal styling */
         .modal {
             display: none;
@@ -61,8 +149,22 @@
             max-width: 800px;
             max-height: 80vh;
             overflow-y: auto;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
         }
 
+        .close, .close-modal {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .close:hover, .close-modal:hover {
+            color: #333;
+        }
+
+        /* Rest of your existing styles */
         #pagele-list {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
@@ -137,6 +239,10 @@
             font-size: 1.2em;
             margin: 30px 0;
             min-height: 100px;
+            background-color: #f9f9f9;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: inset 0 0 5px rgba(0,0,0,0.1);
         }
         
         #sentence-controls {
@@ -153,6 +259,7 @@
             border: none;
             border-radius: 4px;
             cursor: pointer;
+            font-family: 'Roboto', sans-serif;
         }
         
         #sentence-controls button:hover {
@@ -164,313 +271,608 @@
             cursor: not-allowed;
         }
 
+        /* Spinner for recording status */
+        .status-spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #3498db;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 2s linear infinite;
+            margin-bottom: 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .status-message, .timer {
+            color: white;
+            margin: 5px 0;
+        }
     </style>
+
     <script>
+        let pagele_language = 'en';
+        const language_name_map = {
+            'english': 'en',
+            'espagnol': 'es',
+            'francais': 'fr',
+            'deutsch': 'de',
+        };
+        function createWebSocketConnection() {
+            const socket = new WebSocket('wss://carriertech.uk:8675');
+            //const socket = new WebSocket('ws://localhost:8675');
+            socket.addEventListener('open', (event) => {
+                console.log('WebSocket connection established');
+            });
 
+            socket.addEventListener('error', (error) => {
+                console.error('WebSocket error:', error);
+            });
 
-function createWebSocketConnection() {
-    //const socket = new WebSocket('wss://carriertech.uk:8675');
-    const socket = new WebSocket('ws://localhost:8675');
-    socket.addEventListener('open', (event) => {
-        console.log('WebSocket connection established');
-    });
+            socket.addEventListener('message', (event) => {
+                const response = JSON.parse(event.data);
+                console.log("Received WebSocket message:", response);
 
-    socket.addEventListener('error', (error) => {
-        console.error('WebSocket error:', error);
-    });
-
-    socket.addEventListener('message', (event) => {
-        const response = JSON.parse(event.data);
-        console.log("Received WebSocket message:", response);
-
-        // Handle array response (direct pagele list)
-        if (Array.isArray(response)) {
-            console.log('Received pagele list array directly');
-            displayPageleList(response);
-        }
-        // Handle success response with user data
-        else if (response.status === "success" && response.pagele == "{}") {
-            
-            if (!localStorage.getItem('username')) {
-                localStorage.setItem('username', response.username);
-            }
-            
-            requestPageleList();
-            
-        } 
-        // Handle responses with type field (as in your original code)
-        else if (response.type === 'token_verification_result') {
-            if (response.success) {
-                console.log('Token verification successful');
-                
-                // Check if user has a selected pagele
-                if (!response.user_data.selected_pagele) {
-                    // Request available pageles
-                    requestPageleList();
+                // Handle array response (direct pagele list)
+                if (Array.isArray(response)) {
+                    console.log('Received pagele list array directly');
+                    displayPageleList(response);
                 }
-            } else {
-                console.log('Token verification failed');
-                // Handle invalid token
-                localStorage.removeItem('token');
-                localStorage.removeItem('username');
-                handleInvalidToken();
-            }
-        } else if (response.type === 'pagele_list') {
-            // Display the pagele selection modal with the list
-            displayPageleList(response.pagele_books);
-        } else if (response.type === 'get_pagele') {
-            const pagele_data = response.pagele_data;
-            
-            // Transform the chapter data format
-            const chapters = [];
-            
-            // Convert the object-based chapter structure to an array
-            Object.keys(pagele_data).forEach(key => {
-                if (key.startsWith('chapter')) {
-                    // Extract chapter number from key (e.g., "chapter1" -> 1)
-                    const chapterNumber = parseInt(key.replace('chapter', ''));
+                // Handle success response with user data
+                else if (response.status === "success" && response.pagele == "{}") {
                     
-                    chapters.push({
-                        title: `Chapter ${chapterNumber}`,
-                        sentences: pagele_data[key],
-                        points: 0 // Default points, update if available elsewhere
+                    if (!localStorage.getItem('username')) {
+                        localStorage.setItem('username', response.username);
+                    }
+                    
+                    requestPageleList();
+                    
+                } 
+                // Handle responses with type field (as in your original code)
+                else if (response.type === 'token_verification_result') {
+                    if (response.success) {
+                        console.log('Token verification successful');
+                        
+                        // Check if user has a selected pagele
+                        if (!response.user_data.selected_pagele) {
+                            // Request available pageles
+                            requestPageleList();
+                        }
+                    } else {
+                        console.log('Token verification failed');
+                        // Handle invalid token
+                        localStorage.removeItem('token');
+                        localStorage.removeItem('username');
+                        handleInvalidToken();
+                    }
+                } else if (response.type === 'pagele_list') {
+                    // Display the pagele selection modal with the list
+                    displayPageleList(response.pagele_books);
+                } else if (response.type === 'get_pagele') {
+                    const pagele_data = response.pagele_data;
+                    
+                    // Transform the chapter data format
+                    const chapters = [];
+                    
+                    // Convert the object-based chapter structure to an array
+                    Object.keys(pagele_data).forEach(key => {
+                        if (key.startsWith('chapter')) {
+                            // Extract chapter number from key (e.g., "chapter1" -> 1)
+                            const chapterNumber = parseInt(key.replace('chapter', ''));
+                            
+                            chapters.push({
+                                title: `Chapter ${chapterNumber}`,
+                                sentences: pagele_data[key],
+                                points: 0 // Default points, update if available elsewhere
+                            });
+                        }
                     });
+                    
+                    // Sort chapters by number
+                    chapters.sort((a, b) => {
+                        const numA = parseInt(a.title.replace('Chapter ', ''));
+                        const numB = parseInt(b.title.replace('Chapter ', ''));
+                        return numA - numB;
+                    });
+                    
+                    displayChaptersGrid(chapters);
+                } else if (response.status === "error") {
+                    // Handle error messages
+                    console.error('Server error:', response.message);
+                    if (response.message === "Invalid or expired token") {
+                        localStorage.removeItem('token');
+                        localStorage.removeItem('username');
+                        handleInvalidToken();
+                    }
+                } else if (response.hasOwnProperty('pred_sentence')) {
+                    handlePredSentence(response);
+                } else if (response.status === 'success' && response.hasOwnProperty('audio')) {
+                    handleTTSResponse(response);
+                }
+                
+                // Hide recording status indicator when response received
+                const statusIndicator = document.getElementById('recording-status');
+                if (statusIndicator) {
+                    // Stop and clear the timer
+                    clearInterval(timerInterval);
+                    const finalTime = ((Date.now() - processingStartTime) / 1000).toFixed(1);
+                    const timerElement = statusIndicator.querySelector('.timer');
+                    if (timerElement) {
+                        timerElement.textContent = `${finalTime}s`;
+                    }
+                    // Hide the status indicator
+                    statusIndicator.style.display = 'none';
                 }
             });
+            return socket;
+        }
+
+        function sendSocketMessage(message) {
             
-            // Sort chapters by number
-            chapters.sort((a, b) => {
-                const numA = parseInt(a.title.replace('Chapter ', ''));
-                const numB = parseInt(b.title.replace('Chapter ', ''));
-                return numA - numB;
+            socket = createWebSocketConnection();
+            
+            socket.addEventListener('open', () => {
+                    socket.send(JSON.stringify(message));
+                }, { once: true });
+            
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            
+            // Check for stored token and username
+            const storedToken = localStorage.getItem('token');
+            const storedUsername = localStorage.getItem('username');
+            console.log("storedToken: ", storedToken);
+            console.log("storedUsername: ", storedUsername);
+            
+            if (storedToken) {
+                sendSocketMessage({
+                    task: "verify_token",
+                    token: storedToken
+                });
+            }
+
+        });
+
+        // Function to request the list of available pageles
+        function requestPageleList() {
+            sendSocketMessage({
+                task: "get_pagele_list",
+                token: localStorage.getItem('token')
             });
+        }
+
+        // Function to display the pagele selection modal
+        function displayPageleList(pageleBooks) {
+            const pageleList = document.getElementById('pagele-list');
+            pageleList.innerHTML = '';
             
-            displayChaptersGrid(chapters);
-        } else if (response.status === "error") {
-            // Handle error messages
-            console.error('Server error:', response.message);
-            if (response.message === "Invalid or expired token") {
-                localStorage.removeItem('token');
-                localStorage.removeItem('username');
-                handleInvalidToken();
+            if (pageleBooks.length === 0) {
+                pageleList.innerHTML = '<p>No pagele books available.</p>';
+            } else {
+                pageleBooks.forEach(pagele => {
+                    const card = document.createElement('div');
+                    card.className = 'pagele-card';
+                    card.dataset.pageleId = pagele.filename;
+                    
+                    card.innerHTML = `
+                        <img class="pagele-cover" src="${pagele.cover}" alt="${pagele.book_name} cover">
+                        <div class="pagele-title">${pagele.book_name}</div>
+                        <div class="pagele-language">${pagele.language}</div>
+                        <div class="pagele-sentences">${pagele.total_sentences} sentences</div>
+                    `;
+                    
+                    card.addEventListener('click', () => selectPagele(pagele.filename, pagele.language, 0));
+                    pageleList.appendChild(card);
+                });
+            }
+            
+            showPageleModal();
+        }
+
+        // Function to show the pagele selection modal
+        function showPageleModal() {
+            const modal = document.getElementById('pagele-modal');
+            modal.style.display = 'block';
+        }
+
+        // Function to hide the pagele selection modal
+        function hidePageleModal() {
+            const modal = document.getElementById('pagele-modal');
+            modal.style.display = 'none';
+        }
+
+        // Function to select a pagele
+        function selectPagele(pageleFilename, language, index) {
+            pagele_language = language;
+            sendSocketMessage({
+                task: "init_pagele",
+                pagele_filename: pageleFilename,
+                language: language,
+                index: index,
+                token: localStorage.getItem('token')
+            });
+            console.log("Selected pagele:", pageleFilename);
+            hidePageleModal();
+        }
+
+        // Function to display chapters in a grid
+        function displayChaptersGrid(chapters) {
+            const chaptersGrid = document.getElementById('chapters-grid');
+            chaptersGrid.innerHTML = '';
+            
+            if (!chapters || chapters.length === 0) {
+                chaptersGrid.innerHTML = '<p>No chapters available.</p>';
+            } else {
+                chapters.forEach((chapter, index) => {
+                    const card = document.createElement('div');
+                    card.className = 'chapter-card';
+                    card.dataset.chapterIndex = index;
+                    
+                    card.innerHTML = `
+                        <div class="chapter-title">${chapter.title || `Chapter ${index + 1}`}</div>
+                        <div class="chapter-points">${chapter.points || 0} points</div>
+                    `;
+                    
+                    card.addEventListener('click', () => openSentenceModal(chapter, index));
+                    chaptersGrid.appendChild(card);
+                });
+            }
+            
+            showChaptersModal();
+        }
+
+        // Function to show the chapters modal
+        function showChaptersModal() {
+            const modal = document.getElementById('chapters-modal');
+            modal.style.display = 'block';
+        }
+
+        // Function to hide the chapters modal
+        function hideChaptersModal() {
+            const modal = document.getElementById('chapters-modal');
+            modal.style.display = 'none';
+        }
+
+        // Variables to track current sentence
+        let currentChapter = null;
+        let currentSentenceIndex = 0;
+        let sentences = [];
+
+        // Add these variables at the top of your script with other variables
+        let isRecording = false;
+        let mediaRecorder;
+        let audioChunks = [];
+        let currentAudio = null;
+        let processingStartTime = 0;
+        let timerInterval = null;
+        let userPoints = 0;
+
+        // Function to open the sentence modal for a chapter
+        function openSentenceModal(chapter, chapterIndex) {
+            hideChaptersModal();
+            
+            currentChapter = chapter;
+            currentSentenceIndex = 0;
+            sentences = chapter.sentences || [];
+            
+            document.getElementById('chapter-title').textContent = chapter.title || `Chapter ${chapterIndex + 1}`;
+            
+            updateSentenceDisplay();
+            
+            const modal = document.getElementById('sentence-modal');
+            modal.style.display = 'block';
+            
+            // Add event listeners for navigation buttons
+            document.getElementById('prev-sentence').addEventListener('click', showPreviousSentence);
+            document.getElementById('next-sentence').addEventListener('click', showNextSentence);
+            
+            // Reset points display for this chapter session
+            userPoints = 0;
+            updatePointsDisplay(userPoints);
+        }
+
+        // Function to update the displayed sentence
+        function updateSentenceDisplay() {
+            const sentenceElem = document.getElementById('current-sentence');
+            const counterElem = document.getElementById('sentence-counter');
+            const prevButton = document.getElementById('prev-sentence');
+            const nextButton = document.getElementById('next-sentence');
+            
+            if (sentences.length === 0) {
+                sentenceElem.textContent = "No sentences available for this chapter.";
+                counterElem.textContent = "0/0";
+                prevButton.disabled = true;
+                nextButton.disabled = true;
+                return;
+            }
+            
+            sentenceElem.textContent = sentences[currentSentenceIndex];
+            counterElem.textContent = `${currentSentenceIndex + 1}/${sentences.length}`;
+            
+            // Update button states
+            prevButton.disabled = currentSentenceIndex === 0;
+            nextButton.disabled = currentSentenceIndex === sentences.length - 1;
+        }
+
+        // Function to show the previous sentence
+        function showPreviousSentence() {
+            if (currentSentenceIndex > 0) {
+                currentSentenceIndex--;
+                updateSentenceDisplay();
             }
         }
-    });
-    return socket;
-}
 
+        // Function to show the next sentence
+        function showNextSentence() {
+            if (currentSentenceIndex < sentences.length - 1) {
+                currentSentenceIndex++;
+                updateSentenceDisplay();
+            }
+        }
 
-function sendSocketMessage(message) {
-    
-    socket = createWebSocketConnection();
-        
-    socket.addEventListener('open', () => {
-            socket.send(JSON.stringify(message));
-        }, { once: true });
-    
-}
+        // Function to close the sentence modal
+        function closeSentenceModal() {
+            const modal = document.getElementById('sentence-modal');
+            modal.style.display = 'none';
+            showChaptersModal();
+        }
 
-window.addEventListener('DOMContentLoaded', () => {
-    
-    // Check for stored token and username
-    const storedToken = localStorage.getItem('token');
-    const storedUsername = localStorage.getItem('username');
-    console.log("storedToken: ", storedToken);
-    console.log("storedUsername: ", storedUsername);
-    
-    if (storedToken) {
-        sendSocketMessage({
-            task: "verify_token",
-            token: storedToken
+        // Add click event to close modals when clicking outside
+        window.addEventListener('click', (event) => {
+            const sentenceModal = document.getElementById('sentence-modal');
+            const chaptersModal = document.getElementById('chapters-modal');
+            const pageleModal = document.getElementById('pagele-modal');
+            
+            if (event.target === sentenceModal) {
+                closeSentenceModal();
+            } else if (event.target === chaptersModal) {
+                hideChaptersModal();
+            } else if (event.target === pageleModal) {
+                hidePageleModal();
+            }
         });
-    }
 
-});
-
-// Function to request the list of available pageles
-function requestPageleList() {
-    sendSocketMessage({
-        task: "get_pagele_list",
-        token: localStorage.getItem('token')
-    });
-}
-
-// Function to display the pagele selection modal
-function displayPageleList(pageleBooks) {
-    const pageleList = document.getElementById('pagele-list');
-    pageleList.innerHTML = '';
-    
-    if (pageleBooks.length === 0) {
-        pageleList.innerHTML = '<p>No pagele books available.</p>';
-    } else {
-        pageleBooks.forEach(pagele => {
-            const card = document.createElement('div');
-            card.className = 'pagele-card';
-            card.dataset.pageleId = pagele.filename;
+        // Function to handle prediction sentence response
+        function handlePredSentence(response) {
+            console.log("Received prediction:", response);
             
-            card.innerHTML = `
-                <img class="pagele-cover" src="${pagele.cover}" alt="${pagele.book_name} cover">
-                <div class="pagele-title">${pagele.book_name}</div>
-                <div class="pagele-language">${pagele.language}</div>
-                <div class="pagele-sentences">${pagele.total_sentences} sentences</div>
-            `;
+            const predSentence = response.pred_sentence;
+            const sentenceElement = document.getElementById('current-sentence');
             
-            card.addEventListener('click', () => selectPagele(pagele.filename, pagele.language, 0));
-            pageleList.appendChild(card);
+            // Create a container for both original and prediction
+            const container = document.createElement('div');
+            
+            // Add the original sentence
+            const originalSentence = document.createElement('div');
+            originalSentence.className = 'original-sentence';
+            originalSentence.textContent = sentenceElement.textContent;
+            originalSentence.style.marginBottom = '10px';
+            
+            // Add the prediction underneath
+            const prediction = document.createElement('div');
+            prediction.className = 'prediction-sentence';
+            prediction.innerHTML = predSentence;
+            prediction.style.borderTop = '1px solid #ddd';
+            prediction.style.paddingTop = '10px';
+            
+            // Add them to the container
+            container.appendChild(originalSentence);
+            container.appendChild(prediction);
+            
+            // Replace the content with our new container
+            sentenceElement.innerHTML = '';
+            sentenceElement.appendChild(container);
+            
+            // Add click handlers to wrong words
+            document.querySelectorAll('.wrong').forEach(wrongWord => {
+                wrongWord.addEventListener('click', (event) => {
+                    // Get the correct word from the ID and speak it
+                    const correctWord = wrongWord.id;
+                    if (correctWord) {
+                        textToSpeech(correctWord);
+                    }
+                });
+            });
+            
+            // Calculate and update points using server response
+            const pointsEarned = response.points * 10; // Server sends correct words count
+            userPoints += pointsEarned;
+            
+            // Update display with total words and wrong words info
+            const accuracy = ((response.total_words - response.wrong_words) / response.total_words * 100).toFixed(1);
+            const pointsDisplay = document.getElementById('points');
+            if (pointsDisplay) {
+                pointsDisplay.textContent = `${userPoints} (${accuracy}% correct)`;
+            }
+        }
+
+        // Function to update points display
+        function updatePointsDisplay(points) {
+            const pointsDisplays = document.querySelectorAll('#points');
+            pointsDisplays.forEach(element => {
+                element.textContent = points;
+            });
+        }
+
+        // Function to update timer during recording
+        function updateTimer() {
+            const timerElement = document.querySelector('.timer');
+            if (timerElement && processingStartTime) {
+                const elapsedTime = (Date.now() - processingStartTime) / 1000; // Convert to seconds
+                timerElement.textContent = `${elapsedTime.toFixed(1)}s`;
+            }
+        }
+
+        // Function to handle TTS responses
+        function handleTTSResponse(response) {
+            console.log("Received TTS response:", response);
+            
+            // Stop any previously playing audio
+            if (currentAudio) {
+                currentAudio.pause();
+                currentAudio.currentTime = 0;
+            }
+            
+            // Create and play audio element with the base64 audio data
+            const audio = new Audio(response.audio);
+            currentAudio = audio;
+            
+            // Add event listeners for state management
+            audio.onended = () => {
+                console.log('Speech ended');
+                document.getElementById('robot').setAttribute('data-speaking', 'false');
+                document.getElementById('robot').style.filter = 'brightness(1)';
+                currentAudio = null;
+            };
+            
+            audio.onerror = (e) => {
+                console.error('Speech error:', e);
+                document.getElementById('robot').setAttribute('data-speaking', 'false');
+                document.getElementById('robot').style.filter = 'brightness(1)';
+                currentAudio = null;
+            };
+            
+            // Play the audio
+            audio.play();
+        }
+
+        // Function to create blob and send to server
+        function createBlobAndConnect() {
+            const statusIndicator = document.getElementById('recording-status');
+            if (statusIndicator) {
+                statusIndicator.style.display = 'flex';
+                // Start the timer
+                processingStartTime = Date.now();
+                updateTimer();
+                timerInterval = setInterval(updateTimer, 100); // Update every 0.1 seconds
+            }
+
+            const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+            audioChunks = []; // Clear the chunks array for next recording
+
+            // Convert blob to base64
+            const reader = new FileReader();
+            reader.readAsDataURL(audioBlob);
+            reader.onloadend = function() {
+                const base64data = reader.result;
+                
+                // Get the current sentence for comparison
+                const currentSentence = document.getElementById('current-sentence').textContent;
+                const language = pagele_language;
+                if (language.length == 2) {
+                    language = language_name_map[language];
+                }
+                sendSocketMessage({ 
+                    task: 'stt', 
+                    blob: base64data, 
+                    language: language, 
+                    sentence: currentSentence,
+                    username: localStorage.getItem('username') || '',
+                    book: 'pagele', 
+                    page: 'pagele'
+                });
+            };
+        }
+
+        // Function to speak the current sentence
+        function textToSpeech(textToSpeak) {
+            textToSpeak = textToSpeak.toLowerCase();
+            console.log('Starting text-to-speech for:', textToSpeak);
+            
+            // Get the current sentence language (you might need to determine this from book data)
+            const ttsLang = pagele_language;
+            
+            
+            // Set data-speaking attribute to true and update UI
+            document.getElementById('robot').setAttribute('data-speaking', 'true');
+            document.getElementById('robot').style.filter = 'brightness(0.7)';
+            
+            // Use WebSocket for TTS
+            sendSocketMessage({
+                task: 'tts',
+                text: textToSpeak,
+                language: ttsLang
+            });
+        }
+
+        // Add event listeners once DOM is loaded
+        window.addEventListener('DOMContentLoaded', () => {
+            // Record button event listener
+            const recordBtn = document.getElementById('record');
+            if (recordBtn) {
+                recordBtn.addEventListener('click', async () => {
+                    console.log("Recording button clicked");
+                    try {
+                        let permissionResult = await navigator.permissions.query({ name: 'microphone' });
+                        
+                        if (permissionResult.state === 'granted' || permissionResult.state === 'prompt') {
+                            // Start/stop recording based on current state
+                            if (!isRecording) {
+                                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                                mediaRecorder = new MediaRecorder(stream);
+                                
+                                mediaRecorder.ondataavailable = event => {
+                                    audioChunks.push(event.data);
+                                };
+                                
+                                mediaRecorder.start();
+                                isRecording = true;
+                                if (mediaRecorder.state === 'recording') {
+                                    console.log('Recording started successfully');
+                                    recordBtn.src = "images/stopRecButton.png";
+                                } else {
+                                    alert('Failed to start recording. Please try again.');
+                                    isRecording = false;
+                                    recordBtn.src = "images/recordingButton.png";
+                                }
+                            } else {
+                                mediaRecorder.stop();
+                                isRecording = false;
+                                recordBtn.src = "images/recordingButton.png";
+                            }
+                            
+                            mediaRecorder.onstop = () => {
+                                createBlobAndConnect();
+                            };
+                        } else if (permissionResult.state === 'denied') {
+                            alert('Microphone permission is required for recording.');
+                        }
+                    } catch (error) {
+                        console.error('Error accessing microphone:', error);
+                        alert('Could not access microphone. Please check your browser permissions.');
+                    }
+                });
+            }
+            
+            // Text-to-speech button event listener
+            const robotBtn = document.getElementById('robot');
+            if (robotBtn) {
+                robotBtn.addEventListener('click', () => {
+                    const isCurrentlySpeaking = robotBtn.getAttribute('data-speaking') === 'true';
+                    
+                    if (isCurrentlySpeaking) {
+                        // Stop any currently playing audio
+                        if (currentAudio) {
+                            currentAudio.pause();
+                            currentAudio.currentTime = 0;
+                            currentAudio = null;
+                        }
+                        
+                        robotBtn.setAttribute('data-speaking', 'false');
+                        robotBtn.style.filter = 'brightness(1)';
+                    } else {
+                        const currentSentence = document.getElementById('current-sentence').textContent;
+                        robotBtn.setAttribute('data-speaking', 'true');
+                        robotBtn.style.filter = 'brightness(0.7)';
+                        textToSpeech(currentSentence);
+                    }
+                });
+            }
         });
-    }
-    
-    showPageleModal();
-}
-
-// Function to show the pagele selection modal
-function showPageleModal() {
-    const modal = document.getElementById('pagele-modal');
-    modal.style.display = 'block';
-}
-
-// Function to hide the pagele selection modal
-function hidePageleModal() {
-    const modal = document.getElementById('pagele-modal');
-    modal.style.display = 'none';
-}
-
-// Function to select a pagele
-function selectPagele(pageleFilename, language, index) {
-    sendSocketMessage({
-        task: "init_pagele",
-        pagele_filename: pageleFilename,
-        language: language,
-        index: index,
-        token: localStorage.getItem('token')
-    });
-    console.log("Selected pagele:", pageleFilename);
-    hidePageleModal();
-}
-
-// Function to display chapters in a grid
-function displayChaptersGrid(chapters) {
-    const chaptersGrid = document.getElementById('chapters-grid');
-    chaptersGrid.innerHTML = '';
-    
-    if (!chapters || chapters.length === 0) {
-        chaptersGrid.innerHTML = '<p>No chapters available.</p>';
-    } else {
-        chapters.forEach((chapter, index) => {
-            const card = document.createElement('div');
-            card.className = 'chapter-card';
-            card.dataset.chapterIndex = index;
-            
-            card.innerHTML = `
-                <div class="chapter-title">${chapter.title || `Chapter ${index + 1}`}</div>
-                <div class="chapter-points">${chapter.points || 0} points</div>
-            `;
-            
-            card.addEventListener('click', () => openSentenceModal(chapter, index));
-            chaptersGrid.appendChild(card);
-        });
-    }
-    
-    showChaptersModal();
-}
-
-// Function to show the chapters modal
-function showChaptersModal() {
-    const modal = document.getElementById('chapters-modal');
-    modal.style.display = 'block';
-}
-
-// Function to hide the chapters modal
-function hideChaptersModal() {
-    const modal = document.getElementById('chapters-modal');
-    modal.style.display = 'none';
-}
-
-// Variables to track current sentence
-let currentChapter = null;
-let currentSentenceIndex = 0;
-let sentences = [];
-
-// Function to open the sentence modal for a chapter
-function openSentenceModal(chapter, chapterIndex) {
-    hideChaptersModal();
-    
-    currentChapter = chapter;
-    currentSentenceIndex = 0;
-    sentences = chapter.sentences || [];
-    
-    document.getElementById('chapter-title').textContent = chapter.title || `Chapter ${chapterIndex + 1}`;
-    
-    updateSentenceDisplay();
-    
-    const modal = document.getElementById('sentence-modal');
-    modal.style.display = 'block';
-    
-    // Add event listeners for navigation buttons
-    document.getElementById('prev-sentence').addEventListener('click', showPreviousSentence);
-    document.getElementById('next-sentence').addEventListener('click', showNextSentence);
-}
-
-// Function to update the displayed sentence
-function updateSentenceDisplay() {
-    const sentenceElem = document.getElementById('current-sentence');
-    const counterElem = document.getElementById('sentence-counter');
-    const prevButton = document.getElementById('prev-sentence');
-    const nextButton = document.getElementById('next-sentence');
-    
-    if (sentences.length === 0) {
-        sentenceElem.textContent = "No sentences available for this chapter.";
-        counterElem.textContent = "0/0";
-        prevButton.disabled = true;
-        nextButton.disabled = true;
-        return;
-    }
-    
-    sentenceElem.textContent = sentences[currentSentenceIndex];
-    counterElem.textContent = `${currentSentenceIndex + 1}/${sentences.length}`;
-    
-    // Update button states
-    prevButton.disabled = currentSentenceIndex === 0;
-    nextButton.disabled = currentSentenceIndex === sentences.length - 1;
-}
-
-// Function to show the previous sentence
-function showPreviousSentence() {
-    if (currentSentenceIndex > 0) {
-        currentSentenceIndex--;
-        updateSentenceDisplay();
-    }
-}
-
-// Function to show the next sentence
-function showNextSentence() {
-    if (currentSentenceIndex < sentences.length - 1) {
-        currentSentenceIndex++;
-        updateSentenceDisplay();
-    }
-}
-
-// Function to close the sentence modal
-function closeSentenceModal() {
-    const modal = document.getElementById('sentence-modal');
-    modal.style.display = 'none';
-    showChaptersModal();
-}
-
-// Add click event to close modals when clicking outside
-window.addEventListener('click', (event) => {
-    const sentenceModal = document.getElementById('sentence-modal');
-    const chaptersModal = document.getElementById('chapters-modal');
-    const pageleModal = document.getElementById('pagele-modal');
-    
-    if (event.target === sentenceModal) {
-        closeSentenceModal();
-    } else if (event.target === chaptersModal) {
-        hideChaptersModal();
-    } else if (event.target === pageleModal) {
-        hidePageleModal();
-    }
-});
-
     </script>
+</body>
 </html>

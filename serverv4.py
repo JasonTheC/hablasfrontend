@@ -164,7 +164,7 @@ class ModelManager:
                 item['future'].set_exception(e)
 
 # Initialize the model manager
-#model_manager = ModelManager()
+model_manager = ModelManager()
 
 
 
@@ -176,6 +176,10 @@ def stt_task(data_object):
             lang = language_name_map[lang]
 
         print(f"language code: {lang}")
+
+        # Check if blob exists in data_object
+        if "blob" not in data_object:
+            return {"error": "Missing audio data (blob) in request"}
 
         # Save audio file
         user_id = data_object.get('username', None)
@@ -1311,21 +1315,21 @@ async def main():
     global db
     db = DatabaseManager("usersHablas.db")
     db.init_database();
-    #preload_all_models()
+    preload_all_models()
 
     # Create SSL context
-    """ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
     ssl_context.load_cert_chain(
         '/media/nas/SSLCerts/carriertech.uk/fullchain.pem',
         '/media/nas/SSLCerts/carriertech.uk/privkey.pem'
-    )"""
+    )
 
     # Start the WebSocket server with SSL
     async with websockets.serve(
         handle_connection,
         "0.0.0.0",  # Changed from localhost to accept external connections
         8675,
-        #ssl=ssl_context
+        ssl=ssl_context
     ):
         print("WebSocket server started on wss://carriertech.uk:8675")
         await asyncio.Future()  # Run forever

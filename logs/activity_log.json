@@ -543,5 +543,167 @@
       "language": "francais",
       "pagele": "{}"
     }
+  },
+  {
+    "timestamp": "2025-05-01T17:01:49.124761",
+    "event_type": "token_verification",
+    "ip_address": "127.0.0.1",
+    "username": "jason.carrier@gmail.com",
+    "data": {
+      "task": "verify_token",
+      "token": "f816c009-ecec-48e9-a94d-c5dd4c29eab7",
+      "ip": "127.0.0.1",
+      "status": "success",
+      "username": "jason.carrier@gmail.com",
+      "current_book": "LePetitPrince.epub",
+      "cfi": "epubcfi(/6/12!/4/2/4/2/1:0)",
+      "preferred_language": "en",
+      "language": "francais",
+      "pagele": "{}"
+    }
+  },
+  {
+    "timestamp": "2025-05-01T17:04:45.043611",
+    "event_type": "token_verification",
+    "ip_address": "127.0.0.1",
+    "username": "jason.carrier@gmail.com",
+    "data": {
+      "task": "verify_token",
+      "token": "f816c009-ecec-48e9-a94d-c5dd4c29eab7",
+      "ip": "127.0.0.1",
+      "status": "success",
+      "username": "jason.carrier@gmail.com",
+      "current_book": "LePetitPrince.epub",
+      "cfi": "epubcfi(/6/12!/4/2/4/2/1:0)",
+      "preferred_language": "en",
+      "language": "francais",
+      "pagele": "{}"
+    }
+  },
+  {
+    "timestamp": "2025-05-01T17:08:11.244010",
+    "event_type": "token_verification",
+    "ip_address": "127.0.0.1",
+    "username": "jason.carrier@gmail.com",
+    "data": {
+      "task": "verify_token",
+      "token": "f816c009-ecec-48e9-a94d-c5dd4c29eab7",
+      "ip": "127.0.0.1",
+      "status": "success",
+      "username": "jason.carrier@gmail.com",
+      "current_book": "LePetitPrince.epub",
+      "cfi": "epubcfi(/6/12!/4/2/4/2/1:0)",
+      "preferred_language": "en",
+      "language": "francais",
+      "pagele": "{}"
+    }
+  },
+  {
+    "timestamp": "2025-05-01T17:08:39.966424",
+    "event_type": "token_verification",
+    "ip_address": "127.0.0.1",
+    "username": "jason.carrier@gmail.com",
+    "data": {
+      "task": "verify_token",
+      "token": "f816c009-ecec-48e9-a94d-c5dd4c29eab7",
+      "ip": "127.0.0.1",
+      "status": "success",
+      "username": "jason.carrier@gmail.com",
+      "current_book": "LePetitPrince.epub",
+      "cfi": "epubcfi(/6/12!/4/2/4/2/1:0)",
+      "preferred_language": "en",
+      "language": "francais",
+      "pagele": "{}"
+    }
+  },
+  {
+    "timestamp": "2025-05-01T17:10:40.629046",
+    "event_type": "token_verification",
+    "ip_address": "127.0.0.1",
+    "username": "jason.carrier@gmail.com",
+    "data": {
+      "task": "verify_token",
+      "token": "f816c009-ecec-48e9-a94d-c5dd4c29eab7",
+      "ip": "127.0.0.1",
+      "status": "success",
+      "username": "jason.carrier@gmail.com",
+      "current_book": "LePetitPrince.epub",
+      "cfi": "epubcfi(/6/12!/4/2/4/2/1:0)",
+      "preferred_language": "en",
+      "language": "francais",
+      "pagele": "{}"
+    }
+  },
+  {
+    "timestamp": "2025-05-01T17:12:28.473681",
+    "event_type": "token_verification",
+    "ip_address": "127.0.0.1",
+    "username": "jason.carrier@gmail.com",
+    "data": {
+      "task": "verify_token",
+      "token": "f816c009-ecec-48e9-a94d-c5dd4c29eab7",
+      "ip": "127.0.0.1",
+      "status": "success",
+      "username": "jason.carrier@gmail.com",
+      "current_book": "LePetitPrince.epub",
+      "cfi": "epubcfi(/6/12!/4/2/4/2/1:0)",
+      "preferred_language": "en",
+      "language": "francais",
+      "pagele": "{}"
+    }
+  },
+  {
+    "timestamp": "2025-05-01T17:13:30.995796",
+    "event_type": "token_verification",
+    "ip_address": "127.0.0.1",
+    "username": "jason.carrier@gmail.com",
+    "data": {
+      "task": "verify_token",
+      "token": "f816c009-ecec-48e9-a94d-c5dd4c29eab7",
+      "ip": "127.0.0.1",
+      "status": "success",
+      "username": "jason.carrier@gmail.com",
+      "current_book": "LePetitPrince.epub",
+      "cfi": "epubcfi(/6/12!/4/2/4/2/1:0)",
+      "preferred_language": "en",
+      "language": "francais",
+      "pagele": "{}"
+    }
+  },
+  {
+    "timestamp": "2025-05-01T17:17:20.638705",
+    "event_type": "token_verification",
+    "ip_address": "127.0.0.1",
+    "username": "jason.carrier@gmail.com",
+    "data": {
+      "task": "verify_token",
+      "token": "f816c009-ecec-48e9-a94d-c5dd4c29eab7",
+      "ip": "127.0.0.1",
+      "status": "success",
+      "username": "jason.carrier@gmail.com",
+      "current_book": "LePetitPrince.epub",
+      "cfi": "epubcfi(/6/12!/4/2/4/2/1:0)",
+      "preferred_language": "en",
+      "language": "francais",
+      "pagele": "{}"
+    }
+  },
+  {
+    "timestamp": "2025-05-01T17:18:50.745134",
+    "event_type": "token_verification",
+    "ip_address": "127.0.0.1",
+    "username": "jason.carrier@gmail.com",
+    "data": {
+      "task": "verify_token",
+      "token": "f816c009-ecec-48e9-a94d-c5dd4c29eab7",
+      "ip": "127.0.0.1",
+      "status": "success",
+      "username": "jason.carrier@gmail.com",
+      "current_book": "LePetitPrince.epub",
+      "cfi": "epubcfi(/6/12!/4/2/4/2/1:0)",
+      "preferred_language": "en",
+      "language": "francais",
+      "pagele": "{}"
+    }
   }
 ]

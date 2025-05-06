@@ -21,7 +21,7 @@
             <div id="tutorial">Tutorial</div>
             <div id="pagele-section">Daily Pagele</div>
             <div id="user-section">Login</div>
-            <img src="images/settings.png" id="settings"/> 
+        <img src="images/settings.png" id="settings"/> 
         </div>
     </div>
 
@@ -36,7 +36,7 @@
                     <p></p>
                     <button id="browse-books-btn" onclick="loadAvailableBooks()">Tap here to begin!</button>
                 </div>
-            </div> 
+        </div>
     </div>
 
     <input type="file" id="fileInput" accept=".epub"/>
@@ -69,9 +69,9 @@
                 <div id="file">
                     <img src="images/upload-icon-white.png" alt="upload symbol" />
                     <img src="images/epub-icon-white.png" alt="upload symbol" />
-                </div>
             </div>
     </div>
+</div>
 
 
 <div id="books-modal" >
@@ -110,9 +110,9 @@
                 <div class="status-spinner"></div>
                 <div class="status-message">Processing...</div>
                 <div class="timer">0.0s</div>
-            </div>
-        </div>
-   
+    </div>
+</div>
+
         <!-- Add status indicator -->
         <div id="recording-status" style="display: none;">
             <div class="status-spinner"></div>
@@ -297,8 +297,8 @@ function waitForEpub() {
 
 // Replace the existing WebSocket implementation with a simpler function-based approach
 function createWebSocketConnection() {
-    //const socket = new WebSocket('wss://carriertech.uk:8675');
-    const socket = new WebSocket('ws://localhost:8675');
+    const socket = new WebSocket('wss://carriertech.uk:8675');
+    //const socket = new WebSocket('ws://localhost:8675');
     socket.addEventListener('open', (event) => {
         console.log('WebSocket connection established');
     });
@@ -376,9 +376,9 @@ function createWebSocketConnection() {
     socket.addEventListener('close', (event) => {
         console.log('WebSocket connection closed', event.code, event.reason);
     });
-    
+
     return socket;
-}
+    }
 
 // Initialize the socket
 let socket = createWebSocketConnection();
@@ -406,7 +406,7 @@ function loadAvailableBooks() {
 
 
 
-function createBlobAndConnect() {
+/*function createBlobAndConnect() {
     const statusIndicator = document.getElementById('recording-status');
     if (statusIndicator) {
         statusIndicator.style.display = 'flex';
@@ -435,7 +435,7 @@ function createBlobAndConnect() {
             page: selectedPage 
         });
     };
-}
+}*/
 
 // Update login button click handler
 loginButton.addEventListener(EVENT_TYPE, () => {
@@ -517,35 +517,35 @@ function handleLogout() {
 
 // Handler functions for different types of responses
 function handleBooksResponse(response) {
-    // Group books by language
+        // Group books by language
     const booksByLanguage = response.books.reduce((acc, book) => {
-        if (!acc[book.language]) {
-            acc[book.language] = [];
-        }
-        acc[book.language].push(book);
-        return acc;
-    }, {});
-    
+            if (!acc[book.language]) {
+                acc[book.language] = [];
+            }
+            acc[book.language].push(book);
+            return acc;
+        }, {});
+        
    
     const booksGrid = document.getElementById('books-grid');
     booksGrid.innerHTML = '';
     
-    Object.entries(booksByLanguage).forEach(([language, languageBooks]) => {
-        const languageSection = document.createElement('div');
-        languageSection.className = 'language-section';
-        
-        const languageHeader = document.createElement('h2');
-        languageHeader.textContent = language.charAt(0).toUpperCase() + language.slice(1);
-        languageSection.appendChild(languageHeader);
-        
-        const booksContainer = document.createElement('div');
-        booksContainer.className = 'books-container';
-        
-        languageBooks.forEach(book => {
-            const bookElement = document.createElement('div');
-            bookElement.className = 'book';
+        Object.entries(booksByLanguage).forEach(([language, languageBooks]) => {
+            const languageSection = document.createElement('div');
+            languageSection.className = 'language-section';
+            
+            const languageHeader = document.createElement('h2');
+            languageHeader.textContent = language.charAt(0).toUpperCase() + language.slice(1);
+            languageSection.appendChild(languageHeader);
+            
+            const booksContainer = document.createElement('div');
+            booksContainer.className = 'books-container';
+            
+            languageBooks.forEach(book => {
+                const bookElement = document.createElement('div');
+                bookElement.className = 'book';
 
-            const img = document.createElement('img');
+                const img = document.createElement('img');
             // Check if cover is base64 data or path
             if (book.cover && book.cover.startsWith('data:')) {
                 img.src = book.cover;
@@ -554,15 +554,15 @@ function handleBooksResponse(response) {
                 img.src = 'images/default-cover.png';
                 console.error('Invalid cover data for book:', book.filename);
             }
-            img.alt = book.filename;
+                img.alt = book.filename;
             
-            const title = document.createElement('div');
-            title.className = 'book-title';
-            title.textContent = book.filename.replace('.epub', '');
-            
-            bookElement.appendChild(img);
-            bookElement.appendChild(title);
-            
+                const title = document.createElement('div');
+                title.className = 'book-title';
+                title.textContent = book.filename.replace('.epub', '');
+                
+                bookElement.appendChild(img);
+                bookElement.appendChild(title);
+                
             // Add click event to load the book (now using the async function)
             bookElement.addEventListener(EVENT_TYPE, async () => {
                     // Show loading indicator
@@ -585,12 +585,12 @@ function handleBooksResponse(response) {
                 
             });
             
-            booksContainer.appendChild(bookElement);
+                booksContainer.appendChild(bookElement);
+            });
+            
+            languageSection.appendChild(booksContainer);
+            booksGrid.appendChild(languageSection);
         });
-        
-        languageSection.appendChild(booksContainer);
-        booksGrid.appendChild(languageSection);
-    });
 }
 
 function setLanguage(language){
@@ -632,7 +632,7 @@ function handleTokenResponse(response) {
     updateAuthUI(true, response.username, response);
     
     // Close the settings drawer
-    drawer.classList.remove('open');
+        drawer.classList.remove('open');
 }
 
 function updateAuthUI(isLoggedIn, username = '', responseData = null) {
@@ -853,14 +853,14 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
 });
     // Separate function for epub rendering
     async function renderEpub(file, cfi=null) {
-            currentBook = ePub(file);
+        currentBook = ePub(file);
             const viewer = document.getElementById("viewer");
-            viewer.innerHTML = "";
-            rendition = currentBook.renderTo("viewer", {
-                height: "100%",
+        viewer.innerHTML = "";
+        rendition = currentBook.renderTo("viewer", {
+            height: "100%",
                 width: "100%",
-                allowScriptedContent: true,
-                script: true,
+            allowScriptedContent: true,
+            script: true,
                 flow: "scrolled-doc",
                 manager: "continuous"
             });
@@ -1022,7 +1022,7 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
                 });
             }
             
-            fileDiv.style.display = "none";
+        fileDiv.style.display = "none";
             
             // Create scroll down button if it doesn't exist
             if (!document.getElementById('scroll-down-btn')) {
@@ -1454,20 +1454,20 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
             currentBook.getRange(rangeCfi)
                 .then(range => {
                     if (range) {
-                        selectedText = range.toString();
-                        console.log("Raw selected text:", selectedText);
-                        
-                        // Clean up text
-                        selectedText = cleanText(selectedText);
-                        console.log("Cleaned selected text:", selectedText);
-                        
+                    selectedText = range.toString();
+                    console.log("Raw selected text:", selectedText);
+                    
+                    // Clean up text
+                    selectedText = cleanText(selectedText);
+                    console.log("Cleaned selected text:", selectedText);
+                    
                         lines = selectedText.split('.')
                             .map(line => line.trim())
                             .filter(line => line.length > 0)
                             .map(line => line + '.');
                         
-                        console.log("Lines array:", lines);
-                        console.log("Number of lines:", lines.length);
+                    console.log("Lines array:", lines);
+                    console.log("Number of lines:", lines.length);
                     } else {
                         console.log("Range is null or undefined");
                     }
@@ -1770,7 +1770,7 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
                         
                         pageleRobotBtn.setAttribute('data-speaking', 'false');
                         pageleRobotBtn.style.filter = 'brightness(1)';
-                    } else {
+        } else {
                         pageleRobotBtn.setAttribute('data-speaking', 'true');
                         pageleRobotBtn.style.filter = 'brightness(0.7)';
                         textToSpeech(currentDailySentences[currentSentenceIndex]);
