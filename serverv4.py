@@ -422,10 +422,10 @@ async def get_book_data(data_object):
         return {"status": "error", "message": str(e)}
 
 async def translate_task(data_object):
-    source_text = data_object.get("text", "")
-    source_lang = data_object.get("source_lang", "en")
-    target_lang = data_object.get("target_lang", "fr")
-    current_book = data_object.get("current_book", "")
+    source_text = data_object["text"]
+    source_lang = data_object["source_lang"]
+    target_lang = data_object["target_lang"]
+    current_book = data_object["current_book"]
     cfi = data_object.get("cfi", "")  # Get CFI instead of page
     username = data_object.get("username", "")
 

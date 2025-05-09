@@ -26,9 +26,53 @@
     </div>
 
     <div id="initChoice">
-        <div id="initDailyPagele">Daily Pagele</div>
-        <div id="initFreeRead">Free read</div>
+        <div id="initDailyPagele" class="disabled">Daily Pagele</div>
+        <div id="initFreeRead" class="disabled">Free read</div>
+        
+        <div id="init-login-section">
+            <h3>Please log in to start</h3>
+            <input type="text" id="init-user-name" placeholder="Email">
+            <input type="password" id="init-user-password" placeholder="Password">
+            <div id="init-login-signup" style="display: flex; width: 100%; gap: 10px; margin-top: 10px;">
+                <div id="init-login-button" class="options" style="flex: 1;">Login</div>
+                <div id="init-signup-button" class="options" style="flex: 1;">Sign up</div>
+            </div>
+        </div>
     </div>
+
+    <style>
+    .disabled {
+        opacity: 0.5;
+        pointer-events: none;
+        filter: grayscale(50%);
+    }
+    #init-login-section {
+        margin-top: 20px;
+        padding: 20px;
+        background-color: rgba(255, 255, 255, 0.9);
+        border-radius: 10px;
+        width: 80%;
+        max-width: 400px;
+    }
+    #init-login-section input {
+        width: 100%;
+        padding: 10px;
+        margin-bottom: 10px;
+        border-radius: 5px;
+        border: 1px solid #ccc;
+    }
+    #init-login-section .options {
+        padding: 10px;
+        text-align: center;
+        background-color: #4CAF50;
+        color: white;
+        border-radius: 5px;
+        cursor: pointer;
+    }
+    #init-login-section .options:hover {
+        background-color: #45a049;
+    }
+    </style>
 
     <div id="div2viewer">
             <div id="viewer">
@@ -508,6 +552,10 @@ function handleLogout() {
     // Close the settings drawer
     drawer.classList.remove('open');
     
+    // Make sure we're showing the initial choice with login form
+    document.getElementById('div2viewer').style.display = 'none';
+    document.getElementById('initChoice').style.display = 'flex';
+    
     // Notify server about logout
     sendSocketMessage({
         task: "logout",
@@ -639,15 +687,29 @@ function updateAuthUI(isLoggedIn, username = '', responseData = null) {
     const loginSignupContainer = document.getElementById('login-singup');
     const usernameInput = document.getElementById('user-name');
     const passwordInput = document.getElementById('user-password');
+    const initLoginSection = document.getElementById('init-login-section');
+    const initDailyPagele = document.getElementById('initDailyPagele');
+    const initFreeRead = document.getElementById('initFreeRead');
     
     if (isLoggedIn) {
-        // Hide login/signup elements
+        // Hide login/signup elements in settings drawer
         loginSignupContainer.style.display = 'none';
         usernameInput.style.display = 'none';
         passwordInput.style.display = 'none';
+        
+        // Hide login section on initial screen
+        if (initLoginSection) {
+            initLoginSection.style.display = 'none';
+        }
+        
+        // Enable Free Read and Pagele buttons
+        initDailyPagele.classList.remove('disabled');
+        initFreeRead.classList.remove('disabled');
+        
         sourceLang = responseData.language;
         languageSel = setLanguage(sourceLang);
-        // Add logged-in user display
+        
+        // Add logged-in user display to settings
         const userInfoDiv = document.createElement('div');
         userInfoDiv.id = 'user-info';
         userInfoDiv.className = 'options';
@@ -659,6 +721,7 @@ function updateAuthUI(isLoggedIn, username = '', responseData = null) {
             </div>
         `;
         pageleDiv.style.display = 'block';
+        
         // Insert after the login elements
         const settingsOptions = document.getElementById('settings-options');
         settingsOptions.insertBefore(userInfoDiv, document.getElementById('available-books'));
@@ -666,7 +729,7 @@ function updateAuthUI(isLoggedIn, username = '', responseData = null) {
         // Add logout functionality
         document.getElementById('logout-button').addEventListener(EVENT_TYPE, handleLogout);
 
-        // Load user's current book if available - use responseData instead of response
+        // Load user's current book if available
         if (responseData && responseData.current_book && responseData.epub) {
             selectedBook = responseData.current_book;
             selectedPage = responseData.page || 0;
@@ -697,10 +760,19 @@ function updateAuthUI(isLoggedIn, username = '', responseData = null) {
             });
         }
     } else {
-        // Show login/signup elements
+        // Show login/signup elements in settings drawer
         loginSignupContainer.style.display = 'flex';
         usernameInput.style.display = 'block';
         passwordInput.style.display = 'block';
+        
+        // Show login section on initial screen
+        if (initLoginSection) {
+            initLoginSection.style.display = 'block';
+        }
+        
+        // Disable Free Read and Pagele buttons
+        initDailyPagele.classList.add('disabled');
+        initFreeRead.classList.add('disabled');
         
         // Remove user info if it exists
         const userInfo = document.getElementById('user-info');
@@ -784,6 +856,11 @@ window.addEventListener('DOMContentLoaded', () => {
     const storedUsername = localStorage.getItem('username');
     console.log("storedToken: ", storedToken);
     console.log("storedUsername: ", storedUsername);
+    
+    // Display initial choice with disabled buttons by default
+    document.getElementById('initChoice').style.display = 'flex';
+    document.getElementById('initDailyPagele').classList.add('disabled');
+    document.getElementById('initFreeRead').classList.add('disabled');
     
     if (storedToken) {
         // Wait for WebSocket connection to be established
