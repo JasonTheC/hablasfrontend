@@ -77,19 +77,17 @@
         </div>
         
         <!-- Chapters Grid Modal -->
-        <div id="chapters-modal" class="modal">
-            <div class="modal-content">
-                <span class="close">&times;</span>
+        <div id="chapters-modal" >
+                <span id="close-chapters-modal" class="close">&times;</span>
                 <h2>Chapters</h2>
                 <div id="chapters-grid"></div>
-            </div>
         </div>
         
         <!-- Sentence Display Modal -->
         <div id="sentence-modal" class="modal">
-                <span class="close-modal">&times;</span>
+                <span id="close-modal" class="close-modal">&times;</span>
                 <h2 id="chapter-title">Chapter Title</h2>
-                <button id="translation-btn" class="hold-button"> T </button>
+                <button id="translation-btn" class="hold-button"> Translate </button>
                 <div id="sentence-container" ></div>
                 <div id="prediction-container" ></div>
                 <div class="sentence-info-container">
@@ -131,6 +129,7 @@
             'italiano': 'it'
         };
         const sentenceModal = document.getElementById('sentence-modal');
+        const pageleModal = document.getElementById('pagele-modal');
         const sentenceElem = document.getElementById('sentence-container');
         const counterElem = document.getElementById('sentence-counter');
         const prevButton = document.getElementById('prev-sentence');
@@ -140,7 +139,17 @@
         const prediction = document.getElementById('prediction-container');
         const pointsSpan = document.getElementById('points');
         const availablePagele = document.getElementById('available-pagele');
-
+        const closeSentenceModalBtn = document.getElementById('close-modal');
+        const chaptersModal = document.getElementById('chapters-modal');
+        closeSentenceModalBtn.addEventListener('click', () => {
+            sentenceModal.style.display = 'none';
+            chaptersModal.style.display = 'block';
+        });
+        const closeChaptersModal = document.getElementById('close-chapters-modal');
+        closeChaptersModal.addEventListener('click', () => {
+            chaptersModal.style.display = 'none';
+            pageleModal.style.display = 'block';
+        });
         availablePagele.addEventListener('click', () => {
             requestPageleList();
         });
@@ -154,6 +163,11 @@
             username: '',
             points: 0
         };
+        
+        let timerInterval = null;
+        let userPoints = 0;
+        let ttsCache = {}; // Cache for TTS audio data
+        let lastTtsRequestDetails = null; // Stores {text, lang} of the last TTS request
         
         function createWebSocketConnection() {
             const socket = new WebSocket('wss://carriertech.uk:8675');
@@ -520,8 +534,7 @@
 
         // Function to show the pagele selection modal
         function showPageleModal() {
-            const modal = document.getElementById('pagele-modal');
-            modal.style.display = 'block';
+            pageleModal.style.display = 'block';
             sentenceModal.style.display = 'none';
         }
 
@@ -594,8 +607,6 @@
         let audioChunks = [];
         let currentAudio = null;
         let processingStartTime = 0;
-        let timerInterval = null;
-        let userPoints = 0;
 
         // Function to open the sentence modal for a chapter
         function openSentenceModal(chapter, chapterIndex) {
@@ -669,7 +680,7 @@
         }
 
         // Add click event to close modals when clicking outside
-        window.addEventListener('click', (event) => {
+        /*window.addEventListener('click', (event) => {
             const sentenceModal = document.getElementById('sentence-modal');
             const chaptersModal = document.getElementById('chapters-modal');
             const pageleModal = document.getElementById('pagele-modal');
@@ -681,7 +692,7 @@
             } else if (event.target === pageleModal) {
                 hidePageleModal();
             }
-        });
+        });*/
 
         // Function to handle prediction sentence response
         function handlePredSentence(response) {
@@ -730,37 +741,67 @@
             }
         }
 
-        // Function to handle TTS responses
-        function handleTTSResponse(response) {
-            console.log("Received TTS response:", response);
-            
-            // Stop any previously playing audio
+        // NEW helper function to play audio data and manage UI
+        function playAudioFromData(audioData, textKeyForLog) {
+            console.log(`Playing audio for: ${textKeyForLog}`);
+        
             if (currentAudio) {
                 currentAudio.pause();
                 currentAudio.currentTime = 0;
             }
-            
-            // Create and play audio element with the base64 audio data
-            const audio = new Audio(response.audio);
+        
+            const audio = new Audio(audioData);
             currentAudio = audio;
-            
-            // Add event listeners for state management
+        
+            const robotBtn = document.getElementById('robot');
+            if (robotBtn) {
+                robotBtn.setAttribute('data-speaking', 'true');
+                robotBtn.style.filter = 'brightness(0.7)';
+            }
+        
             audio.onended = () => {
-                console.log('Speech ended');
-                document.getElementById('robot').setAttribute('data-speaking', 'false');
-                document.getElementById('robot').style.filter = 'brightness(1)';
+                console.log('Speech ended for:', textKeyForLog);
+                if (robotBtn) {
+                    robotBtn.setAttribute('data-speaking', 'false');
+                    robotBtn.style.filter = 'brightness(1)';
+                }
                 currentAudio = null;
             };
-            
+        
             audio.onerror = (e) => {
-                console.error('Speech error:', e);
-                document.getElementById('robot').setAttribute('data-speaking', 'false');
-                document.getElementById('robot').style.filter = 'brightness(1)';
+                console.error('Speech error for:', textKeyForLog, e);
+                if (robotBtn) {
+                    robotBtn.setAttribute('data-speaking', 'false');
+                    robotBtn.style.filter = 'brightness(1)';
+                }
                 currentAudio = null;
             };
-            
-            // Play the audio
-            audio.play();
+        
+            audio.play().catch(e => {
+                console.error('Error playing audio for:', textKeyForLog, e);
+                if (robotBtn) {
+                    robotBtn.setAttribute('data-speaking', 'false');
+                    robotBtn.style.filter = 'brightness(1)';
+                }
+                currentAudio = null; 
+            });
+        }
+
+        // Function to handle TTS responses
+        function handleTTSResponse(response) {
+            console.log("Received TTS response via WebSocket:", response);
+        
+            if (lastTtsRequestDetails && lastTtsRequestDetails.text && lastTtsRequestDetails.lang) {
+                const cacheKey = `${lastTtsRequestDetails.lang}_${lastTtsRequestDetails.text}`;
+                ttsCache[cacheKey] = response.audio;
+                console.log('TTS: Cached audio for key:', cacheKey);
+                
+                playAudioFromData(response.audio, cacheKey);
+            } else {
+                console.warn('TTS: Received TTS response, but no lastTtsRequestDetails found. Cannot cache. Playing audio directly.');
+                const fallbackKey = `unknown_${Date.now()}`;
+                playAudioFromData(response.audio, fallbackKey);
+            }
         }
 
         // Function to create blob and send to server
@@ -803,22 +844,48 @@
 
         // Function to speak the current sentence
         function textToSpeech(textToSpeak) {
-            textToSpeak = textToSpeak.toLowerCase();
-            console.log('Starting text-to-speech for:', textToSpeak);
+            const lowerText = textToSpeak.toLowerCase();
+            console.log('Requesting text-to-speech for:', lowerText, 'Original pagele_language:', pagele_language);
             
-            // Get the current sentence language (you might need to determine this from book data)
-            const ttsLang = pagele_language;
+            let langForTTS = 'en'; // Default language code
+            const currentRawPageleLang = pagele_language;
+        
+            if (currentRawPageleLang) {
+                const lowerPageleLang = currentRawPageleLang.toLowerCase();
+                if (language_name_map[lowerPageleLang]) {
+                    langForTTS = language_name_map[lowerPageleLang];
+                } else if (currentRawPageleLang.length === 2) { // Already a 2-letter code e.g. 'fr'
+                    langForTTS = currentRawPageleLang;
+                } else {
+                    console.warn(`TTS: Unmapped/invalid pagele_language '${currentRawPageleLang}'. Using default '${langForTTS}'.`);
+                }
+            } else {
+                console.warn(`TTS: pagele_language is not set. Using default '${langForTTS}'.`);
+            }
             
+            console.log('TTS: Using language code:', langForTTS, 'for text:', lowerText);
+        
+            const cacheKey = `${langForTTS}_${lowerText}`;
+            const robotBtn = document.getElementById('robot');
+        
+            if (ttsCache[cacheKey]) {
+                console.log('TTS: Playing from cache for key:', cacheKey);
+                playAudioFromData(ttsCache[cacheKey], cacheKey);
+                return;
+            }
             
-            // Set data-speaking attribute to true and update UI
-            document.getElementById('robot').setAttribute('data-speaking', 'true');
-            document.getElementById('robot').style.filter = 'brightness(0.7)';
+            console.log('TTS: Not in cache, requesting from server for key:', cacheKey);
+            lastTtsRequestDetails = { text: lowerText, lang: langForTTS };
+        
+            if (robotBtn) {
+                robotBtn.setAttribute('data-speaking', 'true');
+                robotBtn.style.filter = 'brightness(0.7)';
+            }
             
-            // Use WebSocket for TTS
             sendSocketMessage({
                 task: 'tts',
-                text: textToSpeak,
-                language: ttsLang
+                text: lowerText,
+                language: langForTTS
             });
         }
 
@@ -888,7 +955,7 @@
                         robotBtn.setAttribute('data-speaking', 'false');
                         robotBtn.style.filter = 'brightness(1)';
                     } else {
-                        const currentSentence = document.getElementById('current-sentence').textContent;
+                        const currentSentence = sentenceElem.textContent;
                         robotBtn.setAttribute('data-speaking', 'true');
                         robotBtn.style.filter = 'brightness(0.7)';
                         textToSpeech(currentSentence);

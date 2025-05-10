@@ -1235,7 +1235,8 @@ flex-direction: column;
 }
 
 /* Chapters Modal Styling */
-#chapters-modal .modal-content {
+#chapters-modal  {
+    display: none;
     position: relative;
     background-color: #f9f9f9;
     margin: 5vh auto;
@@ -1244,7 +1245,6 @@ flex-direction: column;
     max-width: 800px;
     border: 1px solid #ccc;
     border-radius: 10px;
-    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
     max-height: 90vh;
     overflow-y: auto;
 }
