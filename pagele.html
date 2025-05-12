@@ -3,7 +3,7 @@
 <head>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <link href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700&family=Roboto:wght@400;700&family=Quicksand:wght@400;700&family=Montserrat:wght@400;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=1.0">
+    <link rel="stylesheet" href="style.css?v=1.1">
     <style>
         .hold-button {
             margin-top: 10px;
@@ -37,7 +37,7 @@
     <div id="title">
         <p>Pagele</p>
         <div id="title-right">
-            <img src="images/settings.png" id="settings"/> 
+            <img src="images/settings.png" id="settings" style="width: 100% !important; max-width: 100% !important;"/> 
         </div>
     </div>
 
@@ -86,8 +86,11 @@
         <!-- Sentence Display Modal -->
         <div id="sentence-modal" class="modal">
                 <span id="close-modal" class="close-modal">&times;</span>
-                <h2 id="chapter-title">Chapter Title</h2>
-                <button id="translation-btn" class="hold-button"> Translate </button>
+                <div class="sentence-info-container">
+                    <button id="translation-btn" class="hold-button"> Translate </button>
+                    <h2 id="chapter-title">Chapter Title</h2>
+                    
+                </div>
                 <div id="sentence-container" ></div>
                 <div id="prediction-container" ></div>
                 <div class="sentence-info-container">
@@ -114,6 +117,8 @@
     </div>
 
     <script>
+        let completedIndices = {};
+        let pageleFilename = "";
         let pagele_language = 'en';
         const language_name_map = {
             'english': 'en',
@@ -141,6 +146,8 @@
         const availablePagele = document.getElementById('available-pagele');
         const closeSentenceModalBtn = document.getElementById('close-modal');
         const chaptersModal = document.getElementById('chapters-modal');
+        const recordBtn = document.getElementById('record');
+
         closeSentenceModalBtn.addEventListener('click', () => {
             sentenceModal.style.display = 'none';
             chaptersModal.style.display = 'block';
@@ -234,9 +241,12 @@
                     displayPageleList(response.pagele_books);
                 } else if (response.type === 'get_pagele') {
                     const pagele_data = response.pagele_data;
-                    
+                    pageleFilename = response.user_pagele.current_pagele;
                     // Transform the chapter data format
                     const chapters = [];
+                    
+                    // Get user progress data from the response
+                    completedIndices = response.user_pagele.books[pageleFilename].completed_indices;
                     
                     // Convert the object-based chapter structure to an array
                     Object.keys(pagele_data).forEach(key => {
@@ -244,10 +254,19 @@
                             // Extract chapter number from key (e.g., "chapter1" -> 1)
                             const chapterNumber = parseInt(key.replace('chapter', ''));
                             
+                            // Calculate total points for this chapter from completedIndices
+                            let chapterPoints = 0;
+                            if (completedIndices[key]) {
+                                Object.values(completedIndices[key]).forEach(points => {
+                                    chapterPoints += (points || 0);
+                                });
+                            }
+                            
                             chapters.push({
+                                key: key,
                                 title: `Chapter ${chapterNumber}`,
                                 sentences: pagele_data[key],
-                                points: 0 // Default points, update if available elsewhere
+                                points: chapterPoints // Set points from user progress data
                             });
                         }
                     });
@@ -261,23 +280,17 @@
                     
                     displayChaptersGrid(chapters);
                 } else if (response.status === "error") {
-                    // Handle error messages
-                    console.error('Server error:', response.message);
-                    if (response.message === "Invalid or expired token") {
-                        localStorage.removeItem('token');
-                        localStorage.removeItem('username');
-                        handleInvalidToken();
-                    }
+                    
                 } else if (response.hasOwnProperty('pred_sentence')) {
                     handlePredSentence(response);
                 } else if (response.status === 'success' && response.hasOwnProperty('audio')) {
                     handleTTSResponse(response);
-                } else if (response.hasOwnProperty('translated_text')) {
-                    console.log("translated_text: ", response.translated_text);
+                } else if (response.hasOwnProperty('translated_words')) {
+                    console.log("translated_text: ", response.translated_words);
                     if (translate_down) {
-                        sentenceElem.innerHTML = response.translated_text;
+                        sentenceElem.innerHTML = response.translated_words;
                     }
-                    translated_text = response.translated_text;
+                    translated_text = response.translated_words;
                             
                 } else if (response && response.preferred_language && typeof response.preferred_language === 'string') {
                     userInfo.preferredLanguage = response.preferred_language;
@@ -615,9 +628,20 @@
             currentChapter = chapter;
             currentSentenceIndex = 0;
             sentences = chapter.sentences || [];
-            
+            console.log("currentChapter: ", currentChapter);
             document.getElementById('chapter-title').textContent = chapter.title || `Chapter ${chapterIndex + 1}`;
             
+            // Get chapter key from the chapter data
+            const chapterKey = chapter.key || `chapter${chapterIndex}`;
+            
+            // Display chapter points total if available
+            const chapterPoints = chapter.points || 0;
+            const pointsDisplay = document.getElementById('chapter-points');
+            if (pointsDisplay) {
+                pointsDisplay.textContent = chapterPoints;
+            }
+            
+            // Set up the sentence display with points
             updateSentenceDisplay();
             
             const modal = document.getElementById('sentence-modal');
@@ -628,14 +652,10 @@
             nextButton.addEventListener('click', showNextSentence);
             
             // Reset points display for this chapter session
-            userPoints = 0;
-            updatePointsDisplay(userPoints);
         }
 
         // Function to update the displayed sentence
         function updateSentenceDisplay() {
-            
-            
             if (sentences.length === 0) {
                 sentenceElem.textContent = "No sentences available for this chapter.";
                 counterElem.textContent = "0/0";
@@ -646,6 +666,39 @@
             
             sentenceElem.textContent = sentences[currentSentenceIndex];
             counterElem.textContent = `${currentSentenceIndex + 1}/${sentences.length}`;
+            
+            // Get and display points for current sentence
+            const chapterKey = currentChapter.key;
+            let sentencePoints = 0;
+            console.log("completedIndices: ", completedIndices);
+            console.log("chapterKey: ", completedIndices[chapterKey]);
+            console.log("currentSentenceIndex: ", completedIndices[chapterKey][currentSentenceIndex]);
+            if (completedIndices && 
+                completedIndices[chapterKey] && 
+                completedIndices[chapterKey][currentSentenceIndex] !== undefined) {
+                sentencePoints = completedIndices[chapterKey][currentSentenceIndex];
+                console.log("sentencePoints: ", sentencePoints);
+            }
+            
+            // Update points display for current sentence
+            if (pointsSpan) {
+                pointsSpan.textContent = sentencePoints;
+                console.log("pointsSpan updated with: ", sentencePoints);
+            } else {
+                console.error("Points span element not found!");
+            }
+            
+            // Add visual indicator for completed sentences
+            if (sentencePoints > 0) {
+                sentenceElem.classList.add('completed');
+                if (sentencePoints >= 10) {
+                    sentenceElem.classList.add('max-points');
+                } else {
+                    sentenceElem.classList.remove('max-points');
+                }
+            } else {
+                sentenceElem.classList.remove('completed', 'max-points');
+            }
             
             // Update button states
             prevButton.disabled = currentSentenceIndex === 0;
@@ -713,15 +766,7 @@
             
       
             pointsSpan.innerHTML = response.points;
-            //userPoints += pointsEarned;
             
-            /*
-            // Update display with total words and wrong words info
-            const accuracy = ((response.total_words - response.wrong_words) / response.total_words * 100).toFixed(1);
-            const pointsDisplay = document.getElementById('points');
-            if (pointsDisplay) {
-                pointsDisplay.textContent = `${userPoints} (${accuracy}% correct)`;
-            }*/
         }
 
         // Function to update points display
@@ -836,7 +881,9 @@
                     language: language, 
                     sentence: currentSentence,
                     username: localStorage.getItem('username') || '',
-                    book: 'pagele', 
+                    book: pageleFilename, 
+                    chapter: currentChapter.key,
+                    currentSentenceIndex: currentSentenceIndex,
                     page: 'pagele'
                 });
             };
@@ -892,7 +939,6 @@
         // Add event listeners once DOM is loaded
         window.addEventListener('DOMContentLoaded', () => {
             // Record button event listener
-            const recordBtn = document.getElementById('record');
             if (recordBtn) {
                 recordBtn.addEventListener('click', async () => {
                     console.log("Recording button clicked");

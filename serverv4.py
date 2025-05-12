@@ -231,15 +231,44 @@ def stt_task(data_object):
         wrong_words = predicted_sentence.count('class="wrong"')
         points = total_words - wrong_words
 
+        points_to_send = 0
+        if data_object.get("book").endswith(".epub"):
+            db.set_current_book_task(data_object, fpath, predicted_sentence)
+        else:
+            #get user data
+            print(f"data_object: {data_object}")
+            user_data = db.get_user_data(data_object.get("username"))
+            print(f"user_data: {json.dumps(user_data, indent=2)}")
+            pagele_data = json.loads(user_data["pagele"])
+            pagele_data["current_pagele"] = data_object.get("book")
+            pagele_data["current_chapter"] = data_object.get("chapter")
+            print(pagele_data["books"][data_object.get("book")]["completed_indices"].keys())
+            pagele_book = pagele_data["books"][data_object.get("book")]["completed_indices"]
+            pagele_book[data_object.get("chapter")][data_object.get("currentSentenceIndex")] = points
+            total_points = 0
+            
+
+            for chapter in pagele_book.keys():
+                try:
+                    for sentence in pagele_book[chapter].keys():
+                        total_points += pagele_book[chapter][sentence]
+                except Exception as e:
+                    print(f"error: {e}")
+                    continue
+                    
+            print(f"total_points: {total_points}")
+            pagele_data["books"][data_object.get("book")]["total_points"] = total_points
+            user_data["pagele"] = json.dumps(pagele_data)
+            points_to_send = pagele_book
+            db.update_pagele_data(user_data)
+
         message_returned = {
             "pred_sentence": predicted_sentence,
             "points": points,
             "total_words": total_words,
             "wrong_words": wrong_words,
+            "book_points": points_to_send
         }
-
-        db.set_current_book_task(data_object, fpath, predicted_sentence)
-
         return message_returned
 
     except Exception as e:
@@ -422,12 +451,19 @@ async def get_book_data(data_object):
         return {"status": "error", "message": str(e)}
 
 async def translate_task(data_object):
+    print(f"data_object: {data_object}")
     source_text = data_object["text"]
     source_lang = data_object["source_lang"]
     target_lang = data_object["target_lang"]
-    current_book = data_object["current_book"]
+    print(f"source_text: {source_text}")
+    print(f"source_lang: {source_lang}")
+    print(f"target_lang: {target_lang}")
+    current_book = data_object.get("current_book", "")
+    print(f"current_book: {current_book}")
     cfi = data_object.get("cfi", "")  # Get CFI instead of page
+    print(f"cfi: {cfi}")
     username = data_object.get("username", "")
+    print(f"username: {username}")
 
     if source_lang == target_lang:
         return {"status": "success", "translated_text": source_text}
@@ -442,10 +478,10 @@ async def translate_task(data_object):
         "deutsch": "de",
         "italiano": "it"
     }
-
-    if source_lang in source_lang_map:
+    print(f"source_lang_map: {source_lang_map}")
+    if source_lang in source_lang_map.keys():
         source_lang = source_lang_map[source_lang]
-
+    if source_lang in source_lang_map.values():
         print(f"Attempting to translate from {source_lang} to {target_lang}")
         translator_instance = Translator()
         result = await translator_instance.translate(source_text, src=source_lang, dest=target_lang)
@@ -453,9 +489,7 @@ async def translate_task(data_object):
         if hasattr(result, 'text') and username != "":
             translated_text = result.text
             print(f"Translation successful: {translated_text}")
-            print(f"current_book: {current_book}")
-            print(f"username: {username}")
-            if current_book and username:
+            if current_book != "" and username != "":
                 print(f"Updating database for user {username} with book {current_book} and CFI {cfi}")
                 db.set_current_book_task({
                     "username": username,
@@ -729,31 +763,52 @@ async def init_pagele_task(data_object):
     print(f"language: {language}")
     user_data = db.get_user_data(token)
     print(f"user_data: {user_data}")
-    
+    pagele_data = user_data["pagele"]
     """if user_data["pagele"] == '{}':
         pagele_data = {}
     else:"""
-    pagele_data = json.loads(user_data["pagele"])
-        
-    # Update user_data with the parsed dictionary
-    user_data["pagele"] = pagele_data
+    if isinstance(pagele_data, str):
+        try:
+            pagele_data = json.loads(pagele_data)
+        except json.JSONDecodeError:
+            pagele_data = {}
     
-    if not user_data["pagele"]:
-        user_data["pagele"] = {"current_pagele": pagele_filename, "current_index": 0,
-                                "books": {pagele_filename: {"completed_indices": {}, "total_points": 0, "last_played": ""}}}
-    elif pagele_filename in user_data["pagele"]["books"].keys():
-        user_data["pagele"]["current_pagele"] = pagele_filename
-        user_data["pagele"]["current_index"] = user_data["pagele"]["books"][pagele_filename]["completed_indices"][-1] + 1
+    # Ensure pagele_data is a dictionary
+    if not isinstance(pagele_data, dict):
+        pagele_data = {}
+    
+    
+    print(f"pagele_data: {pagele_data}")
+    print(f"{EPUB_DIR}/{language}/{pagele_filename}")
+    pagele_json = open(f"{EPUB_DIR}/{language}/{pagele_filename}", "r")
+    print(f"pagele_json: {pagele_json}")
+    pagele_json = json.load(pagele_json)
+    print(f"pagele_jsonloaded")
+    print(type(pagele_data))
+    if "books" in pagele_data and pagele_filename in list(pagele_data["books"].keys()):
+        print("pagele_filename is in pagele_data")
+        pagele_data["current_pagele"] = pagele_filename
     else:
-        user_data["pagele"]["current_pagele"] = pagele_filename
-        user_data["pagele"]["current_index"] = 0
-        user_data["pagele"]["books"][pagele_filename] = {"completed_indices": {}, "total_points": 0, "last_played": ""}
+        print("pagele_filename is not in pagele_data")
+        completed_indices = init_completed_indices(pagele_json)
+        pagele_data["current_pagele"] = pagele_filename
+        pagele_data["current_index"] = 0
+        print(f"current_index: 0")
+        if "books" not in pagele_data:
+            pagele_data["books"] = {}
+        pagele_data["books"][pagele_filename] = {"completed_indices": completed_indices, "total_points": 0, "last_played": ""}
 
+    user_data["pagele"] = json.dumps(pagele_data)
+    db.update_pagele_data(user_data)
+    return {"status": "success", "pagele_data": pagele_json, "index": pagele_data["current_index"], "type": "get_pagele", "user_pagele": pagele_data}
 
-    pagele_data = open(f"{EPUB_DIR}/{language}/{pagele_filename}", "r")
-    pagele_data = json.load(pagele_data)
-
-    return {"status": "success", "pagele_data": pagele_data, "index": user_data["pagele"]["current_index"], "type": "get_pagele", "user_pagele": user_data["pagele"]}
+def init_completed_indices(pagele_json):
+    completed_indices = {}
+    for chapter in pagele_json:
+        completed_indices[chapter] = {}
+        for idx, sentence in enumerate(pagele_json[chapter]):
+            completed_indices[chapter][idx] = 0
+    return completed_indices
 
 async def get_available_pagele():
     pagele_books = []  # Initialize the list to store pagele data
@@ -892,7 +947,18 @@ class DatabaseManager:
             pagele TEXT DEFAULT '{}'  -- New column for storing pagele data as JSON
         )
         ''')
-
+        """
+        {
+        "current_pagele": "filename.json",  // Current pagele file being used
+        "current_index": 0,                 // Current position in the pagele content
+        "books": {
+                    "filename.json": {                // Each pagele file has an entry
+                    "completed_indices": {},        // Tracking completed sections 
+                    "total_points": 0,              // Total points earned
+                    "last_played": ""               // Timestamp of last play
+                    }
+                }
+        }"""
         # Check if pagele column exists, add it if it doesn't
         cursor.execute("PRAGMA table_info(users)")
         columns = [column[1] for column in cursor.fetchall()]
@@ -1102,38 +1168,28 @@ class DatabaseManager:
         cursor.execute("SELECT pagele FROM users WHERE username = ?", (data_object.get("username"),))
         result = cursor.fetchone()
         pagele_data = data_object.get("pagele")
+        if type(pagele_data) != str:
+            pagele_data = json.dumps(pagele_data)
         cursor.execute(
             "UPDATE users SET pagele = ? WHERE username = ?",
-            (json.dumps(pagele_data), data_object.get("username"))
+            (pagele_data, data_object.get("username"))
         )
-        
+        print("updated pagele_data")
         conn.commit()
         conn.close()
-        
-    def get_pagele_data(self, username, book_name=None):
-        conn = sqlite3.connect(self.DB_PATH)
-        cursor = conn.cursor()
-        cursor.execute("SELECT pagele FROM users WHERE username = ?", (username,))
-        result = cursor.fetchone()
-        
-        if not result:
-            return {} if book_name is None else 0
-        
-        try:
-            pagele_data = json.loads(result[0])
-        except (json.JSONDecodeError, TypeError):
-            pagele_data = {}
-        conn.close()
 
-        return pagele_data
     
     def get_user_data(self, token):
         print(f"get_user_data: {token}")
+        if "@" in token:
+            the_query = "SELECT * FROM users WHERE username = ?"
+        else:
+            the_query = "SELECT * FROM users WHERE login_token = ?"
         conn = sqlite3.connect(self.DB_PATH)
         cursor = conn.cursor()
         cursor.execute("PRAGMA table_info(users)")
         columns = [column[1] for column in cursor.fetchall()]
-        cursor.execute("SELECT * FROM users WHERE login_token = ?", (token,))
+        cursor.execute(the_query, (token,))
         result = cursor.fetchone()
         conn.close()
         result = dict(zip(columns, result))
