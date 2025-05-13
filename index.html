@@ -5,7 +5,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.1.5/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/epubjs/dist/epub.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700&family=Roboto:wght@400;700&family=Quicksand:wght@400;700&family=Montserrat:wght@400;700&display=swap" rel="stylesheet"> <!-- Include Lato, Roboto, and Montserrat fonts -->
-<link rel="stylesheet" href="style.css?v=1.1">
+<link rel="stylesheet" href="style.css?v=1.01">
 <head>
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -124,7 +124,7 @@
     </div>
 </div>
 
-<div id="myModal" class="modal"> 
+<div id="myModal"> 
     <div class="modal-content" id="modal-content"> 
         <span class="close-modal">&times;</span>
         <div id="modal-main">
@@ -745,6 +745,8 @@ function updateAuthUI(isLoggedIn, username = '', responseData = null) {
             }).catch(error => {
                 console.error('Error rendering book:', error);
             });
+        } else{
+            loadAvailableBooks();
         }
     } else {
         // Show login/signup elements in settings drawer
@@ -906,6 +908,10 @@ async function handlePredSentence(response) {
 // Call loadAvailableBooks when the available books button is clicked
 availableBooksBtn.addEventListener(EVENT_TYPE, () => {
     loadAvailableBooks();
+    drawer.classList.remove('open');
+        setTimeout(() => {
+            drawer.style.display = 'none';
+        }, 300); 
     
 });
 
@@ -1054,8 +1060,7 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
                                 sentenceSpan.style.backgroundColor = 'rgba(169, 209, 215, 0.5)';
                                 
                                 // Show modal with translation
-                                const modal = document.getElementById('myModal');
-                                const modalContent = modal.querySelector('.modal-content');
+                                const modalContent = modalDiv.querySelector('.modal-content');
                                 
                                 // Calculate width for modal content
                                 const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
@@ -1069,7 +1074,7 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
                                     modalContent.style.width = `${modalWidth}px`;
                                 }
                                 
-                                modal.style.display = 'block';
+                                modalDiv.style.display = 'block';
                                 
                                 // Update translation
                                 selectedText = sentence.trim();

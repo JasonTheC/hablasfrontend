@@ -3,7 +3,7 @@
 <head>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <link href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700&family=Roboto:wght@400;700&family=Quicksand:wght@400;700&family=Montserrat:wght@400;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=1.1">
+    <link rel="stylesheet" href="style.css?v=1.07">
     <style>
         .hold-button {
             margin-top: 10px;
@@ -31,13 +31,13 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
-    <title>Pagele</title>
+    <title>Daily Pages</title>
 </head>
 <body>
     <div id="title">
-        <p>Pagele</p>
+        <p>Daily Pages</p>
         <div id="title-right">
-            <img src="images/settings.png" id="settings" style="width: 100% !important; max-width: 100% !important;"/> 
+            <img src="images/settings.png" id="settings"/> 
         </div>
     </div>
 
@@ -85,11 +85,11 @@
         
         <!-- Sentence Display Modal -->
         <div id="sentence-modal" class="modal">
-                <span id="close-modal" class="close-modal">&times;</span>
+                
                 <div class="sentence-info-container">
                     <button id="translation-btn" class="hold-button"> Translate </button>
                     <h2 id="chapter-title">Chapter Title</h2>
-                    
+                    <span id="close-modal" >&times;</span>
                 </div>
                 <div id="sentence-container" ></div>
                 <div id="prediction-container" ></div>
@@ -534,7 +534,6 @@
                         <img class="pagele-cover" src="${pagele.cover}" alt="${pagele.book_name} cover">
                         <div class="pagele-title">${pagele.book_name}</div>
                         <div class="pagele-language">${pagele.language}</div>
-                        <div class="pagele-sentences">${pagele.total_sentences} sentences</div>
                     `;
                     
                     card.addEventListener('click', () => selectPagele(pagele.filename, pagele.language, 0));
