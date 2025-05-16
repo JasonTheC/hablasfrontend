@@ -1374,7 +1374,9 @@ async def main():
         handle_connection,
         "0.0.0.0",  # Changed from localhost to accept external connections
         8675,
-        ssl=ssl_context
+        ssl=ssl_context,
+        origins=["https://hablas.app", "https://carriertech.uk", "http://localhost:8000", "http://127.0.0.1:8000"]  # Specify allowed origins here
+
     ):
         print("WebSocket server started on wss://carriertech.uk:8675")
         await asyncio.Future()  # Run forever

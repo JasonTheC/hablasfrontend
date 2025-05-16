@@ -21,29 +21,27 @@ div {
 #title {
     font-family: 'Quicksand', sans-serif;
     font-weight: 600;
-    color: white; 
+    color: white;
     padding: 1%;
-    display: block;
+    display: flex; /* Use flexbox for the main title container */
+    justify-content: space-between; /* Put space between the children */
+    align-items: center; /* Vertically align items in the center */
     margin-left: 4%;
-    min-height: 40px; 
+    min-height: 40px;
     height: 5%;
     width: 90vw;
 }
 
 /* The webapp name */
 #title p {
-    float: left;
-    margin: 0;
+    margin: 0; /* Remove float as flexbox handles positioning */
 }
 
 /* Wrapper for both user-section and settings */
 #title-right {
-    float: right;
-    height: 100%;
-    max-width: 25%;
-    display: flex;
-    align-items: center;
-    gap: 10px;
+    display: flex; /* Use flexbox to arrange user-section and settings */
+    align-items: center; /* Vertically align items */
+    gap: 10px; /* Space between user-section and settings */
 }
 
 #user-section {
@@ -53,16 +51,13 @@ div {
 }
 
 #settings {
-    float: right;
     height: 100%;
     width: auto !important;
     aspect-ratio: 1/1;
-    margin-right: 0; 
     padding: 1%;
     cursor: pointer;
-    position: relative;
-    z-index: 99999 !important; /* Extremely high z-index with !important */
-    max-width: none !important;
+    max-width: none !important; /* Remove unnecessary !important */
+    z-index: auto !important; /* Reset z-index, likely not needed */
 }
 
 #div2viewer {

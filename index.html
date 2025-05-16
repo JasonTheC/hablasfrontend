@@ -1,11 +1,12 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.1.5/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/epubjs/dist/epub.min.js"></script>
-<link href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700&family=Roboto:wght@400;700&family=Quicksand:wght@400;700&family=Montserrat:wght@400;700&display=swap" rel="stylesheet"> <!-- Include Lato, Roboto, and Montserrat fonts -->
-<link rel="stylesheet" href="style.css?v=1.01">
+<link href="https://fonts.googleapis.com/css2%3Ffamily=Lato:wght@400%3B700&amp;family=Roboto:wght@400%3B700&amp;family=Quicksand:wght@400%3B700&amp;family=Montserrat:wght@400%3B700&amp;display=swap.css" rel="stylesheet"> <!-- Include Lato, Roboto, and Montserrat fonts -->
+<link rel="stylesheet" href="style.css">
 <head>
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -17,7 +18,7 @@
     <div id="title">
         <p>Hablas</p>
         <div id="title-right">
-            <div id="tutorial">Tutorial</div>
+       
             <div id="user-section">Login</div>
         <img src="images/settings.png" id="settings"/> 
         </div>
@@ -99,7 +100,7 @@
                 <select id="languageUserOptions" default="en" class="settings-select">
                     <option value="en">English</option>
                     <option value="es">Spanish</option> 
-                    <option value="fr">Français</option>
+                    <option value="fr">FranÃ§ais</option>
                     <option value="de">Deutch</option>
                     <option value="it">Italian</option>
                 </select>
@@ -108,6 +109,7 @@
                     <option value="female">Female</option>
                     <option value="male">Male</option>
                 </select>
+                <div id="tutorial">Tutorial</div>
                 <div id="points-display">Points: <span id="points">0</span></div>
                 <div id="file">
                     <img src="images/upload-icon-white.png" alt="upload symbol" />
@@ -208,7 +210,7 @@
     const lang_conversion = {
         "francais": "fr",
         "english": "en",
-        "español": "es",
+        "espaÃ±ol": "es",
         "espagnol": "es",
         "spanish": "es",
         "deutsch": "de",
