@@ -5,6 +5,7 @@ import wave , base64
 import os #library for anything that has to do with your hard-drive
 import torch, sqlite3
 from gtts import gTTS  # Add this import for Google Text-to-Speech
+from dotenv import load_dotenv  # Add this import for loading environment variables
 
 import librosa #library to analyse and process audio . soundfile is similar
 from transformers import Wav2Vec2ForCTC, Wav2Vec2Processor
@@ -30,7 +31,15 @@ import queue
 from concurrent.futures import ThreadPoolExecutor
 import threading
 import ipaddress
+import stripe
 
+# Load environment variables from .env file
+load_dotenv()
+
+# Get Stripe key from environment variable
+stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
+if not stripe.api_key:
+    raise ValueError("STRIPE_SECRET_KEY environment variable is not set")
 
 LANG_ID = "fr"
 MODEL_ID = "jonatasgrosman/wav2vec2-large-xlsr-53-french"
@@ -861,6 +870,32 @@ async def get_available_pagele():
         print(f"Error getting available pagele files: {e}")
         return []
 
+async def tip_task(data_object):
+    """Handle tip payments using Stripe"""
+    try:
+        amount = data_object.get("amount")
+        if not amount:
+            return {"status": "error", "message": "No amount provided"}
+
+        # Convert amount to cents (Stripe uses smallest currency unit)
+        amount_cents = int(float(amount) * 100)
+
+        # Create a PaymentIntent
+        intent = stripe.PaymentIntent.create(
+            amount=amount_cents,
+            currency='usd',
+            automatic_payment_methods={"enabled": True},
+        )
+
+        return {
+            "status": "success",
+            "client_secret": intent.client_secret
+        }
+
+    except Exception as e:
+        print(f"Error in tip_task: {e}")
+        return {"status": "error", "message": str(e)}
+
 async def handle_connection(websocket):
     print(f"Client connected, {websocket.remote_address}")
     
@@ -904,6 +939,9 @@ async def handle_connection(websocket):
             message_returned = await get_available_pagele()
         elif data_object.get("task") == "init_pagele":
             message_returned = await init_pagele_task(data_object)
+        elif data_object.get("task") == "tip":
+            message_returned = await tip_task(data_object)
+            logger.log_event("tip", {**data_object, **message_returned}, websocket)
 
         await websocket.send(json.dumps(message_returned))
 
@@ -1360,7 +1398,7 @@ async def main():
     global db
     db = DatabaseManager("usersHablas.db")
     db.init_database();
-    preload_all_models()
+    #preload_all_models()
 
     # Create SSL context
     ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
