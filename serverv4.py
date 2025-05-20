@@ -5,7 +5,6 @@ import wave , base64
 import os #library for anything that has to do with your hard-drive
 import torch, sqlite3
 from gtts import gTTS  # Add this import for Google Text-to-Speech
-from dotenv import load_dotenv  # Add this import for loading environment variables
 
 import librosa #library to analyse and process audio . soundfile is similar
 from transformers import Wav2Vec2ForCTC, Wav2Vec2Processor
@@ -31,15 +30,8 @@ import queue
 from concurrent.futures import ThreadPoolExecutor
 import threading
 import ipaddress
-import stripe
+import orjson # <--- Add this import
 
-# Load environment variables from .env file
-load_dotenv()
-
-# Get Stripe key from environment variable
-stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
-if not stripe.api_key:
-    raise ValueError("STRIPE_SECRET_KEY environment variable is not set")
 
 LANG_ID = "fr"
 MODEL_ID = "jonatasgrosman/wav2vec2-large-xlsr-53-french"
@@ -179,15 +171,19 @@ model_manager = ModelManager()
 
 def stt_task(data_object):
     try:
+        print(f"[STT] Starting STT processing for user: {data_object.get('username', 'unknown')}")
+        start_time = time.time()
+        
         # Map language name to code if needed
         lang = data_object['language'].lower()
+        print(f"[STT] Processing language: {lang}")
         if lang in language_name_map:
             lang = language_name_map[lang]
-
-        print(f"language code: {lang}")
+            print(f"[STT] Mapped to language code: {lang}")
 
         # Check if blob exists in data_object
         if "blob" not in data_object:
+            print("[STT] Error: Missing audio data (blob) in request")
             return {"error": "Missing audio data (blob) in request"}
 
         # Save audio file
@@ -198,6 +194,7 @@ def stt_task(data_object):
         
         book_name = data_object.get('book', '').replace('.epub', '')  # Remove .epub extension
         
+        print(f"[STT] Creating directories for user: {user_id}, book: {book_name}")
         # Create user and book specific directory
         user_dir = RECORDINGS_DIR / user_id
         book_dir = user_dir / book_name if book_name else user_dir / "general"
@@ -206,82 +203,138 @@ def stt_task(data_object):
         # Save audio file with timestamp in the appropriate directory
         timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
         fpath = book_dir / f"recording_{timestamp}.wav"
-        with open(fpath, "wb") as audio_file:
-            base64_string = data_object["blob"]
-            actual_base64 = base64_string.split(',')[1]
-            binary_data = base64.b64decode(actual_base64)
-            audio_file.write(binary_data)
+        print(f"[STT] Saving audio to: {fpath}")
+        
+        try:
+            with open(fpath, "wb") as audio_file:
+                base64_string = data_object["blob"]
+                actual_base64 = base64_string.split(',')[1]
+                binary_data = base64.b64decode(actual_base64)
+                audio_file.write(binary_data)
+            print(f"[STT] Audio file saved successfully")
+        except Exception as e:
+            print(f"[STT] Error saving audio file: {str(e)}")
+            return {"error": f"Error saving audio file: {str(e)}"}
 
         # Process audio synchronously instead of using asyncio
-        processor, model = model_manager.get_or_load_model(lang)
+        print(f"[STT] Loading model for language: {lang}")
+        try:
+            processor, model = model_manager.get_or_load_model(lang)
+            print(f"[STT] Model loaded successfully")
+        except Exception as e:
+            print(f"[STT] Error loading model: {str(e)}")
+            return {"error": f"Error loading model: {str(e)}"}
 
         # Load and process audio
-        audio = librosa.load(fpath, sr=16_000)[0]
-        inputs = processor(audio, sampling_rate=16_000, return_tensors="pt", padding=True)
+        print(f"[STT] Loading audio file for processing")
+        try:
+            audio = librosa.load(fpath, sr=16_000)[0]
+            print(f"[STT] Audio loaded, length: {len(audio)} samples")
+            inputs = processor(audio, sampling_rate=16_000, return_tensors="pt", padding=True)
+            print(f"[STT] Audio processed by processor")
+        except Exception as e:
+            print(f"[STT] Error processing audio: {str(e)}")
+            return {"error": f"Error processing audio: {str(e)}"}
 
         # Move inputs to GPU
-        input_values = inputs.input_values.to('cuda')
-        attention_mask = inputs.attention_mask.to('cuda')
+        try:
+            print(f"[STT] Moving tensors to GPU")
+            input_values = inputs.input_values.to('cuda')
+            attention_mask = inputs.attention_mask.to('cuda')
+            print(f"[STT] Tensors moved to GPU successfully")
+        except Exception as e:
+            print(f"[STT] Error moving tensors to GPU: {str(e)}")
+            return {"error": f"Error moving tensors to GPU: {str(e)}"}
 
         # Run inference with automatic mixed precision
-        with autocast():
-            with torch.no_grad():
-                logits = model(input_values, attention_mask=attention_mask).logits
+        print(f"[STT] Running inference")
+        try:
+            with autocast():
+                with torch.no_grad():
+                    logits = model(input_values, attention_mask=attention_mask).logits
+            print(f"[STT] Inference completed successfully")
+        except Exception as e:
+            print(f"[STT] Error during inference: {str(e)}")
+            return {"error": f"Error during inference: {str(e)}"}
 
         # Process results
-        predicted_ids = torch.argmax(logits, dim=-1)
-        the_words = processor.batch_decode(predicted_ids)[0]  # Take first result since we're processing single audio
+        print(f"[STT] Processing results")
+        try:
+            predicted_ids = torch.argmax(logits, dim=-1)
+            the_words = processor.batch_decode(predicted_ids)[0]  # Take first result since we're processing single audio
+            print(f"[STT] Transcription: {the_words[:50]}...")  # Print first 50 chars of transcription
+        except Exception as e:
+            print(f"[STT] Error processing results: {str(e)}")
+            return {"error": f"Error processing results: {str(e)}"}
 
-        # Rest of the processing remains the same
-        predicted_sentence, similarity_ratio, original_words, spoken_words = TextComparator.generate_html_report(
-            data_object["sentence"], the_words)
+        # Compare with expected sentence
+        print(f"[STT] Comparing with expected sentence")
+        try:
+            if "sentence" not in data_object:
+                print(f"[STT] Warning: No expected sentence provided for comparison")
+                predicted_sentence = the_words
+                similarity_ratio = 0
+                original_words = []
+                spoken_words = the_words.split()
+            else:
+                predicted_sentence, similarity_ratio, original_words, spoken_words = TextComparator.generate_html_report(
+                    data_object["sentence"], the_words)
+            print(f"[STT] Comparison completed, similarity: {similarity_ratio:.2f}")
+        except Exception as e:
+            print(f"[STT] Error comparing sentences: {str(e)}")
+            return {"error": f"Error comparing sentences: {str(e)}"}
 
+        # Calculate points
         total_words = len(spoken_words)
         wrong_words = predicted_sentence.count('class="wrong"')
         points = total_words - wrong_words
+        print(f"[STT] Calculated points: {points}/{total_words}")
 
         points_to_send = 0
-        if data_object.get("book").endswith(".epub"):
+        if data_object.get("book", "").endswith(".epub"):
+            print(f"[STT] Updating book task in database")
             db.set_current_book_task(data_object, fpath, predicted_sentence)
         else:
+            print(f"[STT] Updating pagele data")
             #get user data
-            print(f"data_object: {data_object}")
             user_data = db.get_user_data(data_object.get("username"))
-            print(f"user_data: {json.dumps(user_data, indent=2)}")
-            pagele_data = json.loads(user_data["pagele"])
+            if type(user_data["pagele"]) == str:
+                pagele_data = json.loads(user_data["pagele"])
+            else:
+                pagele_data = user_data["pagele"]
             pagele_data["current_pagele"] = data_object.get("book")
             pagele_data["current_chapter"] = data_object.get("chapter")
-            print(pagele_data["books"][data_object.get("book")]["completed_indices"].keys())
             pagele_book = pagele_data["books"][data_object.get("book")]["completed_indices"]
             pagele_book[data_object.get("chapter")][data_object.get("currentSentenceIndex")] = points
             total_points = 0
-            
-
             for chapter in pagele_book.keys():
                 try:
                     for sentence in pagele_book[chapter].keys():
                         total_points += pagele_book[chapter][sentence]
                 except Exception as e:
-                    print(f"error: {e}")
+                    print(f"[STT] Error calculating points for chapter {chapter}: {str(e)}")
                     continue
-                    
-            print(f"total_points: {total_points}")
+            print(f"[STT] Total points: {total_points}")
             pagele_data["books"][data_object.get("book")]["total_points"] = total_points
             user_data["pagele"] = json.dumps(pagele_data)
-            points_to_send = pagele_book
             db.update_pagele_data(user_data)
-
+            print(f"[STT] Pagele data updated successfully")
+        
         message_returned = {
             "pred_sentence": predicted_sentence,
             "points": points,
             "total_words": total_words,
             "wrong_words": wrong_words,
-            "book_points": points_to_send
         }
+        print(f"[STT] message_returned: {message_returned}")
+        print(f"[STT] STT processing completed in {time.time() - start_time:.4f}s")
         return message_returned
 
     except Exception as e:
-        print(f"Error in stt_task: {e}")
+        import traceback
+        error_trace = traceback.format_exc()
+        print(f"[STT] Critical error in STT processing: {str(e)}")
+        print(f"[STT] Error traceback: {error_trace}")
         return {"error": str(e)}
 
 def extract_epub_cover(epub_path: Path, cover_dir: Path) -> str:
@@ -316,7 +369,6 @@ def extract_epub_cover(epub_path: Path, cover_dir: Path) -> str:
                                     output_path.write_bytes(image_data)
                                     return str(output_path.relative_to(COVERS_DIR.parent))
                                 except Exception as e:
-                                    print(f"Error saving cover image: {e}")
                                     continue
 
                     # If no cover found, try first image in manifest
@@ -338,11 +390,9 @@ def extract_epub_cover(epub_path: Path, cover_dir: Path) -> str:
                                     output_path.write_bytes(image_data)
                                     return str(output_path.relative_to(COVERS_DIR.parent))
                                 except Exception as e:
-                                    print(f"Error saving first image as cover: {e}")
                                     continue
 
             except Exception as e:
-                print(f"Error reading EPUB structure: {e}")
                 # Try direct image search as fallback
                 for filename in zip_file.namelist():
                     if any(filename.lower().endswith(ext) for ext in ['.jpg', '.jpeg', '.png']):
@@ -353,13 +403,11 @@ def extract_epub_cover(epub_path: Path, cover_dir: Path) -> str:
                             output_path.write_bytes(image_data)
                             return str(output_path.relative_to(COVERS_DIR.parent))
                         except Exception as e:
-                            print(f"Error saving fallback image: {e}")
                             continue
 
     except Exception as e:
         print(f"Error extracting cover from {epub_path}: {e}")
 
-    print(f"No cover found for {epub_path.name}, using default")
     return DEFAULT_COVER
 
 def get_file_as_base64(file_path: Path) -> str:
@@ -370,7 +418,6 @@ def get_file_as_base64(file_path: Path) -> str:
             b64_data = base64.b64encode(file.read()).decode('utf-8')
             return f"data:{mime_type};base64,{b64_data}"
     except Exception as e:
-        print(f"Error converting file to base64: {e}")
         return ""
 
 async def get_available_books():
@@ -381,22 +428,18 @@ async def get_available_books():
         # Make sure default cover exists
         default_cover_path = Path("images/default-cover.png")
         if not default_cover_path.exists():
-            print(f"Creating default cover at {default_cover_path}")
             img = Image.new('RGB', (120, 180), color='lightgray')
             d = ImageDraw.Draw(img)
             d.text((10,10), "No\nCover", fill='black')
             default_cover_path.parent.mkdir(parents=True, exist_ok=True)
             img.save(default_cover_path)
-            print("Default cover created successfully")
 
         # Process books
         for lang_dir in EPUB_DIR.glob("*"):
             if lang_dir.is_dir():
                 language = lang_dir.name
-                print(f"\nProcessing language directory: {language}")
 
                 for epub_path in lang_dir.glob("*.epub"):
-                    print(f"\nProcessing book: {epub_path.name}")
                     cover_dir = COVERS_DIR / language
                     cover_path = extract_epub_cover(epub_path, cover_dir)
 
@@ -406,7 +449,6 @@ async def get_available_books():
                         else:
                             cover_file = COVERS_DIR.parent / cover_path
 
-                        print(f"Converting cover to base64 for {epub_path.name}")
                         cover_base64 = get_file_as_base64(cover_file)
 
                         books.append({
@@ -416,14 +458,12 @@ async def get_available_books():
                             "cover": cover_base64
                             # Removed the epub base64 data to make the response lighter
                         })
-                        print(f"Successfully processed book: {epub_path.name}")
                     except Exception as e:
                         print(f"Error processing book {epub_path.name}: {e}")
                         continue
 
         return books
     except Exception as e:
-        print(f"Error getting available books: {e}")
         return []
 
 async def get_book_data(data_object):
@@ -440,9 +480,7 @@ async def get_book_data(data_object):
                 if file == filename:
                     epub_path = Path(root) / file
                     break
-        print(epub_path)
         language = epub_path.parent.name
-        print(f"language: {language}")
         if not epub_path.exists():
             return {"status": "error", "message": f"Book not found: {filename}"}
 
@@ -456,23 +494,16 @@ async def get_book_data(data_object):
             "epub": epub_base64
         }
     except Exception as e:
-        print(f"Error getting book data: {e}")
         return {"status": "error", "message": str(e)}
 
 async def translate_task(data_object):
-    print(f"data_object: {data_object}")
     source_text = data_object["text"]
     source_lang = data_object["source_lang"]
     target_lang = data_object["target_lang"]
-    print(f"source_text: {source_text}")
-    print(f"source_lang: {source_lang}")
-    print(f"target_lang: {target_lang}")
+
     current_book = data_object.get("current_book", "")
-    print(f"current_book: {current_book}")
     cfi = data_object.get("cfi", "")  # Get CFI instead of page
-    print(f"cfi: {cfi}")
     username = data_object.get("username", "")
-    print(f"username: {username}")
 
     if source_lang == target_lang:
         return {"status": "success", "translated_text": source_text}
@@ -487,19 +518,15 @@ async def translate_task(data_object):
         "deutsch": "de",
         "italiano": "it"
     }
-    print(f"source_lang_map: {source_lang_map}")
     if source_lang in source_lang_map.keys():
         source_lang = source_lang_map[source_lang]
     if source_lang in source_lang_map.values():
-        print(f"Attempting to translate from {source_lang} to {target_lang}")
         translator_instance = Translator()
         result = await translator_instance.translate(source_text, src=source_lang, dest=target_lang)
 
         if hasattr(result, 'text') and username != "":
             translated_text = result.text
-            print(f"Translation successful: {translated_text}")
             if current_book != "" and username != "":
-                print(f"Updating database for user {username} with book {current_book} and CFI {cfi}")
                 db.set_current_book_task({
                     "username": username,
                     "book": current_book,
@@ -516,7 +543,6 @@ async def translate_task(data_object):
             }
         if username == "" and hasattr(result, 'text'):
             translated_text = result.text
-            print(f"Translation successful: {translated_text}")
             return {
                 "status": "success",
                 "translated_words": translated_text,
@@ -525,6 +551,9 @@ async def translate_task(data_object):
    
 
 async def login_task(self, data_object):
+    print(f"[LOGIN] Starting login process for user: {data_object.get('username')}")
+    start_time = time.time()
+    
     conn = sqlite3.connect(self.DB_PATH)
     cursor = conn.cursor()
 
@@ -532,19 +561,26 @@ async def login_task(self, data_object):
     password = data_object.get("password")
 
     # Get column names
+    print(f"[LOGIN] Getting table columns")
+    column_start = time.time()
     cursor.execute("PRAGMA table_info(users)")
     columns = [column[1] for column in cursor.fetchall()]
+    print(f"[LOGIN] Got columns in {time.time() - column_start:.4f}s")
 
+    print(f"[LOGIN] Checking credentials")
+    auth_start = time.time()
     cursor.execute("SELECT * FROM users WHERE username = ? AND password = ?",
                 (username, password))
     user_row = cursor.fetchone()
+    print(f"[LOGIN] Credential check completed in {time.time() - auth_start:.4f}s")
 
     if user_row:
         # Convert row to dictionary
         user = dict(zip(columns, user_row))
-        print(user)
-
+        
         # Generate new token using UUID and set expiry to 24 hours from now
+        print(f"[LOGIN] Generating token")
+        token_start = time.time()
         token = str(uuid.uuid4())
         expiry = datetime.now() + timedelta(days=10000)
 
@@ -554,6 +590,7 @@ async def login_task(self, data_object):
             WHERE username = ?""",
             (token, expiry, username))
         conn.commit()
+        print(f"[LOGIN] Token generated and saved in {time.time() - token_start:.4f}s")
 
         message = {
             "status": "success",
@@ -562,12 +599,14 @@ async def login_task(self, data_object):
             "current_book": user.get("current_book", ""),
             "cfi": user.get("cfi", ""),  # Use CFI instead of page
             "preferred_language": user.get("preferred_language", "en"),
+            "pagele": json.loads(user.get("pagele", "{}")),
             "type": "login"
         }
 
         # Only add epub and language if there's a current book
         if user.get("current_book"):
-            print("getting books")
+            print(f"[LOGIN] Loading current book: {user.get('current_book')}")
+            book_start = time.time()
             epub = None
             language = None
             epubs = os.walk(EPUB_DIR)
@@ -576,6 +615,14 @@ async def login_task(self, data_object):
                     if file == user["current_book"]:
                         book_path = Path(root) / file
                         break
+            if book_path.exists():
+                language = book_path.parent.name
+                print(f"[LOGIN] Loading book content")
+                with open(book_path, "rb") as f:
+                    book_data = f.read()
+                    book_base64 = base64.b64encode(book_data).decode('utf-8')
+                    epub = f"data:application/epub+zip;base64,{book_base64}"
+            print(f"[LOGIN] Book loaded in {time.time() - book_start:.4f}s")
 
             if epub and language:
                 message["epub"] = epub
@@ -588,6 +635,7 @@ async def login_task(self, data_object):
         }
 
     conn.close()
+    print(f"[LOGIN] Total login process took {time.time() - start_time:.4f}s")
     return message
 
 async def verify_token_task(data_object):
@@ -602,7 +650,6 @@ async def verify_token_task(data_object):
     # Get column names
     cursor.execute("PRAGMA table_info(users)")
     columns = [column[1] for column in cursor.fetchall()]
-    print(columns)
 
     # Check if token exists and is not expired
     cursor.execute("""
@@ -619,29 +666,22 @@ async def verify_token_task(data_object):
     user_row = user_row[0]
     # Convert row to dictionary
     user = dict(zip(columns, user_row))
-    print("User data:", user)
-
     epub = None
     language = None
 
-    print(f"user.get('current_book'): {user.get('current_book')}")
     if user.get("current_book"):
-        print("getting books")
         epubs = os.walk(EPUB_DIR)
         for root, dirs, files in epubs:
             for file in files:
                 if file == user["current_book"]:
                     book_path = Path(root) / file
                     break
-        print(f"book_path: {book_path}")
         if book_path.exists():
             language = book_path.parent.name
-            print(f"language: {language}")
             with open(book_path, "rb") as f:
                 book_data = f.read()
                 book_base64 = base64.b64encode(book_data).decode('utf-8')
                 epub = f"data:application/epub+zip;base64,{book_base64}"
-                print(f"Including book data for {user['current_book']}")
 
     response = {
         "status": "success",
@@ -650,9 +690,9 @@ async def verify_token_task(data_object):
         "cfi": user.get("cfi", ""),
         "preferred_language": user.get("preferred_language", "en"),
         "token": token,
-        "epub": epub,
+        #"epub": epub,
         "language": language,
-        "pagele": user.get("pagele", {})
+        #"pagele": user.get("pagele", {})
     }
     return response
 
@@ -720,7 +760,6 @@ def pagele_task(data_object):
             }
 
     except Exception as e:
-        print(f"Error in pagele_task: {e}")
         return {"status": "error", "message": str(e)}
 
 async def tts_task(data_object):
@@ -759,23 +798,25 @@ async def tts_task(data_object):
         }
         
     except Exception as e:
-        print(f"Error in tts_task: {e}")
         return {"status": "error", "message": str(e)}
 
 async def init_pagele_task(data_object):
-    print(f"init_pagele_task: {data_object}")
+    print(f"[PAGELE] Starting pagele initialization")
+    start_time = time.time()
+    
     token = data_object["token"]
-    print(f"token: {token}")
     pagele_filename = data_object["pagele_filename"]
-    print(f"pagele_filename: {pagele_filename}")
     language = data_object["language"]
-    print(f"language: {language}")
+    
+    print(f"[PAGELE] Getting user data for token")
+    user_start = time.time()
     user_data = db.get_user_data(token)
-    print(f"user_data: {user_data}")
-    pagele_data = user_data["pagele"]
-    """if user_data["pagele"] == '{}':
-        pagele_data = {}
-    else:"""
+    if not user_data:
+        return {"status": "error", "message": "Invalid token or user not found"}
+    print(f"[PAGELE] Got user data in {time.time() - user_start:.4f}s")
+    
+    # Get pagele data from user
+    pagele_data = user_data.get("pagele", {})
     if isinstance(pagele_data, str):
         try:
             pagele_data = json.loads(pagele_data)
@@ -786,29 +827,37 @@ async def init_pagele_task(data_object):
     if not isinstance(pagele_data, dict):
         pagele_data = {}
     
-    
-    print(f"pagele_data: {pagele_data}")
-    print(f"{EPUB_DIR}/{language}/{pagele_filename}")
-    pagele_json = open(f"{EPUB_DIR}/{language}/{pagele_filename}", "r")
-    print(f"pagele_json: {pagele_json}")
-    pagele_json = json.load(pagele_json)
-    print(f"pagele_jsonloaded")
-    print(type(pagele_data))
+    # Get pagele file data
+    print(f"[PAGELE] Loading pagele file data")
+    file_start = time.time()
+    pagele_json = db.get_pagele_file(language, pagele_filename)
+    if not pagele_json:
+        return {"status": "error", "message": "Failed to load pagele file"}
+    print(f"[PAGELE] Loaded pagele file in {time.time() - file_start:.4f}s")
+   
+    print(f"[PAGELE] Updating user pagele data")
+    update_start = time.time()
     if "books" in pagele_data and pagele_filename in list(pagele_data["books"].keys()):
-        print("pagele_filename is in pagele_data")
         pagele_data["current_pagele"] = pagele_filename
     else:
-        print("pagele_filename is not in pagele_data")
+        print(f"[PAGELE] Initializing completed indices")
         completed_indices = init_completed_indices(pagele_json)
         pagele_data["current_pagele"] = pagele_filename
         pagele_data["current_index"] = 0
-        print(f"current_index: 0")
         if "books" not in pagele_data:
             pagele_data["books"] = {}
         pagele_data["books"][pagele_filename] = {"completed_indices": completed_indices, "total_points": 0, "last_played": ""}
 
-    user_data["pagele"] = json.dumps(pagele_data)
+    # Update user data in memory
+    user_data["pagele"] = pagele_data
+    print(f"[PAGELE] Updated user data in {time.time() - update_start:.4f}s")
+    
+    # Update database (memory only, no disk write)
+    db_start = time.time()
     db.update_pagele_data(user_data)
+    print(f"[PAGELE] Updated in-memory database in {time.time() - db_start:.4f}s")
+    
+    print(f"[PAGELE] Total pagele initialization took {time.time() - start_time:.4f}s")
     return {"status": "success", "pagele_data": pagele_json, "index": pagele_data["current_index"], "type": "get_pagele", "user_pagele": pagele_data}
 
 def init_completed_indices(pagele_json):
@@ -827,11 +876,13 @@ async def get_available_pagele():
         for lang_dir in EPUB_DIR.glob("*"):
             if lang_dir.is_dir():
                 language = lang_dir.name
-                print(f"\nProcessing pagele files for language: {language}")                
+                
+                # Look for pagele JSON files
                 for pagele_path in lang_dir.glob("*.json"):
-                    print(f"\nProcessing pagele file: {pagele_path.name}")                  
+                    
                     try:
-
+                        # Load the pagele JSON file
+                        
                         book_name = pagele_path.stem.replace('.json', '')
                         book_path = lang_dir / f"{book_name}.epub"
                         book_cover = f"covers/{language}/{book_name}.jpg"
@@ -840,15 +891,17 @@ async def get_available_pagele():
                         if os.path.isfile(book_cover):
                             cover_base64 = get_file_as_base64(book_cover)
                         else:
-                            cover_dir = COVERS_DIR / language
-                            cover_path = extract_epub_cover(book_path, cover_dir)
-                            
-                            if cover_path == DEFAULT_COVER:
-                                cover_file = Path("images/default-cover.png")
-                            else:
-                                cover_file = COVERS_DIR.parent / cover_path
+                        # Get cover image if the book exists
+                            if book_path.exists():
+                                cover_dir = COVERS_DIR / language
+                                cover_path = extract_epub_cover(book_path, cover_dir)
                                 
-                            cover_base64 = get_file_as_base64(cover_file)
+                                if cover_path == DEFAULT_COVER:
+                                    cover_file = Path("images/default-cover.png")
+                                else:
+                                    cover_file = COVERS_DIR.parent / cover_path
+                                    
+                                cover_base64 = get_file_as_base64(cover_file)
                         
                         # Add pagele information to the list
                         pagele_books.append({
@@ -858,114 +911,146 @@ async def get_available_pagele():
                             "path": str(pagele_path.relative_to(EPUB_DIR.parent)),
                             "cover": cover_base64,
                         })
-                        print(f"Successfully processed pagele file: {pagele_path.name}")
                     except Exception as e:
-                        print(f"Error processing pagele file {pagele_path.name}: {e}")
                         continue
-        print(f"pagele_books: {pagele_books}")
         return pagele_books
     except Exception as e:
-        print(f"Error getting available pagele files: {e}")
         return []
 
-async def tip_task(data_object):
-    """Handle tip payments using Stripe"""
-    try:
-        amount = data_object.get("amount")
-        if not amount:
-            return {"status": "error", "message": "No amount provided"}
-
-        # Convert amount to cents (Stripe uses smallest currency unit)
-        amount_cents = int(float(amount) * 100)
-
-        # Create a PaymentIntent
-        intent = stripe.PaymentIntent.create(
-            amount=amount_cents,
-            currency='usd',
-            automatic_payment_methods={"enabled": True},
-        )
-
-        return {
-            "status": "success",
-            "client_secret": intent.client_secret
-        }
-
-    except Exception as e:
-        print(f"Error in tip_task: {e}")
-        return {"status": "error", "message": str(e)}
-
 async def handle_connection(websocket):
-    print(f"Client connected, {websocket.remote_address}")
+    print(f"[SERVER] New connection from {websocket.remote_address}")
+    start_time = time.time()
     
     try:
+        print(f"[SERVER] Waiting for data")
+        recv_start = time.time()
         data = await websocket.recv()
-        data_object = json.loads(data)
+        print(f"[SERVER] Received data in {time.time() - recv_start:.4f}s")
+        
+        print(f"[SERVER] Parsing JSON")
+        parse_start = time.time()
+        # Use orjson for loading if preferred, though standard json.loads is usually less of a bottleneck
+        data_object = json.loads(data) 
+        print(f"[SERVER] Parsed JSON in {time.time() - parse_start:.4f}s")
+        
         client_ip = websocket.remote_address[0]
         data_object['ip'] = client_ip
-        print(f"Received data: {data_object}")
         message_returned = {"error": "Invalid task"}  # Default message
 
-        if data_object.get("task") == "get_books":
+        task = data_object.get("task")
+        print(f"[SERVER] Processing task: {task}")
+        task_start = time.time()
+        
+        if task == "get_books":
             books = await get_available_books()
             message_returned = {"books": books}
-        elif data_object.get("task") == "get_book_data":
+        elif task == "get_book_data":
             message_returned = await get_book_data(data_object)
-        elif data_object.get("task") == "stt":
+        elif task == "stt":
             message_returned = stt_task(data_object)
-            logger.log_event("stt", {**data_object, **message_returned}, websocket)
-        elif data_object.get("task") == "tts":
+        elif task == "tts":
             message_returned = await tts_task(data_object)
-            logger.log_event("tts", {**data_object, **message_returned}, websocket)
-        elif data_object.get("task") == "login":
+        elif task == "login":
             message_returned = await db.login_task(data_object)
-            logger.log_event("login", {**data_object, **message_returned}, websocket)
-        elif data_object.get("task") == "signup":
+        elif task == "signup":
             message_returned = db.signup_task(data_object)
-            logger.log_event("signup", {**data_object, **message_returned}, websocket)
-        elif data_object.get("task") == "change_settings":
+        elif task == "change_settings":
             message_returned = db.change_settings_task(data_object)
-            logger.log_event("settings_change", {**data_object, **message_returned}, websocket)
-        elif data_object.get("task") == "translate":
+        elif task == "translate":
             message_returned = await translate_task(data_object)
-            logger.log_event("translation", {**data_object, **message_returned}, websocket)
-        elif data_object.get("task") == "verify_token":
+        elif task == "verify_token":
             message_returned = await verify_token_task(data_object)
-            logger.log_event("token_verification", {**data_object, **message_returned}, websocket)
-        elif data_object.get("task") == "pagele":
+        elif task == "pagele":
             message_returned = await pagele_task(data_object)
-        elif data_object.get("task") == "get_pagele_list":
+        elif task == "get_pagele_list":
             message_returned = await get_available_pagele()
-        elif data_object.get("task") == "init_pagele":
+        elif task == "init_pagele":
             message_returned = await init_pagele_task(data_object)
-        elif data_object.get("task") == "tip":
-            message_returned = await tip_task(data_object)
-            logger.log_event("tip", {**data_object, **message_returned}, websocket)
+            
+        print(f"[SERVER] Task {task} processed in {time.time() - task_start:.4f}s")
 
-        await websocket.send(json.dumps(message_returned))
+        print(f"[SERVER] Serializing response to JSON with orjson")
+        json_dump_start = time.time()
+        # Use orjson.dumps() which returns bytes
+        response_bytes = orjson.dumps(message_returned) 
+        print(f"[SERVER] Serialized JSON with orjson in {time.time() - json_dump_start:.4f}s")
+        
+        print(f"[SERVER] Sending response")
+        send_start = time.time()
+        # Send the bytes directly. Most WebSocket libraries handle this.
+        # If your library needs a string, use: await websocket.send(response_bytes.decode())
+        await websocket.send(response_bytes) 
+        print(f"[SERVER] Response sent in {time.time() - send_start:.4f}s")
 
     except Exception as e:
-        print(f"Error: {e}")
-        logger.log_event("error", {"error": str(e)}, websocket)
+        print(f"[SERVER] Error: {e}")
         await websocket.send(json.dumps({"error": str(e)}))
     finally:
-        print("Client disconnected")
+        print(f"[SERVER] Connection handled in {time.time() - start_time:.4f}s")
+        print("[SERVER] Client disconnected")
 
 # Add a function to preload all models
 def preload_all_models():
     """Preload all language models at startup"""
-    print("Preloading all language models...")
     for lang in language_dict:
-        print(f"Loading {lang} model...")
         model_manager.get_or_load_model(lang)
-    print("All models loaded!")
 
 class DatabaseManager:
     def __init__(self, db_path):
-        self.DB_PATH = db_path #a constructor defines what parameters are needed to create an object
-
+        self.DB_PATH = db_path
+        self.connection_pool = {}
+        self.connection_lock = threading.Lock()
+        
+        # In-memory data store
+        self.users = {}  # username -> complete user data
+        self.tokens = {}  # token -> username mapping
+        self.pagele_files = {}  # language/filename -> pagele data
+        
+        # Dirty flags to track what needs saving
+        self.dirty_users = set()
+        self.last_save_time = time.time()
+        
+        # Start background thread for periodic DB sync
+        self.sync_thread = threading.Thread(target=self._periodic_sync, daemon=True)
+        self.sync_thread.start()
+        
+    def _periodic_sync(self):
+        """Periodically sync in-memory data to disk"""
+        while True:
+            time.sleep(300)  # Check every 5 minutes
+            try:
+                self.save_to_db()
+            except Exception as e:
+                print(f"[DB] Error in periodic sync: {e}")
+    
+    def get_connection(self):
+        """Get a database connection from the pool or create a new one"""
+        thread_id = threading.get_ident()
+        
+        with self.connection_lock:
+            if thread_id not in self.connection_pool:
+                conn = sqlite3.connect(self.DB_PATH, check_same_thread=False)
+                # Enable WAL mode for better concurrency
+                conn.execute('PRAGMA journal_mode=WAL')
+                # Increase cache size for better performance
+                conn.execute('PRAGMA cache_size=-10000')  # ~10MB cache
+                self.connection_pool[thread_id] = conn
+            
+            return self.connection_pool[thread_id]
+    
+    def close_all_connections(self):
+        """Close all database connections in the pool"""
+        # Save any pending changes first
+        self.save_to_db()
+        
+        with self.connection_lock:
+            for conn in self.connection_pool.values():
+                conn.close()
+            self.connection_pool.clear()
+            
     def init_database(self):
         """Initialize the SQLite database with necessary tables"""
-        conn = sqlite3.connect(self.DB_PATH)
+        conn = self.get_connection()
         cursor = conn.cursor()
 
         # Create users table with CFI instead of page
@@ -983,125 +1068,256 @@ class DatabaseManager:
             pagele TEXT DEFAULT '{}'  -- New column for storing pagele data as JSON
         )
         ''')
-        """
-        {
-        "current_pagele": "filename.json",  // Current pagele file being used
-        "current_index": 0,                 // Current position in the pagele content
-        "books": {
-                    "filename.json": {                // Each pagele file has an entry
-                    "completed_indices": {},        // Tracking completed sections 
-                    "total_points": 0,              // Total points earned
-                    "last_played": ""               // Timestamp of last play
-                    }
-                }
-        }"""
+        
+        # Create index on login_token for faster token lookups
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_login_token ON users(login_token)')
+        
         # Check if pagele column exists, add it if it doesn't
         cursor.execute("PRAGMA table_info(users)")
         columns = [column[1] for column in cursor.fetchall()]
         if 'pagele' not in columns:
             cursor.execute("ALTER TABLE users ADD COLUMN pagele TEXT DEFAULT '{}'")
             conn.commit()
-            print("Added pagele column to users table")
 
         conn.commit()
-        conn.close()
-
-    def _execute_login_task(self, data_object):
-        conn = sqlite3.connect(self.DB_PATH)
+        
+        # Load all users into memory
+        self._load_all_users()
+        
+    def _load_all_users(self):
+        """Load all users into memory"""
+        print("[DB] Loading all users into memory...")
+        start_time = time.time()
+        
+        conn = self.get_connection()
         cursor = conn.cursor()
-        try:
-            username = data_object.get("username")
-            password = data_object.get("password")
+        
+        cursor.execute("SELECT * FROM users")
+        rows = cursor.fetchall()
+        
+        # Get column names
+        cursor.execute("PRAGMA table_info(users)")
+        columns = [column[1] for column in cursor.fetchall()]
+        
+        # Process each user
+        for row in rows:
+            user_data = dict(zip(columns, row))
+            username = user_data["username"]
+            token = user_data.get("login_token")
+            
+            # Parse pagele JSON
+            if user_data.get("pagele"):
+                try:
+                    user_data["pagele"] = json.loads(user_data["pagele"])
+                except:
+                    user_data["pagele"] = {}
+            
+            # Store in memory
+            self.users[username] = user_data
+            if token:
+                self.tokens[token] = username
+        
+        print(f"[DB] Loaded {len(rows)} users into memory in {time.time() - start_time:.4f}s")
 
-            cursor.execute("PRAGMA table_info(users)")
-            columns = [column[1] for column in cursor.fetchall()]
+    def save_to_db(self):
+        """Save dirty users to database"""
+        if not self.dirty_users:
+            return
+            
+        print(f"[DB] Saving {len(self.dirty_users)} users to database...")
+        start_time = time.time()
+        
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        
+        for username in self.dirty_users:
+            if username not in self.users:
+                continue
+                
+            user_data = self.users[username]
+            
+            # Convert pagele to JSON if it's a dict
+            pagele_json = user_data.get("pagele", {})
+            if not isinstance(pagele_json, str):
+                pagele_json = json.dumps(pagele_json)
+            
+            cursor.execute("""
+                UPDATE users SET 
+                    current_book = ?,
+                    cfi = ?,
+                    utterrance_fname = ?,
+                    predicted_sentence = ?,
+                    preferred_language = ?,
+                    login_token = ?,
+                    token_expiry = ?,
+                    pagele = ?
+                WHERE username = ?
+            """, (
+                user_data.get("current_book", ""),
+                user_data.get("cfi", ""),
+                user_data.get("utterrance_fname", ""),
+                user_data.get("predicted_sentence", ""),
+                user_data.get("preferred_language", "en"),
+                user_data.get("login_token", ""),
+                user_data.get("token_expiry", ""),
+                pagele_json,
+                username
+            ))
+        
+        conn.commit()
+        self.dirty_users.clear()
+        self.last_save_time = time.time()
+        
+        print(f"[DB] Save completed in {time.time() - start_time:.4f}s")
 
-            cursor.execute("SELECT * FROM users WHERE username = ? AND password = ?",
-                           (username, password))
-            user_row = cursor.fetchone()
-
-            if user_row:
-                user = dict(zip(columns, user_row))
-                token = str(uuid.uuid4())
-                expiry = datetime.now() + timedelta(days=10000)
-
-                cursor.execute("""
-                    UPDATE users
-                    SET login_token = ?, token_expiry = ?
-                    WHERE username = ?""",
-                    (token, expiry, username))
-                conn.commit()
-
-                message = {
-                    "status": "success",
-                    "token": token,
-                    "username": username,
-                    "current_book": user.get("current_book", ""),
-                    "cfi": user.get("cfi", ""),
-                    "preferred_language": user.get("preferred_language", "en"),
-                    "pagele": json.loads(user.get("pagele", "{}")),
-                    "type": "login"
-                }
-
-                if user.get("current_book"):
-                    epub = None
-                    language = None
-                    book_path_found = None # Variable to store the found book path
-                    for root, dirs, files in os.walk(EPUB_DIR):
-                        for file in files:
-                            if file == user["current_book"]:
-                                book_path_found = Path(root) / file
-                                break
-                        if book_path_found: # Exit outer loop if book found
-                            break
-                    
-                    if book_path_found and book_path_found.exists():
-                        language = book_path_found.parent.name
-                        with open(book_path_found, "rb") as f:
-                            book_data = f.read()
-                            book_base64 = base64.b64encode(book_data).decode('utf-8')
-                            epub = f"data:application/epub+zip;base64,{book_base64}"
-                        
-                        if epub and language: # Check epub and language again as they are set inside condition
-                            message["epub"] = epub
-                            message["language"] = language
-            else:
-                message = {
-                    "status": "error",
-                    "message": "Invalid credentials"
-                }
-            return message
-        finally:
-            conn.close()
+    def update_pagele_data(self, user_data):
+        """Update pagele data in memory only"""
+        print(f"[DB] Updating pagele data for user: {user_data.get('username')}")
+        start_time = time.time()
+        
+        username = user_data.get("username")
+        if not username or username not in self.users:
+            print(f"[DB] User not found: {username}")
+            return
+        
+        # Update in memory only
+        self.users[username]["pagele"] = user_data["pagele"]
+        
+        # Mark as dirty for later saving
+        self.dirty_users.add(username)
+        
+        print(f"[DB] Memory update completed in {time.time() - start_time:.4f}s")
+    
+    def get_user_data(self, identifier):
+        """Get user data from memory"""
+        print(f"[DB] Getting user data for: {identifier[:8] if identifier else 'None'}...")
+        start_time = time.time()
+        
+        # Direct username lookup
+        if identifier in self.users:
+            print(f"[DB] User found by username in {time.time() - start_time:.4f}s")
+            return self.users[identifier]
+        
+        # Token lookup
+        if identifier in self.tokens:
+            username = self.tokens[identifier]
+            print(f"[DB] User found by token in {time.time() - start_time:.4f}s")
+            return self.users[username]
+        
+        print(f"[DB] User not found in memory")
+        return None
 
     async def login_task(self, data_object):
-        return await asyncio.to_thread(self._execute_login_task, data_object)
-
-    def signup_task(self, data_object):
-        conn = sqlite3.connect(self.DB_PATH)
-        cursor = conn.cursor()
-
+        print(f"[LOGIN] Starting login process for user: {data_object.get('username')}")
+        start_time = time.time()
+        
         username = data_object.get("username")
         password = data_object.get("password")
+        
+        # Check credentials in memory
+        if username in self.users and self.users[username].get("password") == password:
+            user_data = self.users[username]
+        else:
+            return {"status": "error", "message": "Invalid credentials"}
+        
+        # Generate new token
+        token = str(uuid.uuid4())
+        expiry = datetime.now() + timedelta(days=10000)
+        
+        # Update user data with new token
+        user_data["login_token"] = token
+        user_data["token_expiry"] = expiry
+        
+        # Update token mapping
+        self.tokens[token] = username
+        
+        # Mark as dirty for later saving
+        self.dirty_users.add(username)
+        
+        # Prepare response
+        message = {
+            "status": "success",
+            "token": token,
+            "username": username,
+            "current_book": user_data.get("current_book", ""),
+            "cfi": user_data.get("cfi", ""),
+            "preferred_language": user_data.get("preferred_language", "en"),
+            #"pagele": user_data.get("pagele", {}),
+            "type": "login"
+        }
+        
+        # Only add epub and language if there's a current book
+        if user_data.get("current_book"):
+            epub = None
+            language = None
+            book_path = None
+            
+            for root, dirs, files in os.walk(EPUB_DIR):
+                for file in files:
+                    if file == user_data["current_book"]:
+                        book_path = Path(root) / file
+                        break
+                if book_path:
+                    break
+                    
+            if book_path and book_path.exists():
+                language = book_path.parent.name
+                with open(book_path, "rb") as f:
+                    book_data = f.read()
+                    book_base64 = base64.b64encode(book_data).decode('utf-8')
+                    epub = f"data:application/epub+zip;base64,{book_base64}"
+                    
+            if epub and language:
+                message["epub"] = epub
+                message["language"] = language
+        
+        print(f"[LOGIN] Total login process took {time.time() - start_time:.4f}s")
+        return message
 
+    def signup_task(self, data_object):
+        """Create a new user in memory and database"""
+        username = data_object.get("username")
+        password = data_object.get("password")
+        
         # Check if username already exists
-        cursor.execute("SELECT username FROM users WHERE username = ?", (username,))
-        if cursor.fetchone():
-            conn.close()
+        if username in self.users:
             return {"status": "error", "message": "Username already exists"}
-
+        
         # Generate token for new user
         token = str(uuid.uuid4())
         expiry = datetime.now() + timedelta(days=10000)
-
-        # Create new user with token
+        
+        # Create new user in memory
+        user_data = {
+            "username": username,
+            "password": password,
+            "login_token": token,
+            "token_expiry": expiry,
+            "current_book": "",
+            "cfi": "",
+            "utterrance_fname": "",
+            "predicted_sentence": "",
+            "preferred_language": "en",
+            "pagele": {}
+        }
+        
+        # Store in memory
+        self.users[username] = user_data
+        self.tokens[token] = username
+        
+        # Mark as dirty for later saving
+        self.dirty_users.add(username)
+        
+        # Also save immediately to database
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        
         cursor.execute("""
             INSERT INTO users (username, password, login_token, token_expiry)
             VALUES (?, ?, ?, ?)""",
             (username, password, token, expiry))
         conn.commit()
-        conn.close()
-
+        
         return {
             "status": "success",
             "message": "User created successfully",
@@ -1110,122 +1326,66 @@ class DatabaseManager:
         }
 
     def set_current_book_task(self, data_object, utterrance_fname, predicted_sentence):
-        try:
-            conn = sqlite3.connect(self.DB_PATH)
-            cursor = conn.cursor()
-
-            username = data_object.get("username")
-            current_book = data_object.get("book", data_object.get("current_book", ""))  # Try both book and current_book
-            cfi = data_object.get("cfi", "")  # Use CFI instead of page
-
-            print(f"Updating database for {username} with book: {current_book}, cfi: {cfi}")
-
-            # First verify the user exists
-            cursor.execute("SELECT username FROM users WHERE username = ?", (username,))
-            if not cursor.fetchone():
-                print(f"User {username} not found in database")
-                return False
-
-            # Update the user's current book and cfi
-            cursor.execute("""
-                UPDATE users
-                SET current_book = ?,
-                    cfi = ?,
-                    utterrance_fname = ?,
-                    predicted_sentence = ?
-                WHERE username = ?
-            """, (current_book, cfi, utterrance_fname, predicted_sentence, username))
-
-            if cursor.rowcount == 0:
-                print(f"No rows were updated for user {username}")
-            else:
-                print(f"Successfully updated book info for user {username}")
-
-            conn.commit()
-
-            # Verify the update
-            cursor.execute("SELECT current_book, cfi FROM users WHERE username = ?", (username,))
-            result = cursor.fetchone()
-            print(f"After update - Book: {result[0]}, CFI: {result[1]}")
-
-            return True
-        except Exception as e:
-            print(f"Error in set_current_book_task: {e}")
+        """Update current book info in memory"""
+        username = data_object.get("username")
+        if not username or username not in self.users:
             return False
-        finally:
-            conn.close()
+            
+        current_book = data_object.get("book", data_object.get("current_book", ""))
+        cfi = data_object.get("cfi", "")
+        
+        # Update in memory
+        self.users[username]["current_book"] = current_book
+        self.users[username]["cfi"] = cfi
+        self.users[username]["utterrance_fname"] = utterrance_fname
+        self.users[username]["predicted_sentence"] = predicted_sentence
+        
+        # Mark as dirty for later saving
+        self.dirty_users.add(username)
+        
+        return True
 
     def change_settings_task(self, data_object):
-        """Handle user settings updates"""
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
-
+        """Update user settings in memory"""
         token = data_object.get("token")
-        updates = {}
-
+        if not token or token not in self.tokens:
+            return {"status": "error", "message": "Invalid token"}
+            
+        username = self.tokens[token]
+        user_data = self.users[username]
+        
+        # Update settings
         if "current_book" in data_object:
-            updates["current_book"] = data_object["current_book"]
+            user_data["current_book"] = data_object["current_book"]
         if "cfi" in data_object:
-            updates["cfi"] = data_object["cfi"]
+            user_data["cfi"] = data_object["cfi"]
         if "preferred_language" in data_object:
-            updates["preferred_language"] = data_object["preferred_language"]
-
-        if not updates:
-            return {"status": "error", "message": "No settings to update"}
-
-        # Verify token and update settings
-        cursor.execute("SELECT username FROM users WHERE login_token = ? AND token_expiry > ?",
-                    (token, datetime.now()))
-        user = cursor.fetchone()
-
-        if not user:
-            conn.close()
-            return {"status": "error", "message": "Invalid or expired token"}
-
-        # Build update query
-        update_query = "UPDATE users SET " + ", ".join(f"{k} = ?" for k in updates.keys())
-        update_query += " WHERE login_token = ?"
-
-        # Execute update
-        cursor.execute(update_query, list(updates.values()) + [token])
-        conn.commit()
-        conn.close()
-
+            user_data["preferred_language"] = data_object["preferred_language"]
+            
+        # Mark as dirty for later saving
+        self.dirty_users.add(username)
+        
         return {"status": "success", "message": "Settings updated successfully"}
 
-    def update_pagele_data(self, data_object):
-        conn = sqlite3.connect(self.DB_PATH)
-        cursor = conn.cursor()            
-        cursor.execute("SELECT pagele FROM users WHERE username = ?", (data_object.get("username"),))
-        result = cursor.fetchone()
-        pagele_data = data_object.get("pagele")
-        if type(pagele_data) != str:
-            pagele_data = json.dumps(pagele_data)
-        cursor.execute(
-            "UPDATE users SET pagele = ? WHERE username = ?",
-            (pagele_data, data_object.get("username"))
-        )
-        print("updated pagele_data")
-        conn.commit()
-        conn.close()
-
-    
-    def get_user_data(self, token):
-        print(f"get_user_data: {token}")
-        if "@" in token:
-            the_query = "SELECT * FROM users WHERE username = ?"
-        else:
-            the_query = "SELECT * FROM users WHERE login_token = ?"
-        conn = sqlite3.connect(self.DB_PATH)
-        cursor = conn.cursor()
-        cursor.execute("PRAGMA table_info(users)")
-        columns = [column[1] for column in cursor.fetchall()]
-        cursor.execute(the_query, (token,))
-        result = cursor.fetchone()
-        conn.close()
-        result = dict(zip(columns, result))
-        print(f"result: {result}")
-        return result
+    def get_pagele_file(self, language, filename):
+        """Get pagele file data from memory cache or load from disk"""
+        cache_key = f"{language}/{filename}"
+        
+        if cache_key in self.pagele_files:
+            return self.pagele_files[cache_key]
+            
+        # Load from disk
+        pagele_path = f"{EPUB_DIR}/{language}/{filename}"
+        try:
+            with open(pagele_path, "r") as f:
+                pagele_data = json.load(f)
+                
+            # Cache for future use
+            self.pagele_files[cache_key] = pagele_data
+            return pagele_data
+        except Exception as e:
+            print(f"[DB] Error loading pagele file {pagele_path}: {e}")
+            return None
 
 class TextComparator:
     @staticmethod
@@ -1240,8 +1400,6 @@ class TextComparator:
         original_words = normalize_text(text1)
         spoken_words = normalize_text(text2)
 
-        print(f"Original words: {original_words}")
-        print(f"Spoken words: {spoken_words}")
         m, n = len(original_words), len(spoken_words)
         score = [[0 for _ in range(n+1)] for _ in range(m+1)]
         traceback = [[None for _ in range(n+1)] for _ in range(m+1)]
@@ -1319,80 +1477,27 @@ class TextComparator:
 
         # Join the marked words back into text
         marked_text = ' '.join(marked_output)
-        print(f"marked_text: {marked_text}")
         # Calculate overall similarity
         similarity_ratio = difflib.SequenceMatcher(None, original_words, spoken_words).ratio()
 
         return marked_text, similarity_ratio, original_words, spoken_words
 
-class Logger:
-    def __init__(self, log_file="logs/activity_log.json"):
-        self.log_file = Path(log_file)
-        # Create logs directory if it doesn't exist
-        self.log_file.parent.mkdir(parents=True, exist_ok=True)
-        # Create the file if it doesn't exist
-        if not self.log_file.exists():
-            self.log_file.write_text("[]")
-
-    def log_event(self, event_type, data, websocket=None):
-        """Log an event with all relevant details"""
-        try:
-            timestamp = datetime.now().isoformat()
-            ip_address = websocket.remote_address[0] if websocket else "unknown"
-
-            log_entry = {
-                "timestamp": timestamp,
-                "event_type": event_type,
-                "ip_address": ip_address,
-                "username": data.get("username", "anonymous"),
-                "data": {
-                    key: value for key, value in data.items()
-                    if key not in ["blob", "epub"] # Exclude large binary data
-                }
-            }
-
-            # Add specific fields based on event type
-            if event_type == "stt":
-                log_entry["stt_details"] = {
-                    "language": data.get("language"),
-                    "sentence": data.get("sentence"),
-                    "predicted_sentence": data.get("pred_sentence", ""),
-                    "points": data.get("points"),
-                    "total_words": data.get("total_words"),
-                    "wrong_words": data.get("wrong_words")
-                }
-            elif event_type == "translation":
-                log_entry["translation_details"] = {
-                    "source_lang": data.get("source_lang"),
-                    "target_lang": data.get("target_lang"),
-                    "source_text": data.get("text"),
-                    "translated_text": data.get("translated_text")
-                }
-
-            # Read existing logs
-            with open(self.log_file, 'r') as f:
-                logs = json.load(f)
-
-            # Append new log
-            logs.append(log_entry)
-
-            # Write updated logs
-            with open(self.log_file, 'w') as f:
-                json.dump(logs, f, indent=2)
-
-        except Exception as e:
-            print(f"Logging error: {e}")
-
-# Initialize the logger
-logger = Logger()
 
 async def main():
-
     global db
     db = DatabaseManager("usersHablas.db")
-    db.init_database();
-    #preload_all_models()
+    db.init_database()
+    preload_all_models()
 
+    # Register cleanup handler
+    def cleanup():
+        print("Saving data to database and closing connections...")
+        db.save_to_db()  # Make sure all in-memory data is saved
+        db.close_all_connections()
+    
+    import atexit
+    atexit.register(cleanup)
+    
     # Create SSL context
     ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
     ssl_context.load_cert_chain(
@@ -1406,7 +1511,7 @@ async def main():
         "0.0.0.0",  # Changed from localhost to accept external connections
         8675,
         ssl=ssl_context,
-        origins=["https://hablas.app", "https://carriertech.uk", "http://localhost:8000", "http://127.0.0.1:8000"]  # Specify allowed origins here
+        origins=["https://hablas.app", "https://carriertech.uk",  "http://localhost:8000", "http://127.0.0.1:8000"]  # Specify allowed origins here
 
     ):
         print("WebSocket server started on wss://carriertech.uk:8675")
