@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -115,8 +114,27 @@
                 </div>
                 
         </div>
-    </div>
 
+    </div>
+<div id="fetching-data-status" style="
+    display: none; 
+    position: fixed; /* Fixed to cover viewport */
+    top: 0; 
+    left: 0; 
+    right: 0; 
+    bottom: 0; 
+    background-color: rgba(0, 0, 0, 0.7); 
+    /* Ensure it's using flex to center content, as per JS */
+    display: flex; 
+    flex-direction: column; 
+    align-items: center; 
+    justify-content: center; 
+    z-index: 2000; /* High z-index to be on top */
+    color: white;
+    ">
+    <div class="status-spinner"></div> <!-- Reuse your existing spinner style if you have one -->
+    <div class="status-message">Fetching data...</div>
+</div>
     <script>
         let completedIndices = {};
         let pageleFilename = "";
@@ -172,6 +190,9 @@
             points: 0
         };
         
+        let currentRequestStartTime = null;
+        let currentRequestTask = '';
+
         let timerInterval = null;
         let userPoints = 0;
         let ttsCache = {}; // Cache for TTS audio data
@@ -188,11 +209,88 @@
                 console.error('WebSocket error:', error);
             });
 
-            socket.addEventListener('message', (event) => {
-                const response = JSON.parse(event.data);
-                console.log("Received WebSocket message:", response);
+            socket.addEventListener('message', async (event) => {
+                const fetchingDataStatusElement = document.getElementById('fetching-data-status');
+                if (fetchingDataStatusElement) {
+                    fetchingDataStatusElement.style.display = 'flex';
+                }
 
+                if (currentRequestStartTime !== null) {
+                    const duration = performance.now() - currentRequestStartTime;
+                    console.log(`WebSocket response for task '${currentRequestTask}' received in ${duration.toFixed(2)} ms`);
+                    currentRequestStartTime = null; // Reset for the next request
+                    currentRequestTask = '';
+                }
+
+                console.log("Type of event.data: ", typeof event.data, "Is Blob?", event.data instanceof Blob, "Is ArrayBuffer?", event.data instanceof ArrayBuffer);
+
+                let jsonString;
+                let parsedResponseObject; // Use a temporary variable for the parsed object
+
+                if (event.data instanceof ArrayBuffer) {
+                    console.log("Received ArrayBuffer, decoding...");
+                    const decoder = new TextDecoder("utf-8");
+                    jsonString = decoder.decode(event.data);
+                } else if (event.data instanceof Blob) {
+                    console.log("Received Blob, reading as text...");
+                    try {
+                        jsonString = await event.data.text(); // Await the promise
+                    } catch (e) {
+                        console.error("Error reading Blob as text:", e);
+                        if (currentRequestTask === 'stt' && statusIndicator && statusIndicator.style.display !== 'none') {
+                           clearInterval(timerInterval);
+                           statusIndicator.style.display = 'none';
+                           if (processingStartTime) processingStartTime = 0;
+                        }
+                        if (fetchingDataStatusElement) fetchingDataStatusElement.style.display = 'none';
+                        return; // Early exit
+                    }
+                } else if (typeof event.data === 'string') {
+                    console.log("Received string directly.");
+                    jsonString = event.data;
+                } else {
+                    console.error("Received WebSocket message of unknown type:", event.data);
+                    if (currentRequestTask === 'stt' && statusIndicator && statusIndicator.style.display !== 'none') {
+                        clearInterval(timerInterval);
+                        statusIndicator.style.display = 'none';
+                        if (processingStartTime) processingStartTime = 0;
+                    }
+                    if (fetchingDataStatusElement) fetchingDataStatusElement.style.display = 'none';
+                    return; // Early exit
+                }
+
+                // Now, parse the jsonString
+                if (typeof jsonString === 'string') {
+                    try {
+                        parsedResponseObject = JSON.parse(jsonString);
+                        // Successfully parsed, log it before assigning to 'response' for user's code
+                        console.log("Received WebSocket message (parsed successfully):", parsedResponseObject);
+                    } catch (e) {
+                        console.error("Error parsing JSON string:", e);
+                        console.error("Original string that failed parsing:", jsonString);
+                        if (currentRequestTask === 'stt' && statusIndicator && statusIndicator.style.display !== 'none') {
+                           clearInterval(timerInterval);
+                           statusIndicator.style.display = 'none';
+                           if (processingStartTime) processingStartTime = 0;
+                        }
+                        if (fetchingDataStatusElement) fetchingDataStatusElement.style.display = 'none';
+                        return; // Early exit
+                    }
+                } else {
+                    console.error("Could not convert event.data to a string for parsing.");
+                    if (currentRequestTask === 'stt' && statusIndicator && statusIndicator.style.display !== 'none') {
+                        clearInterval(timerInterval);
+                        statusIndicator.style.display = 'none';
+                        if (processingStartTime) processingStartTime = 0;
+                    }
+                    if (fetchingDataStatusElement) fetchingDataStatusElement.style.display = 'none';
+                    return; // Early exit
+                }
                 
+                const response = parsedResponseObject; // Assign to 'response' for compatibility with the rest of the user's code
+                if (fetchingDataStatusElement) { 
+                    fetchingDataStatusElement.style.display = 'none';
+                }
 
                 // Handle array response (direct pagele list)
                 if (Array.isArray(response)) {
@@ -241,45 +339,7 @@
                     // Display the pagele selection modal with the list
                     displayPageleList(response.pagele_books);
                 } else if (response.type === 'get_pagele') {
-                    const pagele_data = response.pagele_data;
-                    pageleFilename = response.user_pagele.current_pagele;
-                    // Transform the chapter data format
-                    const chapters = [];
-                    
-                    // Get user progress data from the response
-                    completedIndices = response.user_pagele.books[pageleFilename].completed_indices;
-                    
-                    // Convert the object-based chapter structure to an array
-                    Object.keys(pagele_data).forEach(key => {
-                        if (key.startsWith('chapter')) {
-                            // Extract chapter number from key (e.g., "chapter1" -> 1)
-                            const chapterNumber = parseInt(key.replace('chapter', ''));
-                            
-                            // Calculate total points for this chapter from completedIndices
-                            let chapterPoints = 0;
-                            if (completedIndices[key]) {
-                                Object.values(completedIndices[key]).forEach(points => {
-                                    chapterPoints += (points || 0);
-                                });
-                            }
-                            
-                            chapters.push({
-                                key: key,
-                                title: `Chapter ${chapterNumber}`,
-                                sentences: pagele_data[key],
-                                points: chapterPoints // Set points from user progress data
-                            });
-                        }
-                    });
-                    
-                    // Sort chapters by number
-                    chapters.sort((a, b) => {
-                        const numA = parseInt(a.title.replace('Chapter ', ''));
-                        const numB = parseInt(b.title.replace('Chapter ', ''));
-                        return numA - numB;
-                    });
-                    
-                    displayChaptersGrid(chapters);
+                    displayChaptersGrid(response);
                 } else if (response.status === "error") {
                     
                 } else if (response.hasOwnProperty('pred_sentence')) {
@@ -323,10 +383,16 @@
         }
 
         function sendSocketMessage(message) {
+            const fetchingDataStatusElement = document.getElementById('fetching-data-status');
+            if (fetchingDataStatusElement) {
+                fetchingDataStatusElement.style.display = 'flex';
+            }
             
             socket = createWebSocketConnection();
             
             socket.addEventListener('open', () => {
+                    currentRequestStartTime = performance.now();
+                    currentRequestTask = message.task || 'unknown_task';
                     socket.send(JSON.stringify(message));
                 }, { once: true });
             
@@ -384,7 +450,6 @@
             // Update points if available
             if (response.points) {
                 userInfo.points = response.points;
-                updatePointsDisplay(userInfo.points);
             }
             
             // Store preferred language if available
@@ -572,24 +637,35 @@
         }
 
         // Function to display chapters in a grid
-        function displayChaptersGrid(chapters) {
+        function displayChaptersGrid(response) {
+            pageleFilename = response.user_pagele.current_pagele;
+            completedIndices = response.user_pagele.books[pageleFilename].completed_indices;
+            console.log("completedIndices: ", completedIndices);
             const chaptersGrid = document.getElementById('chapters-grid');
             chaptersGrid.innerHTML = '';
-            
-            if (!chapters || chapters.length === 0) {
+            pagele_data = response.pagele_data;
+            if (Object.keys(pagele_data).length === 0) {
                 chaptersGrid.innerHTML = '<p>No chapters available.</p>';
             } else {
-                chapters.forEach((chapter, index) => {
+                Object.keys(pagele_data).forEach((chapter, index) => {
                     const card = document.createElement('div');
                     card.className = 'chapter-card';
-                    card.dataset.chapterIndex = index;
-                    
+                    card.dataset.chapterIndex = index;   
+                    let chapterPoints = 0;
+                    /*console.log("chapter: ", chapter);
+                    //console.log("completedIndices[chapter]: ", completedIndices[chapter]);
+                    Object.values(completedIndices[chapter]).forEach((points) => {
+                 
+                        console.log("points: ", points);
+                        chapterPoints += points;
+                    });*/
                     card.innerHTML = `
-                        <div class="chapter-title">${chapter.title || `Chapter ${index + 1}`}</div>
-                        <div class="chapter-points">${chapter.points || 0} points</div>
+                        <div class="chapter-title">${chapter}</div>
+                       
                     `;
+                    // <div class="chapter-points">${chapterPoints} points</div>
                     
-                    card.addEventListener('click', () => openSentenceModal(chapter, index));
+                    card.addEventListener('click', () => openSentenceModal(chapter, index, completedIndices[chapter]));
                     chaptersGrid.appendChild(card);
                 });
             }
@@ -612,7 +688,7 @@
         // Variables to track current sentence
         let currentChapter = null;
         let currentSentenceIndex = 0;
-        let sentences = [];
+        let pagele_data = null;
 
         // Add these variables at the top of your script with other variables
         let isRecording = false;
@@ -622,24 +698,15 @@
         let processingStartTime = 0;
 
         // Function to open the sentence modal for a chapter
-        function openSentenceModal(chapter, chapterIndex) {
-            hideChaptersModal();
-            
+        function openSentenceModal(chapter, chapterIndex, chapterPoints) {
             currentChapter = chapter;
+            hideChaptersModal();
+
             currentSentenceIndex = 0;
-            sentences = chapter.sentences || [];
-            console.log("currentChapter: ", currentChapter);
-            document.getElementById('chapter-title').textContent = chapter.title || `Chapter ${chapterIndex + 1}`;
+            console.log("currentChapter: ", chapter);
+            document.getElementById('chapter-title').textContent = chapter;
+
             
-            // Get chapter key from the chapter data
-            const chapterKey = chapter.key || `chapter${chapterIndex}`;
-            
-            // Display chapter points total if available
-            const chapterPoints = chapter.points || 0;
-            const pointsDisplay = document.getElementById('chapter-points');
-            if (pointsDisplay) {
-                pointsDisplay.textContent = chapterPoints;
-            }
             
             // Set up the sentence display with points
             updateSentenceDisplay();
@@ -656,6 +723,7 @@
 
         // Function to update the displayed sentence
         function updateSentenceDisplay() {
+            let sentences = pagele_data[currentChapter];
             if (sentences.length === 0) {
                 sentenceElem.textContent = "No sentences available for this chapter.";
                 counterElem.textContent = "0/0";
@@ -668,15 +736,14 @@
             counterElem.textContent = `${currentSentenceIndex + 1}/${sentences.length}`;
             
             // Get and display points for current sentence
-            const chapterKey = currentChapter.key;
             let sentencePoints = 0;
             console.log("completedIndices: ", completedIndices);
-            console.log("chapterKey: ", completedIndices[chapterKey]);
-            console.log("currentSentenceIndex: ", completedIndices[chapterKey][currentSentenceIndex]);
+            console.log("currentChapter: ", completedIndices[currentChapter]);
+            console.log("currentSentenceIndex: ", completedIndices[currentChapter][currentSentenceIndex]);
             if (completedIndices && 
-                completedIndices[chapterKey] && 
-                completedIndices[chapterKey][currentSentenceIndex] !== undefined) {
-                sentencePoints = completedIndices[chapterKey][currentSentenceIndex];
+                completedIndices[currentChapter] && 
+                completedIndices[currentChapter][currentSentenceIndex] !== undefined) {
+                sentencePoints = completedIndices[currentChapter][currentSentenceIndex];
                 console.log("sentencePoints: ", sentencePoints);
             }
             
@@ -719,8 +786,9 @@
         function showNextSentence() {
             translated_text = "";
             prediction.innerHTML = "";
-            if (currentSentenceIndex < sentences.length - 1) {
+            if (currentSentenceIndex < pagele_data[currentChapter].length - 1) {
                 currentSentenceIndex++;
+                console.log("currentSentenceIndex: ", currentSentenceIndex);
                 updateSentenceDisplay();
             }
         }
@@ -766,16 +834,11 @@
             
       
             pointsSpan.innerHTML = response.points;
+            completedIndices[currentChapter][currentSentenceIndex] = response.points;
             
         }
 
-        // Function to update points display
-        function updatePointsDisplay(points) {
-            const pointsDisplays = document.querySelectorAll('#points');
-            pointsDisplays.forEach(element => {
-                element.textContent = points;
-            });
-        }
+      
 
         // Function to update timer during recording
         function updateTimer() {
@@ -882,7 +945,7 @@
                     sentence: currentSentence,
                     username: localStorage.getItem('username') || '',
                     book: pageleFilename, 
-                    chapter: currentChapter.key,
+                    chapter: currentChapter,
                     currentSentenceIndex: currentSentenceIndex,
                     page: 'pagele'
                 });

@@ -198,7 +198,27 @@
         <div class="loading-spinner">Loading...</div>
     </div>
 </div>
-
+<div id="parsing-status" style="
+    display: none; 
+    position: absolute; 
+    top: 0; 
+    left: 0; 
+    right: 0; 
+    bottom: 0; 
+    height: 10%;
+    width: 10%;
+    background-color: rgba(0, 0, 0, 0.7); 
+    /* इंश्योर it's using flex to center content, as per JS */
+    display: flex; 
+    flex-direction: column; 
+    align-items: center; 
+    justify-content: center; 
+    z-index: 1001; /* Adjust if needed to be on top */
+    color: white;
+    ">
+    <div class="status-spinner"></div> <!-- Reuse your existing spinner style -->
+    <div class="status-message">Parsing data...</div>
+</div>
 <!-- Add Stripe Elements -->
 <div id="payment-modal" class="modal">
     <div class="modal-content">
@@ -344,11 +364,10 @@
 console.log ("starting script");
 
 
-
 // Replace the existing WebSocket implementation with a simpler function-based approach
 function createWebSocketConnection() {
-    //const socket = new WebSocket('wss://carriertech.uk:8675');
-    const socket = new WebSocket('ws://localhost:8675');
+    const socket = new WebSocket('wss://carriertech.uk:8675');
+    //const socket = new WebSocket('ws://localhost:8675');
     socket.addEventListener('open', (event) => {
         console.log('WebSocket connection established');
     });
@@ -357,24 +376,131 @@ function createWebSocketConnection() {
         console.error('WebSocket error:', error);
     });
 
-    socket.addEventListener('message', (event) => {
-            const response = JSON.parse(event.data);
-            console.log("Received WebSocket message:", response);
+    socket.addEventListener('message', async (event) => {
+            const messageProcessingStartTime = performance.now(); // Start timing
+            const parsingStatusElement = document.getElementById('parsing-status');
+            if (parsingStatusElement) {
+                parsingStatusElement.style.display = 'flex';
+            }
+
+            console.log("Type of event.data: ", typeof event.data, "Is Blob?", event.data instanceof Blob, "Is ArrayBuffer?", event.data instanceof ArrayBuffer);
             
-            const statusIndicator = document.getElementById('recording-status');
-            if (statusIndicator) {
-                // Stop and clear the timer
-                clearInterval(timerInterval);
-                const finalTime = ((Date.now() - processingStartTime) / 1000).toFixed(1);
-                const timerElement = statusIndicator.querySelector('.timer');
-                if (timerElement) {
-                    timerElement.textContent = `${finalTime}s`;
+            let jsonString;
+            let parsedResponseObject = null; 
+            let conversionStartTime, conversionEndTime, parsingStartTime, parsingEndTime, afterConversionTime, afterParsingTime;
+
+            if (event.data instanceof ArrayBuffer) {
+                console.log("Received ArrayBuffer, decoding...");
+                try {
+                    conversionStartTime = performance.now();
+                    const decoder = new TextDecoder("utf-8");
+                    jsonString = decoder.decode(event.data);
+                    conversionEndTime = performance.now();
+                    console.log(`ArrayBuffer decoding took ${(conversionEndTime - conversionStartTime).toFixed(2)} ms`);
+                } catch (e) {
+                    console.error("Error decoding ArrayBuffer:", e);
+                    const statusIndicator = document.getElementById('recording-status');
+                    if (currentRequestTask === 'stt' && statusIndicator && statusIndicator.style.display !== 'none') {
+                       clearInterval(timerInterval); statusIndicator.style.display = 'none'; if (processingStartTime) processingStartTime = 0;
+                    }
+                    if (parsingStatusElement) parsingStatusElement.style.display = 'none';
+                    return;
                 }
-                // Hide the status indicator without a timeout
+            } else if (event.data instanceof Blob) {
+                console.log("Received Blob, reading as text...");
+                try {
+                    conversionStartTime = performance.now();
+                    jsonString = await event.data.text(); // Await the promise
+                    conversionEndTime = performance.now();
+                    console.log(`Blob.text() took ${(conversionEndTime - conversionStartTime).toFixed(2)} ms`);
+                } catch (e) {
+                    console.error("Error reading Blob as text:", e);
+                    const statusIndicator = document.getElementById('recording-status');
+                    if (currentRequestTask === 'stt' && statusIndicator && statusIndicator.style.display !== 'none') {
+                       clearInterval(timerInterval); statusIndicator.style.display = 'none'; if (processingStartTime) processingStartTime = 0;
+                    }
+                    if (parsingStatusElement) parsingStatusElement.style.display = 'none';
+                    return; 
+                }
+            } else if (typeof event.data === 'string') {
+                console.log("Received string directly.");
+                jsonString = event.data;
+            } else {
+                console.error("Received WebSocket message of unknown type:", event.data);
+                const statusIndicator = document.getElementById('recording-status');
+                if (currentRequestTask === 'stt' && statusIndicator && statusIndicator.style.display !== 'none') {
+                    clearInterval(timerInterval); statusIndicator.style.display = 'none'; if (processingStartTime) processingStartTime = 0;
+                }
+                if (parsingStatusElement) parsingStatusElement.style.display = 'none';
+                return; 
+            }
+
+            afterConversionTime = performance.now();
+            console.log(`Time from start to after data conversion (string ready): ${(afterConversionTime - messageProcessingStartTime).toFixed(2)} ms`);
+
+            // Now, parse the jsonString
+            if (typeof jsonString === 'string') {
+                try {
+                    parsingStartTime = performance.now();
+                    parsedResponseObject = JSON.parse(jsonString);
+                    parsingEndTime = performance.now();
+                    console.log(`JSON.parse() took ${(parsingEndTime - parsingStartTime).toFixed(2)} ms`);
+                } catch (e) {
+                    console.error("Error parsing JSON string:", e);
+                    console.error("Original string that failed parsing:", jsonString);
+                    const statusIndicator = document.getElementById('recording-status');
+                    if (currentRequestTask === 'stt' && statusIndicator && statusIndicator.style.display !== 'none') {
+                       clearInterval(timerInterval); statusIndicator.style.display = 'none'; if (processingStartTime) processingStartTime = 0;
+                    }
+                    if (parsingStatusElement) parsingStatusElement.style.display = 'none';
+                    return; 
+                }
+            } else {
+                console.error("Could not convert event.data to a string for parsing.");
+                 const statusIndicator = document.getElementById('recording-status');
+                if (currentRequestTask === 'stt' && statusIndicator && statusIndicator.style.display !== 'none') {
+                    clearInterval(timerInterval); statusIndicator.style.display = 'none'; if (processingStartTime) processingStartTime = 0;
+                }
+                if (parsingStatusElement) parsingStatusElement.style.display = 'none';
+                return;
+            }
+            
+            afterParsingTime = performance.now();
+            console.log(`Time from start to after JSON parsing: ${(afterParsingTime - messageProcessingStartTime).toFixed(2)} ms`);
+
+            const response = parsedResponseObject; 
+            if (parsingStatusElement) { 
+                parsingStatusElement.style.display = 'none';
+            }
+            
+            const messageOverallEndTime = performance.now();
+            console.log(`Overall message parsing and conversion (to response var assignment) took ${(messageOverallEndTime - messageProcessingStartTime).toFixed(2)} ms`);
+
+            console.log("Received WebSocket message (parsed successfully):", response);
+            
+            // General status indicator hiding (as per original index.html logic)
+            // This might need to be more specific if statusIndicator is only for STT
+            const statusIndicator = document.getElementById('recording-status');
+            if (statusIndicator && statusIndicator.style.display !== 'none') { // Check if it's visible before trying to hide
+                clearInterval(timerInterval);
+                if (processingStartTime) { // Ensure processingStartTime was set
+                     const finalTime = ((Date.now() - processingStartTime) / 1000).toFixed(1);
+                     const timerElement = statusIndicator.querySelector('.timer');
+                     if (timerElement) {
+                         timerElement.textContent = `${finalTime}s`;
+                     }
+                     processingStartTime = 0; // Reset
+                }
                 statusIndicator.style.display = 'none';
             }
             
-            if (response.books) {
+            // Important: Check if response is not null before using it
+            if (response === null) {
+                console.error("Response is null after parsing attempt, cannot proceed with message handling.");
+                return;
+            }
+
+            if (response.hasOwnProperty('books')) {
                 handleBooksResponse(response);
             } else if (response.hasOwnProperty('pred_sentence')) {
                 handlePredSentence(response);
@@ -391,6 +517,44 @@ function createWebSocketConnection() {
                 handleTTSResponse(response);
             } else if (response.message === "Invalid credentials") {
                 alert("Invalid credentials, have you signed up?");
+            } else if (response.status === 'success' && response.client_secret) {
+            // Initialize payment element
+                elements = stripe.elements({
+                    clientSecret: response.client_secret,
+                    appearance: {
+                        theme: 'stripe',
+                        variables: {
+                            colorPrimary: '#0570de',
+                            colorBackground: '#ffffff',
+                            colorText: '#30313d',
+                        }
+                    }
+                });
+
+                const paymentElement = elements.create('payment');
+                paymentElement.mount('#payment-element');
+
+                // Handle payment submission
+                document.getElementById('submit-payment').addEventListener(EVENT_TYPE, async (e) => {
+                    e.preventDefault();
+                    
+                    const { error } = await stripe.confirmPayment({
+                        elements,
+                        confirmParams: {
+                            return_url: window.location.origin,
+                        }
+                    });
+
+                    if (error) {
+                        const messageDiv = document.getElementById('payment-message');
+                        messageDiv.textContent = error.message;
+                    } else {
+                        // Payment succeeded
+                        document.getElementById('payment-modal').style.display = 'none';
+                        alert('Thank you for your tip!');
+                    }
+                });
+        
             } else if(response.hasOwnProperty('filename')) {
                     const epubData = response.epub;
                     const base64Data = epubData.split(',')[1];
@@ -1898,49 +2062,7 @@ document.querySelectorAll('.modal .close').forEach(closeBtn => {
         }
     }
 
-    // Update WebSocket message handler to handle tip responses
-    socket.addEventListener('message', async (event) => {
-        const response = JSON.parse(event.data);
-        
-        if (response.status === 'success' && response.client_secret) {
-            // Initialize payment element
-            elements = stripe.elements({
-                clientSecret: response.client_secret,
-                appearance: {
-                    theme: 'stripe',
-                    variables: {
-                        colorPrimary: '#0570de',
-                        colorBackground: '#ffffff',
-                        colorText: '#30313d',
-                    }
-                }
-            });
-
-            const paymentElement = elements.create('payment');
-            paymentElement.mount('#payment-element');
-
-            // Handle payment submission
-            document.getElementById('submit-payment').addEventListener(EVENT_TYPE, async (e) => {
-                e.preventDefault();
-                
-                const { error } = await stripe.confirmPayment({
-                    elements,
-                    confirmParams: {
-                        return_url: window.location.origin,
-                    }
-                });
-
-                if (error) {
-                    const messageDiv = document.getElementById('payment-message');
-                    messageDiv.textContent = error.message;
-                } else {
-                    // Payment succeeded
-                    document.getElementById('payment-modal').style.display = 'none';
-                    alert('Thank you for your tip!');
-                }
-            });
-        }
-    });
+ 
 
     // Add styles for tip section
     const style = document.createElement('style');

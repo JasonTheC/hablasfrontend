@@ -827,21 +827,19 @@ async def get_available_pagele():
         for lang_dir in EPUB_DIR.glob("*"):
             if lang_dir.is_dir():
                 language = lang_dir.name
-                print(f"\nProcessing pagele files for language: {language}")
-                
-                # Look for pagele JSON files
+                print(f"\nProcessing pagele files for language: {language}")                
                 for pagele_path in lang_dir.glob("*.json"):
-                    print(f"\nProcessing pagele file: {pagele_path.name}")
-                    
+                    print(f"\nProcessing pagele file: {pagele_path.name}")                  
                     try:
-                        # Load the pagele JSON file
-                        
+
                         book_name = pagele_path.stem.replace('.json', '')
                         book_path = lang_dir / f"{book_name}.epub"
-                        
+                        book_cover = f"covers/{language}/{book_name}.jpg"
                         # Get cover image if the book exists
                         cover_base64 = ""
-                        if book_path.exists():
+                        if os.path.isfile(book_cover):
+                            cover_base64 = get_file_as_base64(book_cover)
+                        else:
                             cover_dir = COVERS_DIR / language
                             cover_path = extract_epub_cover(book_path, cover_dir)
                             
@@ -1008,81 +1006,76 @@ class DatabaseManager:
         conn.commit()
         conn.close()
 
-    async def login_task(self, data_object):
+    def _execute_login_task(self, data_object):
         conn = sqlite3.connect(self.DB_PATH)
         cursor = conn.cursor()
+        try:
+            username = data_object.get("username")
+            password = data_object.get("password")
 
-        username = data_object.get("username")
-        password = data_object.get("password")
+            cursor.execute("PRAGMA table_info(users)")
+            columns = [column[1] for column in cursor.fetchall()]
 
-        # Get column names
-        cursor.execute("PRAGMA table_info(users)")
-        columns = [column[1] for column in cursor.fetchall()]
+            cursor.execute("SELECT * FROM users WHERE username = ? AND password = ?",
+                           (username, password))
+            user_row = cursor.fetchone()
 
-        cursor.execute("SELECT * FROM users WHERE username = ? AND password = ?",
-                    (username, password))
-        user_row = cursor.fetchone()
+            if user_row:
+                user = dict(zip(columns, user_row))
+                token = str(uuid.uuid4())
+                expiry = datetime.now() + timedelta(days=10000)
 
-        if user_row:
-            # Convert row to dictionary
-            user = dict(zip(columns, user_row))
-            print(user)
+                cursor.execute("""
+                    UPDATE users
+                    SET login_token = ?, token_expiry = ?
+                    WHERE username = ?""",
+                    (token, expiry, username))
+                conn.commit()
 
-            # Generate new token using UUID and set expiry to 24 hours from now
-            token = str(uuid.uuid4())
-            expiry = datetime.now() + timedelta(days=10000)
+                message = {
+                    "status": "success",
+                    "token": token,
+                    "username": username,
+                    "current_book": user.get("current_book", ""),
+                    "cfi": user.get("cfi", ""),
+                    "preferred_language": user.get("preferred_language", "en"),
+                    "pagele": json.loads(user.get("pagele", "{}")),
+                    "type": "login"
+                }
 
-            cursor.execute("""
-                UPDATE users
-                SET login_token = ?, token_expiry = ?
-                WHERE username = ?""",
-                (token, expiry, username))
-            conn.commit()
-
-            message = {
-                "status": "success",
-                "token": token,
-                "username": username,
-                "current_book": user.get("current_book", ""),
-                "cfi": user.get("cfi", ""),  # Use CFI instead of page
-                "preferred_language": user.get("preferred_language", "en"),
-                "pagele": json.loads(user.get("pagele", "{}")),
-                "type": "login"
-            }
-
-            # Only add epub and language if there's a current book
-            if user.get("current_book"):
-                print("getting books")
-                epub = None
-                language = None
-                epubs = os.walk(EPUB_DIR)
-                for root, dirs, files in epubs:
-                    for file in files:
-                        if file == user["current_book"]:
-                            book_path = Path(root) / file
+                if user.get("current_book"):
+                    epub = None
+                    language = None
+                    book_path_found = None # Variable to store the found book path
+                    for root, dirs, files in os.walk(EPUB_DIR):
+                        for file in files:
+                            if file == user["current_book"]:
+                                book_path_found = Path(root) / file
+                                break
+                        if book_path_found: # Exit outer loop if book found
                             break
-                print(f"book_path: {book_path}")
-                if book_path.exists():
-                    language = book_path.parent.name
-                    print(f"language: {language}")
-                    with open(book_path, "rb") as f:
-                        book_data = f.read()
-                        book_base64 = base64.b64encode(book_data).decode('utf-8')
-                        epub = f"data:application/epub+zip;base64,{book_base64}"
-                        print(f"Including book data for {user['current_book']}")
+                    
+                    if book_path_found and book_path_found.exists():
+                        language = book_path_found.parent.name
+                        with open(book_path_found, "rb") as f:
+                            book_data = f.read()
+                            book_base64 = base64.b64encode(book_data).decode('utf-8')
+                            epub = f"data:application/epub+zip;base64,{book_base64}"
+                        
+                        if epub and language: # Check epub and language again as they are set inside condition
+                            message["epub"] = epub
+                            message["language"] = language
+            else:
+                message = {
+                    "status": "error",
+                    "message": "Invalid credentials"
+                }
+            return message
+        finally:
+            conn.close()
 
-            if epub and language:
-                message["epub"] = epub
-                message["language"] = language
-
-        else:
-            message = {
-                "status": "error",
-                "message": "Invalid credentials"
-            }
-
-        conn.close()
-        return message
+    async def login_task(self, data_object):
+        return await asyncio.to_thread(self._execute_login_task, data_object)
 
     def signup_task(self, data_object):
         conn = sqlite3.connect(self.DB_PATH)
