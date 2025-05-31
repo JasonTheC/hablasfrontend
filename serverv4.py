@@ -31,12 +31,25 @@ from concurrent.futures import ThreadPoolExecutor
 import threading
 import ipaddress
 import orjson # <--- Add this import
+import stripe # Add stripe library
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 
 
-LANG_ID = "fr"
-MODEL_ID = "jonatasgrosman/wav2vec2-large-xlsr-53-french"
-AUDIO_DIR = "frenchtrial.wav"
-
+# Map language codes to standard codes if needed
+language_name_map = {
+        "francais": "fr",
+        "english": "en",
+        "español": "es",
+        "espagnol": "es",
+        "spanish": "es",
+        "deutsch": "de",
+        "italiano": "it",
+        "turkish": "tr",
+        "português": "pt",
+        "portuguese": "pt",
+    }
 loaded_processors = {}
 loaded_models = {}
 translator = Translator()
@@ -46,6 +59,14 @@ COVERS_DIR = Path("covers")
 DEFAULT_COVER = "default-cover.png"
 RECORDINGS_DIR = Path("recordings")
 
+stripe.api_key = os.environ.get('STRIPE_SECRET_KEY')
+
+# Email configuration for bug reports
+EMAIL_HOST = 'smtp.gmail.com'  # Change to your SMTP server
+EMAIL_PORT = 587
+EMAIL_USER = os.environ.get('BUG_REPORT_EMAIL_USER')  # Your email
+EMAIL_PASSWORD = os.environ.get('BUG_REPORT_EMAIL_PASSWORD')  # Your email password/app password
+BUG_REPORT_TO_EMAIL = os.environ.get('BUG_REPORT_TO_EMAIL', EMAIL_USER)  # Where to send bug reports
 
 db = None
 
@@ -55,18 +76,12 @@ language_dict = {
     "es": "jonatasgrosman/wav2vec2-large-xlsr-53-spanish",
     "it": "jonatasgrosman/wav2vec2-large-xlsr-53-french",
     "de": "jonatasgrosman/wav2vec2-large-xlsr-53-german",
+    "tr": "m3hrdadfi/wav2vec2-large-xlsr-turkish",
+    "pt": "jonatasgrosman/wav2vec2-large-xlsr-53-portuguese",
 }
 
 # Add this language mapping dictionary at the top level with other dictionaries
-language_name_map = {
-    "francais": "fr",
-    "english": "en",
-    "español": "es",
-    "espagnol": "es",
-    "spanish": "es",
-    "deutsch": "de",
-    "italiano": "it"
-}
+
 
 class ModelManager:
     def __init__(self):
@@ -305,7 +320,7 @@ def stt_task(data_object):
             pagele_data["current_pagele"] = data_object.get("book")
             pagele_data["current_chapter"] = data_object.get("chapter")
             pagele_book = pagele_data["books"][data_object.get("book")]["completed_indices"]
-            pagele_book[data_object.get("chapter")][data_object.get("currentSentenceIndex")] = points
+            pagele_book[data_object.get("chapter")][str(data_object.get("currentSentenceIndex"))] = points
             total_points = 0
             for chapter in pagele_book.keys():
                 try:
@@ -500,7 +515,9 @@ async def translate_task(data_object):
     source_text = data_object["text"]
     source_lang = data_object["source_lang"]
     target_lang = data_object["target_lang"]
-
+    print(f"[TRANSLATE] source_text: {source_text}")
+    print(f"[TRANSLATE] source_lang: {source_lang}")
+    print(f"[TRANSLATE] target_lang: {target_lang}")
     current_book = data_object.get("current_book", "")
     cfi = data_object.get("cfi", "")  # Get CFI instead of page
     username = data_object.get("username", "")
@@ -508,19 +525,11 @@ async def translate_task(data_object):
     if source_lang == target_lang:
         return {"status": "success", "translated_text": source_text}
 
-    # Map language codes to standard codes if needed
-    source_lang_map = {
-        "francais": "fr",
-        "english": "en",
-        "español": "es",
-        "espagnol": "es",
-        "spanish": "es",
-        "deutsch": "de",
-        "italiano": "it"
-    }
-    if source_lang in source_lang_map.keys():
-        source_lang = source_lang_map[source_lang]
-    if source_lang in source_lang_map.values():
+    
+    print(f"[TRANSLATE] language_name_map: {language_name_map}")
+    if source_lang in language_name_map.keys():
+        source_lang = language_name_map[source_lang]
+    if source_lang in language_name_map.values():
         translator_instance = Translator()
         result = await translator_instance.translate(source_text, src=source_lang, dest=target_lang)
 
@@ -639,61 +648,63 @@ async def login_task(self, data_object):
     return message
 
 async def verify_token_task(data_object):
-    """Verify a login token and return user data if valid"""
-    conn = sqlite3.connect(db.DB_PATH)
-    cursor = conn.cursor()
-
+    """Verify a login token and return user data if valid (uses in-memory cache)"""
     token = data_object.get("token")
     if not token:
         return {"status": "error", "message": "No token provided"}
 
-    # Get column names
-    cursor.execute("PRAGMA table_info(users)")
-    columns = [column[1] for column in cursor.fetchall()]
+    print(f"[VERIFY] Verifying token: {token}")
+    # db.get_user_data now handles token validation (existence, matching, expiry)
+    user_data = db.get_user_data(token) 
 
-    # Check if token exists and is not expired
-    cursor.execute("""
-        SELECT * FROM users
-        WHERE login_token = ? AND token_expiry > ?
-    """, (token, datetime.now()))
-
-    user_row = cursor.fetchall()
-    conn.close()
-
-    if not user_row:
+    if not user_data:
+        print(f"[VERIFY] Token invalid or expired based on db.get_user_data.")
         return {"status": "error", "message": "Invalid or expired token"}
 
-    user_row = user_row[0]
-    # Convert row to dictionary
-    user = dict(zip(columns, user_row))
+    print(f"[VERIFY] Token valid. User: {user_data.get('username')}")
+
     epub = None
     language = None
+    current_book_filename = user_data.get("current_book")
 
-    if user.get("current_book"):
-        epubs = os.walk(EPUB_DIR)
-        for root, dirs, files in epubs:
-            for file in files:
-                if file == user["current_book"]:
-                    book_path = Path(root) / file
-                    break
-        if book_path.exists():
-            language = book_path.parent.name
-            with open(book_path, "rb") as f:
-                book_data = f.read()
-                book_base64 = base64.b64encode(book_data).decode('utf-8')
-                epub = f"data:application/epub+zip;base64,{book_base64}"
+    if current_book_filename:
+        book_path = None
+        # Find book path using os.walk, similar to original logic
+        for root, dirs, files in os.walk(EPUB_DIR):
+            if current_book_filename in files:
+                book_path = Path(root) / current_book_filename
+                break 
+        
+        if book_path and book_path.exists():
+            language = book_path.parent.name 
+            try:
+                with open(book_path, "rb") as f:
+                    book_content = f.read()
+                    book_base64 = base64.b64encode(book_content).decode('utf-8')
+                    epub = f"data:application/epub+zip;base64,{book_base64}"
+            except Exception as e:
+                print(f"[VERIFY] Error reading book file {book_path}: {e}")
+                # epub will remain None, language might be set
 
     response = {
         "status": "success",
-        "username": user.get("username", ""),
-        "current_book": user.get("current_book", ""),
-        "cfi": user.get("cfi", ""),
-        "preferred_language": user.get("preferred_language", "en"),
-        "token": token,
-        #"epub": epub,
-        "language": language,
-        #"pagele": user.get("pagele", {})
+        "username": user_data.get("username", ""),
+        "current_book": current_book_filename,
+        "cfi": user_data.get("cfi", ""),
+        "preferred_language": user_data.get("preferred_language", "en"),
+        "token": token, 
+        "language": language, 
     }
+    
+    if epub: 
+        response["epub"] = epub
+
+    # Ensure pagele data is consistent with login_task response
+    pagele_data_in_user = user_data.get("pagele", {})
+    response["pagele"] = pagele_data_in_user if isinstance(pagele_data_in_user, dict) else {}
+
+    # Log a summary of the response for easier debugging
+    response_summary = {k: (v[:30] + '...' if isinstance(v, str) and v and len(v) > 30 else v) for k, v in response.items()}
     return response
 
 def pagele_task(data_object):
@@ -765,13 +776,15 @@ def pagele_task(data_object):
 async def tts_task(data_object):
     """Convert text to speech using Google Text-to-Speech"""
     try:
+        print(f"[TTS] data_object: {data_object}")
         text = data_object.get("text", "")
         lang = data_object.get("language", "en")
-        
+        print(f"[TTS] lang: {lang}")
+        print(f"[TTS] language_name_map: {language_name_map}")
         # Map language name to code if needed
         if lang.lower() in language_name_map:
             lang = language_name_map[lang.lower()]
-            
+        print(f"[TTS] lang: {lang}")
         if not text:
             return {"status": "error", "message": "No text provided for TTS conversion"}
             
@@ -865,7 +878,7 @@ def init_completed_indices(pagele_json):
     for chapter in pagele_json:
         completed_indices[chapter] = {}
         for idx, sentence in enumerate(pagele_json[chapter]):
-            completed_indices[chapter][idx] = 0
+            completed_indices[chapter][str(idx)] = 0
     return completed_indices
 
 async def get_available_pagele():
@@ -916,6 +929,11 @@ async def get_available_pagele():
         return pagele_books
     except Exception as e:
         return []
+def update_interface_language_task(data_object):
+    print(f"[UPDATE_INTERFACE_LANGUAGE] data_object: {data_object}")
+    language = data_object.get("language")
+    print(f"[UPDATE_INTERFACE_LANGUAGE] language: {language}")
+    return {"status": "success", "language": language}
 
 async def handle_connection(websocket):
     print(f"[SERVER] New connection from {websocket.remote_address}")
@@ -966,7 +984,12 @@ async def handle_connection(websocket):
             message_returned = await get_available_pagele()
         elif task == "init_pagele":
             message_returned = await init_pagele_task(data_object)
-            
+        elif task == "tip":
+            message_returned = await tip_task(data_object)
+        elif task == "send_bug_report":
+            message_returned = await send_bug_report_task(data_object)
+        elif task == "update_interface_language":
+            message_returned = await update_interface_language_task(data_object)
         print(f"[SERVER] Task {task} processed in {time.time() - task_start:.4f}s")
 
         print(f"[SERVER] Serializing response to JSON with orjson")
@@ -984,7 +1007,10 @@ async def handle_connection(websocket):
 
     except Exception as e:
         print(f"[SERVER] Error: {e}")
-        await websocket.send(json.dumps({"error": str(e)}))
+        error_message = str(e)
+        if len(error_message) > 500: # Truncate very long error messages
+            error_message = error_message[:500] + "... (truncated)"
+        await websocket.send(orjson.dumps({"error": error_message}))
     finally:
         print(f"[SERVER] Connection handled in {time.time() - start_time:.4f}s")
         print("[SERVER] Client disconnected")
@@ -1085,7 +1111,7 @@ class DatabaseManager:
         self._load_all_users()
         
     def _load_all_users(self):
-        """Load all users into memory"""
+        """Load all users into memory and only valid tokens"""
         print("[DB] Loading all users into memory...")
         start_time = time.time()
         
@@ -1095,29 +1121,72 @@ class DatabaseManager:
         cursor.execute("SELECT * FROM users")
         rows = cursor.fetchall()
         
-        # Get column names
         cursor.execute("PRAGMA table_info(users)")
         columns = [column[1] for column in cursor.fetchall()]
         
-        # Process each user
+        self.users.clear() # Clear existing in-memory users
+        self.tokens.clear() # Clear existing in-memory tokens
+
         for row in rows:
             user_data = dict(zip(columns, row))
             username = user_data["username"]
-            token = user_data.get("login_token")
             
-            # Parse pagele JSON
             if user_data.get("pagele"):
                 try:
-                    user_data["pagele"] = json.loads(user_data["pagele"])
-                except:
-                    user_data["pagele"] = {}
+                    pagele_data_loaded = json.loads(user_data["pagele"])
+                    if isinstance(pagele_data_loaded, dict) and "books" in pagele_data_loaded:
+                        for book_name, book_data in pagele_data_loaded.get("books", {}).items():
+                            if isinstance(book_data, dict) and "completed_indices" in book_data:
+                                completed_indices = book_data.get("completed_indices", {})
+                                if isinstance(completed_indices, dict):
+                                    new_completed_indices = {}
+                                    for chapter_key, chapter_value in completed_indices.items():
+                                        # Ensure chapter_key is string
+                                        str_chapter_key = str(chapter_key)
+                                        if isinstance(chapter_value, dict):
+                                            # Ensure sentence indices are strings
+                                            new_sentence_dict = {str(sentence_idx): score for sentence_idx, score in chapter_value.items()}
+                                            new_completed_indices[str_chapter_key] = new_sentence_dict
+                                        else:
+                                            # Preserve structure if chapter_value is not a dict (e.g. already processed or different format)
+                                            new_completed_indices[str_chapter_key] = chapter_value
+                                    book_data["completed_indices"] = new_completed_indices
+                    user_data["pagele"] = pagele_data_loaded
+                except (json.JSONDecodeError, TypeError):
+                    user_data["pagele"] = {} # Default to empty dict on error
+            else:
+                user_data["pagele"] = {}
             
-            # Store in memory
-            self.users[username] = user_data
-            if token:
-                self.tokens[token] = username
+            self.users[username] = user_data # Store user data
+
+            # Validate and store token
+            token = user_data.get("login_token")
+            expiry_str = user_data.get("token_expiry")
+
+            if token and expiry_str:
+                expiry_dt = None
+                try:
+                    # Attempt to parse expiry string, accommodating formats with or without microseconds
+                    if '.' in expiry_str:
+                        expiry_dt = datetime.strptime(expiry_str, '%Y-%m-%d %H:%M:%S.%f')
+                    else:
+                        expiry_dt = datetime.strptime(expiry_str, '%Y-%m-%d %H:%M:%S')
+                except ValueError:
+                    print(f"[DB] Invalid token expiry format for user {username}: '{expiry_str}'")
+
+
+                if expiry_dt and expiry_dt > datetime.now():
+                    self.tokens[token] = username
+                else:
+                    # Token is expired, invalid, or has bad format; clear it from this user's in-memory data
+                    user_data["login_token"] = None
+                    user_data["token_expiry"] = None
+            else:
+                # No token or no expiry string, ensure they are cleared in memory
+                user_data["login_token"] = None
+                user_data["token_expiry"] = None
         
-        print(f"[DB] Loaded {len(rows)} users into memory in {time.time() - start_time:.4f}s")
+        print(f"[DB] Loaded {len(self.users)} users into memory. Active tokens in cache: {len(self.tokens)}. Time: {time.time() - start_time:.4f}s")
 
     def save_to_db(self):
         """Save dirty users to database"""
@@ -1189,22 +1258,62 @@ class DatabaseManager:
         print(f"[DB] Memory update completed in {time.time() - start_time:.4f}s")
     
     def get_user_data(self, identifier):
-        """Get user data from memory"""
-        print(f"[DB] Getting user data for: {identifier[:8] if identifier else 'None'}...")
+        """Get user data from memory, validating token and expiry if identifier is a token."""
+        # Shorten identifier for logging if it's long (like a token)
+        log_identifier = identifier[:15] + '...' if identifier and len(identifier) > 15 else identifier
+        print(f"[DB] Getting user data for: {log_identifier}")
         start_time = time.time()
         
-        # Direct username lookup
+        # Case 1: Identifier is a username
         if identifier in self.users:
-            print(f"[DB] User found by username in {time.time() - start_time:.4f}s")
+            print(f"[DB] User '{identifier}' found by username in {time.time() - start_time:.4f}s")
             return self.users[identifier]
         
-        # Token lookup
+        # Case 2: Identifier is (potentially) a token
         if identifier in self.tokens:
             username = self.tokens[identifier]
-            print(f"[DB] User found by token in {time.time() - start_time:.4f}s")
-            return self.users[username]
+            user = self.users.get(username)
+
+            if user and user.get("login_token") == identifier:
+                # Token in self.tokens matches the one stored for the user. Now check expiry.
+                token_expiry = user.get("token_expiry") # This could be datetime object or string
+                
+                if token_expiry:
+                    expiry_dt = None
+                    if isinstance(token_expiry, str):
+                        try:
+                            if '.' in token_expiry: # Format with microseconds
+                                expiry_dt = datetime.strptime(token_expiry, '%Y-%m-%d %H:%M:%S.%f')
+                            else: # Format without microseconds
+                                expiry_dt = datetime.strptime(token_expiry, '%Y-%m-%d %H:%M:%S')
+                        except ValueError as e_parse:
+                            print(f"[DB] Error parsing token_expiry string '{token_expiry}' for user '{username}': {e_parse}")
+                            return None # Invalid expiry format
+                    elif isinstance(token_expiry, datetime):
+                        expiry_dt = token_expiry
+                    else:
+                        print(f"[DB] Invalid token_expiry type for user '{username}': {type(token_expiry)}")
+                        return None 
+
+                    if expiry_dt and expiry_dt > datetime.now():
+                        print(f"[DB] User '{username}' found by valid token '{log_identifier}' in {time.time() - start_time:.4f}s")
+                        return user
+                    else:
+                        print(f"[DB] Token '{log_identifier}' for user '{username}' expired or invalid. Expiry: {expiry_dt}")
+                        return None 
+                else:
+                    print(f"[DB] No token_expiry field for user '{username}' with matching token '{log_identifier}'.")
+                    return None
+            else:
+                # Mismatch or user not found, indicating a stale token in self.tokens or inconsistent state
+                if not user:
+                     print(f"[DB] Token '{log_identifier}' maps to username '{username}', but user not found in self.users.")
+                else: # user.get("login_token") != identifier
+                     print(f"[DB] Token '{log_identifier}' maps to username '{username}', but user's current token is '{user.get('login_token')}'. Mismatch.")
+                # Consider removing the stale token: if identifier in self.tokens: del self.tokens[identifier]
+                return None
         
-        print(f"[DB] User not found in memory")
+        print(f"[DB] Identifier '{log_identifier}' not found as username or valid token. Lookup took {time.time() - start_time:.4f}s")
         return None
 
     async def login_task(self, data_object):
@@ -1214,65 +1323,72 @@ class DatabaseManager:
         username = data_object.get("username")
         password = data_object.get("password")
         
-        # Check credentials in memory
-        if username in self.users and self.users[username].get("password") == password:
-            user_data = self.users[username]
-        else:
-            return {"status": "error", "message": "Invalid credentials"}
-        
-        # Generate new token
-        token = str(uuid.uuid4())
-        expiry = datetime.now() + timedelta(days=10000)
-        
-        # Update user data with new token
-        user_data["login_token"] = token
-        user_data["token_expiry"] = expiry
-        
-        # Update token mapping
-        self.tokens[token] = username
-        
-        # Mark as dirty for later saving
-        self.dirty_users.add(username)
-        
-        # Prepare response
-        message = {
-            "status": "success",
-            "token": token,
-            "username": username,
-            "current_book": user_data.get("current_book", ""),
-            "cfi": user_data.get("cfi", ""),
-            "preferred_language": user_data.get("preferred_language", "en"),
-            #"pagele": user_data.get("pagele", {}),
-            "type": "login"
-        }
-        
-        # Only add epub and language if there's a current book
-        if user_data.get("current_book"):
-            epub = None
-            language = None
-            book_path = None
+        user_data = self.users.get(username)
+
+        if user_data and user_data.get("password") == password:
+            # Valid credentials
+            old_token = user_data.get("login_token")
+            if old_token and old_token in self.tokens:
+                # Remove the old token from the central token map
+                del self.tokens[old_token]
+                print(f"[LOGIN] Removed old token {old_token[:8]}... for user {username}")
+
+            # Generate new token
+            new_token = str(uuid.uuid4())
+            # Store expiry as datetime object in memory for precise comparison
+            expiry = datetime.now() + timedelta(days=10000) 
             
-            for root, dirs, files in os.walk(EPUB_DIR):
-                for file in files:
-                    if file == user_data["current_book"]:
-                        book_path = Path(root) / file
+            user_data["login_token"] = new_token
+            user_data["token_expiry"] = expiry # Stored as datetime object
+            
+            # Update token mapping
+            self.tokens[new_token] = username
+            
+            self.dirty_users.add(username) # Mark as dirty for later saving
+            
+            message = {
+                "status": "success",
+                "token": new_token,
+                "username": username,
+                "current_book": user_data.get("current_book", ""),
+                "cfi": user_data.get("cfi", ""),
+                "preferred_language": user_data.get("preferred_language", "en"),
+                "pagele": user_data.get("pagele", {}), # pagele is already a dict here
+                "type": "login"
+            }
+            
+            if user_data.get("current_book"):
+                epub = None
+                language = None
+                book_path = None
+                
+                for root, dirs, files in os.walk(EPUB_DIR):
+                    for file_in_dir in files: # Renamed 'file' to 'file_in_dir' to avoid conflict
+                        if file_in_dir == user_data["current_book"]:
+                            book_path = Path(root) / file_in_dir
+                            break
+                    if book_path:
                         break
-                if book_path:
-                    break
-                    
-            if book_path and book_path.exists():
-                language = book_path.parent.name
-                with open(book_path, "rb") as f:
-                    book_data = f.read()
-                    book_base64 = base64.b64encode(book_data).decode('utf-8')
-                    epub = f"data:application/epub+zip;base64,{book_base64}"
-                    
-            if epub and language:
-                message["epub"] = epub
-                message["language"] = language
-        
-        print(f"[LOGIN] Total login process took {time.time() - start_time:.4f}s")
-        return message
+                        
+                if book_path and book_path.exists():
+                    language = book_path.parent.name
+                    try:
+                        with open(book_path, "rb") as f:
+                            book_file_data = f.read() # Renamed to avoid conflict
+                            book_base64 = base64.b64encode(book_file_data).decode('utf-8')
+                            epub = f"data:application/epub+zip;base64,{book_base64}"
+                    except Exception as e:
+                        print(f"[LOGIN] Error reading book file {book_path} for user {username}: {e}")
+                        
+                if epub and language:
+                    message["epub"] = epub
+                    message["language"] = language
+            
+            print(f"[LOGIN] Login successful for {username}. New token: {new_token[:8]}... Total time: {time.time() - start_time:.4f}s")
+            return message
+        else:
+            print(f"[LOGIN] Invalid credentials for user: {username}. Time: {time.time() - start_time:.4f}s")
+            return {"status": "error", "message": "Invalid credentials"}
 
     def signup_task(self, data_object):
         """Create a new user in memory and database"""
@@ -1482,6 +1598,146 @@ class TextComparator:
 
         return marked_text, similarity_ratio, original_words, spoken_words
 
+async def tip_task(data_object):
+    """Create a Stripe PaymentIntent for a tip."""
+    try:
+        amount_str = data_object.get("amount")
+        if not amount_str:
+            return {"status": "error", "message": "Amount not provided for tip."}
+
+        try:
+            # Stripe expects the amount in the smallest currency unit (e.g., cents for USD)
+            amount_in_cents = int(float(amount_str) * 100)
+        except ValueError:
+            return {"status": "error", "message": "Invalid amount format."}
+
+        if amount_in_cents <= 0: # Basic validation for amount
+            return {"status": "error", "message": "Tip amount must be positive."}
+
+        print(f"[TIP] Creating PaymentIntent for amount: {amount_in_cents} cents")
+        
+        # Create a PaymentIntent with the order amount and currency
+        intent = stripe.PaymentIntent.create(
+            amount=amount_in_cents,
+            currency='gbp', # You can change this to your desired currency
+            automatic_payment_methods={
+                'enabled': True,
+            },
+        )
+        print(f"[TIP] PaymentIntent created successfully. ID: {intent.id}")
+        return {
+            "status": "success",
+            "client_secret": intent.client_secret
+        }
+    except stripe.error.StripeError as e:
+        print(f"[TIP] Stripe error: {str(e)}")
+        return {"status": "error", "message": f"Stripe error: {str(e)}"}
+    except Exception as e:
+        print(f"[TIP] Error creating PaymentIntent: {str(e)}")
+        return {"status": "error", "message": f"Error processing tip: {str(e)}"}
+
+async def send_bug_report_task(data_object):
+    """Send bug report email with user logs and system information"""
+    try:
+        print("[BUG_REPORT] Processing bug report")
+        start_time = time.time()
+        
+        # Extract data from the request
+        system_info = data_object.get("systemInfo", {})
+        logs = data_object.get("logs", [])
+        token = data_object.get("token")
+        
+        # Get user info if token provided
+        user_info = {}
+        if token:
+            user_data = db.get_user_data(token)
+            if user_data:
+                user_info = {
+                    "username": user_data.get("username", "Unknown"),
+                    "current_book": user_data.get("current_book", "None"),
+                    "preferred_language": user_data.get("preferred_language", "en")
+                }
+        
+        # Format the email content using string concatenation
+        timestamp_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')
+        user_info_str = json.dumps(user_info, indent=2) if user_info else "Anonymous user (no token provided)"
+        system_info_str = json.dumps(system_info, indent=2)
+        
+        formatted_email = "Bug Report from Hablas App\n"
+        formatted_email += "==========================\n"
+        formatted_email += f"Report Time: {timestamp_str}\n\n"
+        formatted_email += "USER INFORMATION:\n"
+        formatted_email += user_info_str + "\n\n"
+        formatted_email += "SYSTEM INFORMATION:\n"
+        formatted_email += system_info_str + "\n\n"
+        formatted_email += f"SESSION LOGS ({len(logs)} entries):\n"
+        formatted_email += "=" * 50 + "\n"
+        
+        # Add formatted logs
+        for log_entry in logs:
+            timestamp = log_entry.get("timestamp", "Unknown time")
+            log_type = log_entry.get("type", "unknown").upper()
+            message = log_entry.get("message", "")
+            args = log_entry.get("args", [])
+            
+            formatted_email += f"[{timestamp}] {log_type}: {message}"
+            if args:
+                formatted_email += " | Args: " + " ".join(str(arg) for arg in args)
+            formatted_email += "\n"
+        
+        formatted_email += "\n" + "=" * 50 + "\nEND OF LOGS\n"
+        
+        # Check if email configuration is available
+        if not all([EMAIL_USER, EMAIL_PASSWORD, BUG_REPORT_TO_EMAIL]):
+            print("[BUG_REPORT] Email not configured properly. Missing environment variables.")
+            print("[BUG_REPORT] Bug report content saved to server logs instead.")
+            print(f"[BUG_REPORT] Content:\n{formatted_email}")
+            return {"type": "bug_report_sent", "status": "success", "message": "Bug report logged on server"}
+        
+        # Create email message
+        msg = MIMEMultipart()
+        msg['From'] = EMAIL_USER
+        msg['To'] = BUG_REPORT_TO_EMAIL
+        msg['Subject'] = f"Hablas Bug Report - {system_info.get('timestamp', 'Unknown time')}"
+        
+        # Add body to email
+        msg.attach(MIMEText(formatted_email, 'plain'))
+        
+        # Send email
+        print(f"[BUG_REPORT] Sending email to {BUG_REPORT_TO_EMAIL}")
+        server = smtplib.SMTP(EMAIL_HOST, EMAIL_PORT)
+        server.starttls()
+        server.login(EMAIL_USER, EMAIL_PASSWORD)
+        text = msg.as_string()
+        server.sendmail(EMAIL_USER, BUG_REPORT_TO_EMAIL, text)
+        server.quit()
+        
+        print(f"[BUG_REPORT] Bug report sent successfully in {time.time() - start_time:.4f}s")
+        return {
+            "type": "bug_report_sent", 
+            "status": "success", 
+            "message": "Bug report sent successfully"
+        }
+        
+    except Exception as e:
+        print(f"[BUG_REPORT] Error sending bug report: {str(e)}")
+        # Still log the content to server logs as fallback
+        try:
+            system_info = data_object.get("systemInfo", {})
+            logs = data_object.get("logs", [])
+            print("[BUG_REPORT] FALLBACK - Bug report content:")
+            print(f"[BUG_REPORT] System: {json.dumps(system_info, indent=2)}")
+            print(f"[BUG_REPORT] Logs ({len(logs)} entries):")
+            for log_entry in logs[-10:]:  # Last 10 log entries
+                print(f"[BUG_REPORT] {log_entry}")
+        except:
+            pass
+            
+        return {
+            "type": "bug_report_sent",
+            "status": "error", 
+            "message": f"Error sending bug report: {str(e)}"
+        }
 
 async def main():
     global db
@@ -1511,8 +1767,8 @@ async def main():
         "0.0.0.0",  # Changed from localhost to accept external connections
         8675,
         ssl=ssl_context,
-        origins=["https://hablas.app", "https://carriertech.uk",  "http://localhost:8000", "http://127.0.0.1:8000"]  # Specify allowed origins here
-
+        origins=["https://hablas.app", "https://carriertech.uk",  "http://localhost:8000", "http://127.0.0.1:8000"],  # Specify allowed origins here
+        max_size=10 * 1024 * 1024  # Allow up to 10MB messages
     ):
         print("WebSocket server started on wss://carriertech.uk:8675")
         await asyncio.Future()  # Run forever
