@@ -68,8 +68,10 @@ EMAIL_USER = os.environ.get('BUG_REPORT_EMAIL_USER')  # Your email
 EMAIL_PASSWORD = os.environ.get('BUG_REPORT_EMAIL_PASSWORD')  # Your email password/app password
 BUG_REPORT_TO_EMAIL = os.environ.get('BUG_REPORT_TO_EMAIL', EMAIL_USER)  # Where to send bug reports
 
+WEBSOCKET_LOG_FILE = "websocket_activity.log"
+WEBSOCKET_LOG = open(WEBSOCKET_LOG_FILE, "a")
 db = None
-
+interface_language_json = json.load(open("interface_languages_translated.json"))
 language_dict = {
     "en": "jonatasgrosman/wav2vec2-large-xlsr-53-english",
     "fr": "jonatasgrosman/wav2vec2-large-xlsr-53-french",
@@ -932,8 +934,9 @@ async def get_available_pagele():
 def update_interface_language_task(data_object):
     print(f"[UPDATE_INTERFACE_LANGUAGE] data_object: {data_object}")
     language = data_object.get("language")
-    print(f"[UPDATE_INTERFACE_LANGUAGE] language: {language}")
-    return {"status": "success", "language": language}
+    newLang = interface_language_json.get(language)
+    db.change_settings_task(data_object)
+    return {"status": "success", "interface_language": newLang}
 
 async def handle_connection(websocket):
     print(f"[SERVER] New connection from {websocket.remote_address}")
@@ -989,7 +992,7 @@ async def handle_connection(websocket):
         elif task == "send_bug_report":
             message_returned = await send_bug_report_task(data_object)
         elif task == "update_interface_language":
-            message_returned = await update_interface_language_task(data_object)
+            message_returned = update_interface_language_task(data_object)
         print(f"[SERVER] Task {task} processed in {time.time() - task_start:.4f}s")
 
         print(f"[SERVER] Serializing response to JSON with orjson")
@@ -1003,6 +1006,7 @@ async def handle_connection(websocket):
         # Send the bytes directly. Most WebSocket libraries handle this.
         # If your library needs a string, use: await websocket.send(response_bytes.decode())
         await websocket.send(response_bytes) 
+        
         print(f"[SERVER] Response sent in {time.time() - send_start:.4f}s")
 
     except Exception as e:
@@ -1013,7 +1017,13 @@ async def handle_connection(websocket):
         await websocket.send(orjson.dumps({"error": error_message}))
     finally:
         print(f"[SERVER] Connection handled in {time.time() - start_time:.4f}s")
-        print("[SERVER] Client disconnected")
+        dtowrite = {"time": recv_start,"ip": client_ip, "received": data_object}
+        if task == "stt":
+            dtowrite["received"]["blob"] = "REDACTED"
+            dtowrite["sent"] = message_returned
+        WEBSOCKET_LOG.write(json.dumps(dtowrite) + "\n")
+        WEBSOCKET_LOG.flush()
+        print("[SERVER] Client disconnected Log writte")
 
 # Add a function to preload all models
 def preload_all_models():
@@ -1477,6 +1487,8 @@ class DatabaseManager:
             user_data["cfi"] = data_object["cfi"]
         if "preferred_language" in data_object:
             user_data["preferred_language"] = data_object["preferred_language"]
+        if "language" in data_object:
+            user_data["preferred_language"] = data_object["language"]
             
         # Mark as dirty for later saving
         self.dirty_users.add(username)

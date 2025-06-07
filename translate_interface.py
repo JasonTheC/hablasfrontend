@@ -14,7 +14,7 @@ def translate_interface():
         data = json.load(f)
     
     # Get the English strings
-    en_strings = data['en']
+    en_strings = data['fr']
     
     # Language name mapping that googletrans actually expects
     language_name_map = {
@@ -23,7 +23,7 @@ def translate_interface():
         'bg': 'bulgarian', 'ca': 'catalan', 'ceb': 'cebuano', 'ny': 'chichewa', 'zh-cn': 'chinese (simplified)',
         'zh-tw': 'chinese (traditional)', 'co': 'corsican', 'hr': 'croatian', 'cs': 'czech',
         'da': 'danish', 'nl': 'dutch', 'en': 'english', 'eo': 'esperanto', 'et': 'estonian',
-        'tl': 'filipino', 'fi': 'finnish', 'fr': 'french', 'fy': 'frisian', 'gl': 'galician',
+        'tl': 'filipino', 'fi': 'finnish',  'fy': 'frisian', 'gl': 'galician',
         'ka': 'georgian', 'de': 'german', 'el': 'greek', 'gu': 'gujarati', 'ht': 'haitian creole',
         'ha': 'hausa', 'haw': 'hawaiian', 'iw': 'hebrew', 'he': 'hebrew', 'hi': 'hindi',
         'hmn': 'hmong', 'hu': 'hungarian', 'is': 'icelandic', 'ig': 'igbo', 'id': 'indonesian',
@@ -39,15 +39,15 @@ def translate_interface():
         'su': 'sundanese', 'sw': 'swahili', 'sv': 'swedish', 'tg': 'tajik', 'ta': 'tamil',
         'te': 'telugu', 'th': 'thai', 'tr': 'turkish', 'uk': 'ukrainian', 'ur': 'urdu', 'ug': 'uyghur',
         'uz': 'uzbek', 'vi': 'vietnamese', 'cy': 'welsh', 'xh': 'xhosa', 'yi': 'yiddish',
-        'yo': 'yoruba', 'zu': 'zulu'
+        'yo': 'yoruba', 'zu': 'zulu' #'fr': 'french',
     }
     
     translator = Translator()
-    result = {'en': data['en']}  # Start with English
+    result = {'fr': data['fr']}  # Start with English
     
     # Save English to its own file first
-    with open(f'{output_dir}/en.json', 'w', encoding='utf-8') as f:
-        json.dump(data['en'], f, ensure_ascii=False, indent=4)
+    with open(f'{output_dir}/fr.json', 'w', encoding='utf-8') as f:
+        json.dump(data['fr'], f, ensure_ascii=False, indent=4)
     
     total_languages = len(language_name_map)
     completed = 0
@@ -75,7 +75,7 @@ def translate_interface():
                 try:
                     # Add delay to avoid hitting rate limits
                     time.sleep(0.5)
-                    translation = translator.translate(value, src='en', dest=lang_code)
+                    translation = translator.translate(value, src='fr', dest=lang_code)
                     translated_strings[key] = translation.text
                     print(f"  Translated: {key}")
                 except Exception as e:

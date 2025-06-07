@@ -691,30 +691,14 @@
             }
         };
 
-        // Function to update interface language
-        function updateInterfaceLanguage(langCode) {
-            currentInterfaceLanguage = langCode;
-            if (!interfaceStrings[langCode]) {
-                console.log('Fetching interface strings for language:', langCode);
-                requestInterfaceStrings(langCode);
-            } else {
-                applyInterfaceStrings(interfaceStrings[langCode]);
-            }
-        }
-
-        // Function to request interface strings from server
-        function requestInterfaceStrings(langCode) {
-            sendSocketMessage({
-                task: 'get_interface_strings',
-                language: langCode,
-                token: localStorage.getItem('token')
-            });
-        }
+       
 
         // Function to apply interface strings to the page
         function applyInterfaceStrings(strings) {
-            const currentStrings = strings || interfaceStrings[currentInterfaceLanguage] || interfaceStrings.en;
-            
+            localStorage.setItem('interface_language', JSON.stringify(strings));
+            console.log("stored strings: ", JSON.stringify(strings));
+            const currentStrings = strings// || interfaceStrings[currentInterfaceLanguage] || interfaceStrings.en;
+            console.log("Applying interface strings:", currentStrings);
             // Update title
             document.title = `${currentStrings.appTitle} - Language Learning`;
             document.querySelector('#title p').textContent = currentStrings.appTitle;
@@ -1112,8 +1096,9 @@
                 handleBookFilenameResponse(response);
             }
             // Handle interface strings response
-            else if (response.type === 'interface_strings') {
-                handleInterfaceStringsResponse(response);
+            else if (response.hasOwnProperty('interface_language')) {
+                console.log("Received interface language:", response.interface_language);
+                applyInterfaceStrings(response.interface_language);
             }
             // Handle bug report response
             else if (response.type === 'bug_report_sent') {
@@ -1170,6 +1155,7 @@
                 case 'freeread':
                     document.getElementById('div2viewer').style.display = 'flex';
                     currentMode = 'freeread';
+                    loadAvailableBooks();
                     modeText.textContent = 'Daily Pages';
                     break;
                 case 'pagele':
@@ -1272,7 +1258,18 @@
                 if (initLoginSection) {
                     initLoginSection.style.display = 'none';
                 }
-                
+                /*if (localStorage.getItem('interface_language') !== null) {
+                    const tempInterfaceStrings = localStorage.getItem('interface_language');
+                    console.log("temp interface strings: ", JSON.parse(tempInterfaceStrings));
+                    applyInterfaceStrings(JSON.parse(tempInterfaceStrings));
+                } else not sure why this isn't working*/ 
+                if(userInfo.preferredLanguage){
+                    sendSocketMessage({
+                        task: 'update_interface_language',
+                        language: userInfo.preferredLanguage,
+                        token: localStorage.getItem('token')
+                    });
+                }
                 // Enable buttons
                 initDailypages.classList.remove('disabled');
                 initFreeRead.classList.remove('disabled');
@@ -1670,15 +1667,7 @@
             console.log("selected ", selectedBook);
         }
 
-        function handleInterfaceStringsResponse(response) {
-            console.log("Received interface strings:", response);
-            if (response.language && response.strings) {
-                interfaceStrings[response.language] = response.strings;
-                if (response.language === currentInterfaceLanguage) {
-                    applyInterfaceStrings(response.strings);
-                }
-            }
-        }
+     
 
         // Utility functions
         function setLanguage(language) {
@@ -1724,7 +1713,8 @@
                 target_lang: targetLang, 
                 current_book: selectedBook, 
                 cfi: cfi,
-                username: username 
+                username: username ,
+                token: localStorage.getItem('token')
             });
         }
 
@@ -2394,7 +2384,7 @@
                                         JSON.parse(arg); // Check if it's valid JSON
                                         if (arg.startsWith('{')) return "{JSON Object}";
                                         if (arg.startsWith('[')) return "[JSON Array]";
-                                    } catch (e) {
+                    } catch (e) {
                                         // Not valid JSON, treat as regular string
                                     }
                                 }
@@ -2878,7 +2868,7 @@ Additional Notes:
                     console.log("userInfo: ");
                     console.log(userInfo);
                     
-                    let userLang = userInfo.preferredLanguage || document.getElementById('languageUserOptions').value;
+                    let userLang = document.getElementById('languageUserOptions').value;
                     
                     if (userLang.length > 2) {
                         const lowerLang = userLang.toLowerCase();
@@ -2988,8 +2978,7 @@ Additional Notes:
             languageUserOptionsSelect.addEventListener('change', (event) => {
                 const selectedLang = event.target.value;
                 console.log('Interface language changed to:', selectedLang);
-                updateInterfaceLanguage(selectedLang);
-                
+         
                 // Save user preference
                 if (localStorage.getItem('token')) {
                     sendSocketMessage({
