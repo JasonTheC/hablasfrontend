@@ -182,7 +182,9 @@ img {
     margin-right: 0; 
 }
 
-
+#book img {
+    max-width: 100%;
+}
 #myModal {
     display: none;
     width: 90%;
@@ -416,7 +418,7 @@ img {
 }
 
 .book img {
-    width: 120px;
+    max-width: 100%;
     height: 180px;
     object-fit: cover;
     border-radius: 5px;
@@ -1165,10 +1167,9 @@ flex-direction: column;
 }
 
 #pagele-list {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-    gap: 20px;
-    padding: 10px;
+    display: block;
+    padding: 0;
+    margin: 0;
 }
 
 .pagele-card {
@@ -1195,13 +1196,7 @@ flex-direction: column;
     object-fit: cover;
 }
 
-.pagele-title {
-    font-weight: bold;
-    margin: 10px 0 5px;
-    text-align: center;
-    padding: 0 10px;
-    font-family: 'Quicksand', sans-serif;
-}
+
 
 .pagele-language {
     color: #4588a0;
@@ -1403,4 +1398,190 @@ flex-direction: column;
 .modal-content,
 #tutorialModal {
     z-index: 9000 !important;
+}
+
+
+.disabled {
+    opacity: 0.5;
+    pointer-events: none;
+    filter: grayscale(50%);
+}
+#init-login-section {
+    margin-top: 20px;
+    padding: 20px;
+    background-color: rgba(255, 255, 255, 0.9);
+    border-radius: 10px;
+    width: 80%;
+    max-width: 400px;
+}
+#init-login-section input {
+    width: 100%;
+    padding: 10px;
+    margin-bottom: 10px;
+    border-radius: 5px;
+    border: 1px solid #ccc;
+}
+#init-login-section .options {
+    padding: 10px;
+    text-align: center;
+    background-color: #4CAF50;
+    color: white;
+    border-radius: 5px;
+    cursor: pointer;
+}
+#init-login-section .options:hover {
+    background-color: #45a049;
+}
+
+/* Pagele Language Section Styles */
+.pagele-language-section {
+    margin-bottom: 20px;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.pagele-language-header {
+    background: rgb(240, 240, 240);
+    color: rgb(0, 0, 0);
+    padding: 15px 20px;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: all 0.3s ease;
+    user-select: none;
+}
+
+.pagele-language-header:hover {
+    background: linear-gradient(135deg, #366b7c, #2a5463);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+.pagele-language-header h3 {
+    margin: 0;
+    font-family: 'Quicksand', sans-serif;
+    font-weight: 600;
+    font-size: 1.4em;
+}
+
+.pagele-expand-icon {
+    font-size: 1.2em;
+    transition: transform 0.3s ease;
+    font-weight: bold;
+}
+
+.pagele-books-container {
+    background-color: white;
+    transition: all 0.4s ease;
+    overflow: hidden;
+}
+
+.pagele-books-container.collapsed {
+    max-height: 0;
+    padding: 0 20px;
+    opacity: 0;
+}
+
+.pagele-books-container.expanded {
+    max-height: 1000px;
+    padding: 20px;
+    opacity: 1;
+}
+
+.pagele-books-container .pagele-card {
+    display: inline-block;
+    margin: 10px;
+    vertical-align: top;
+    width: 140px;
+    background-color: #f9f9f9;
+    border: 1px solid #e0e0e0;
+    transition: all 0.3s ease;
+}
+
+.pagele-books-container .pagele-card:hover {
+    transform: translateY(-8px);
+    box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+    border-color: #4588a0;
+}
+
+.pagele-books-container .pagele-cover {
+    width: 100%;
+    max-width: 100%;
+    height: 180px;
+    object-fit: cover;
+    border-radius: 8px 8px 0 0;
+}
+
+.pagele-books-container .pagele-title {
+    padding: 10px;
+    font-weight: bold;
+    text-align: center;
+    font-family: 'Quicksand', sans-serif;
+    font-size: 0.9em;
+    line-height: 1.3;
+    min-height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow-wrap: break-word;
+    hyphens: auto;
+}
+
+/* Update the main pagele list container */
+#pagele-list {
+    display: block;
+    padding: 0;
+    margin: 0;
+}
+
+#pagele-list-container {
+    max-height: 70vh;
+    overflow-y: auto;
+    padding: 20px;
+}
+
+/* Mobile adjustments */
+@media (max-width: 768px) {
+    .pagele-language-header {
+        padding: 12px 15px;
+    }
+    
+    .pagele-language-header h3 {
+        font-size: 1.2em;
+    }
+    
+    .pagele-books-container.expanded {
+        padding: 15px;
+    }
+    
+    .pagele-books-container .pagele-card {
+        width: 120px;
+        margin: 8px;
+    }
+    
+    .pagele-books-container .pagele-cover {
+        height: 150px;
+    }
+    
+    .pagele-books-container .pagele-title {
+        font-size: 0.8em;
+        padding: 8px;
+        min-height: 35px;
+        overflow-wrap: break-word;
+     hyphens: auto;
+    }
+}
+
+/* Add smooth scrolling to the container */
+#pagele-list-container {
+    scroll-behavior: smooth;
+}
+
+/* Remove the old grid styles that are no longer needed */
+#pagele-list {
+    display: block !important;
+    grid-template-columns: none !important;
+    gap: 0 !important;
 }
